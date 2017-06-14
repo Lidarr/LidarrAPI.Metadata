@@ -1,6 +1,0 @@
-{
-  "discogs_api": {
-    "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  },
-  "db_record_expiration_days": 7
-}
