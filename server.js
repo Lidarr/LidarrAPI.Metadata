@@ -1,13 +1,13 @@
-import express from 'express';
-import low from 'lowdb';
-import uuid from 'uuid';
-import winston from 'winston';
-import config from './config.json';
+const restify = require('restify');
+const low = require('lowdb');
+const uuid = require('uuid');
+const winston = require('winston');
+const config = require('./config.json');
 
 const _PORT = (process.env.PORT || 3000);
 
 // Setup Winston Logging
-const logger = new (winston.logger)({
+const logger = new (winston.Logger)({
   transports: [
     new (winston.transports.Console)(),
     new (winston.transports.File)({ filename: 'somefile.log' })
@@ -25,8 +25,10 @@ db.defaults({
   tracks: []
 }).write();
 
-// Setup Express
-const app = express();
+// Setup Restify
+const server = restify.createServer();
+
+server.use(restify.queryParser());
 
 // Express middlewares
 function cleanSingleId(req, res, next) {
@@ -102,90 +104,54 @@ function getDB(type, id) {
   });
 }
 function getDBMultiple(type, ids) {
-  return Promise.all(ids.map(function(id) {
-    return getDB(type, id);
-  }));
+  return Promise.all(ids.map(id => getDB(type, id)));
 }
 
 // Handle API requests
 
 // Artists
-app.get('/artist/:id', cleanSingleId, function(req, res) {
+server.get('/artist/:id', cleanSingleId, (req, res, next) => {
   getDB('artists', req.cleanData.id)
-  .then(function(data) {
-    res.json(data);
-  }, function(err) {
-    res.json({ err: err });
-  });
+  .then(data => res.json(data))
+  .catch(err => res.json({ err: 'The api returned an error.' }));
 });
-app.get('/artists', cleanMultipleIds, function(req, res) {
+server.get('/artists', cleanMultipleIds, (req, res, next) => {
   getDBMultiple('artists', req.cleanData.ids)
-  .then(function(data) {
-    res.json({
-      Artists: data,
-      Count: data.length
-    });
-  }, function(err) {
-    res.json({ err: err });
-  });
+  .then(data => res.json({ Artists: data, Count: data.length }))
+  .catch(err => res.json({ err: 'The api returned an error.' }));
 });
-app.get('/artist/:id/albums', cleanSingleId, function(req, res) {
+server.get('/artist/:id/albums', cleanSingleId, (req, res, next) => {
   discogsApi.search.albumByArtist(req.cleanData.id)
-  .then(function(data) {
-    res.json({
-      Items: data,
-      Count: data.length
-    });
-  }, function(err) {
-    logger.error(`app.get /artist/id/albums: api error`, { err: err });
-    res.json({ err: err });
-  });
+  .then(data => res.json({ Items: data, Count: data.length }))
+  .catch(err => res.json({ err: 'The api returned an error.' }));
 });
 
 // Albums
-app.get('/album/:id', cleanSingleId, function(req, res) {
+server.get('/album/:id', cleanSingleId, (req, res, next) => {
   getDB('albums', req.cleanData.id)
-  .then(function(data) {
-    res.json(data);
-  }, function(err) {
-    res.json({ err: err });
-  });
+  .then(data => res.json(data))
+  .catch(err => res.json({ err: 'The api returned an error.' }));
 });
-app.get('/albums', cleanMultipleIds, function(req, res) {
+server.get('/albums', cleanMultipleIds, (req, res, next) => {
   getDBMultiple('albums', req.cleanData.ids)
-  .then(function(data) {
-    res.json({
-      Albums: data,
-      Count: data.length
-    });
-  }, function(err) {
-    res.json({ err: err });
-  });
+  .then(data => res.json({ Albums: data, Count: data.length }))
+  .catch(err => res.json({ err: 'The api returned an error.' }));
 });
 
 // Tracks
-app.get('/track/:id', cleanSingleId, function(req, res) {
+server.get('/track/:id', cleanSingleId, (req, res, next) => {
   getDB('track', req.cleanData.id)
-  .then(function(data) {
-    res.json(data);
-  }, function(err) {
-    res.json({ err: err });
-  });
+  .then(data => res.json(data))
+  .catch(err => res.json({ err: 'The api returned an error.' }));
 });
-app.get('/tracks', cleanMultipleIds, function(req, res) {
+server.get('/tracks', cleanMultipleIds, (req, res, next) => {
   getDBMultiple('tracks', req.cleanData.ids)
-  .then(function(data) {
-    res.json({
-      Tracks: data,
-      Count: data.length
-    });
-  }, function(err) {
-    res.json({ err: err });
-  });
+  .then(data => res.json({ Tracks: data, Count: data.length }))
+  .catch(err => res.json({ err: 'The api returned an error.' }));
 });
 
 // Other
-app.get('/search', function(req, res) {
+server.get('/search', (req, res, next) => {
   const queryType = req.query.queryType;
   const query = req.query.query;
 
@@ -195,19 +161,14 @@ app.get('/search', function(req, res) {
   }
 
   discogsApi.search[queryType](query)
-  .then(function(data) {
-    res.json({
-      Items: data,
-      Count: data.length
-    });
-  })
-  .catch(function(err) {
+  .then(data => res.json({ Items: data, Count: data.length }))
+  .catch(err => {
     logger.error(`app.get /search: api error`, { err: err });
-    res.json({ err: 'API error.' });
+    res.json({ err: 'The api returned an error.' });
   });
 });
 
-app.listen(_PORT, function(err, port) {
+server.listen(_PORT, (err, port) => {
   if (err) return logger.error(`App listening error`, { err: err });
-  console.log(`Express app listening at port ${_PORT}...`);
+  console.log(`Restify app listening at port ${_PORT}...`);
 });

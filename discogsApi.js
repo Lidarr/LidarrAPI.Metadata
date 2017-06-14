@@ -23,34 +23,28 @@ module.exports = function(db, token) {
     .then(mapFunc);
   }
   const search = {};
-  search.artist = function(query) {
-    return searchGeneric({ url: (baseUrl + 'database/search'), qs: { q: query, type: 'artist' } }, function(data) {
-      return data.results.map(function(item) {
-        return {
-          Id: providerName + '-' + item.id, // Prepend provider name
-          ArtistName: item.title,
-          ImageUrl: item.thumb,
-          Url: item.resource_url
-        };
-      });
-    });
-  }
-  search.albumByArtist = function(artistId) {
+  search.artist = query => searchGeneric({ url: (baseUrl + 'database/search'), qs: { q: query, type: 'artist' } }, data => data.results.map(item => {
+    return {
+      Id: providerName + '-' + item.id, // Prepend provider name
+      ArtistName: item.title,
+      ImageUrl: item.thumb,
+      Url: item.resource_url
+    };
+  }));
+  search.albumByArtist = artistId => {
     // Split ID
     artistId = artistId.split('-').slice(1).join('-');
 
-    return searchGeneric({ url: (baseUrl + 'artists/' + artistId + '/releases') }, function(data) {
-      return data.releases.map(function(item) {
-        return {
-          Id: providerName + '-' + item.id, // Prepend provider name
-          AlbumName: item.title,
-          Year: item.year,
-          Label: item.label,
-          ImageUrl: item.thumb,
-          Url: item.resource_url
-        };
-      });
-    });
+    return searchGeneric({ url: (baseUrl + 'artists/' + artistId + '/releases') }, data => data.releases.map(item => {
+      return {
+        Id: providerName + '-' + item.id, // Prepend provider name
+        AlbumName: item.title,
+        Year: item.year,
+        Label: item.label,
+        ImageUrl: item.thumb,
+        Url: item.resource_url
+      };
+    }));
   }
 
   // Get data about a specific item with a specific id
@@ -60,54 +54,50 @@ module.exports = function(db, token) {
     .then(mapFunc);
   }
   const get = {};
-  get.albums = function(id) {
-    return getGeneric('releases', id, function(item) {
-      return {
-        AlbumName: item.title,
-        Artist: {
-          Id: item.artists[0].id,
-          ArtistName: item.artists[0].name,
-          ArtistUrl: item.artists[0].resource_url
-        },
-        Year: item.year,
-        Genres: item.genres,
-        Overview: item.notes,
-        Labels: item.labels.map(function(item) {
-          return {
-            Name: item.name,
-            CatalogNumber: item.catno,
-            ProviderIds: { [providerName]: id }
-          };
-        }),
-        Images: item.images.map(function(item) {
-          return {
-            Url: item.uri,
-            Height: item.height,
-            Width: item.width
-          };
-        }),
-        Url: item.uri,
-        ProviderIds: { [providerName]: id }
-      };
-    });
-  }
-  get.artists = function(id) {
-    return getGeneric('artists', id, function(item) {
-      return {
-        ArtistName: item.name,
-        Overview: item.profile,
-        Images: item.images.map(function(item) {
-          return {
-            Url: item.uri,
-            Height: item.height,
-            Width: item.width
-          };
-        }),
-        Url: item.uri,
-        ProviderIds: { [providerName]: id }
-      };
-    });
-  }
+  get.albums = id => getGeneric('releases', id, item => {
+    return {
+      AlbumName: item.title,
+      Artist: {
+        Id: item.artists[0].id,
+        ArtistName: item.artists[0].name,
+        ArtistUrl: item.artists[0].resource_url
+      },
+      Year: item.year,
+      Genres: item.genres,
+      Overview: item.notes,
+      Labels: item.labels.map(item => {
+        return {
+          Name: item.name,
+          CatalogNumber: item.catno,
+          ProviderIds: { [providerName]: id }
+        };
+      }),
+      Images: item.images.map(item => {
+        return {
+          Url: item.uri,
+          Height: item.height,
+          Width: item.width
+        };
+      }),
+      Url: item.uri,
+      ProviderIds: { [providerName]: id }
+    };
+  });
+  get.artists = id => getGeneric('artists', id, item => {
+    return {
+      ArtistName: item.name,
+      Overview: item.profile,
+      Images: item.images.map(item => {
+        return {
+          Url: item.uri,
+          Height: item.height,
+          Width: item.width
+        };
+      }),
+      Url: item.uri,
+      ProviderIds: { [providerName]: id }
+    };
+  });
   // TODO: tracks
 
   return { search, get };
