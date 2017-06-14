@@ -99,3 +99,9 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# nodejs
+node_modules/
+
+# config file
+config.json
