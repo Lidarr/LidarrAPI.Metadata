@@ -17,7 +17,7 @@ const logger = new (winston.Logger)({
 // Setup LowDB
 const db = low('db.json');
 
-const discogsApi = require('./discogsApi')(db, config.discogs_api.token);
+const discogsApi = require('./discogsApi')(config.discogs_api.token);
 
 db.defaults({
   artists: [],
@@ -77,7 +77,7 @@ function getDB(type, id) {
       resolve(result);
     } else {
       // Add or update the DB record
-      discogsApi.get[type](id)
+      discogsApi.get(type, id)
       .then(function(data) {
         data.LastUpdate = Date.now();
         if (result) {
@@ -121,7 +121,7 @@ server.get('/artists', cleanMultipleIds, (req, res, next) => {
   .catch(err => res.json({ err: 'The api returned an error.' }));
 });
 server.get('/artist/:id/albums', cleanSingleId, (req, res, next) => {
-  discogsApi.search.albumByArtist(req.cleanData.id)
+  discogsApi.search('albumByArtist', req.cleanData.id)
   .then(data => res.json({ Items: data, Count: data.length }))
   .catch(err => res.json({ err: 'The api returned an error.' }));
 });
@@ -160,7 +160,7 @@ server.get('/search', (req, res, next) => {
     return res.json({ err: 'Invalid query type. Must choose artist.' });
   }
 
-  discogsApi.search[queryType](query)
+  discogsApi.search(queryType, query)
   .then(data => res.json({ Items: data, Count: data.length }))
   .catch(err => {
     logger.error(`app.get /search: api error`, { err: err });

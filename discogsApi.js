@@ -1,8 +1,9 @@
-const request = require('request-promise-native');
-const providerName = 'discogs';
+const API = require('./api.js');
 
-module.exports = function(db, token) {
-  const dRequest = request.defaults({
+module.exports = (token) => {
+  let api = new API('Discogs', 'rest', 'https://api.discogs.com/');
+
+  api.setRequestDefaults({
     method: 'GET',
     headers: {
       'User-Agent': 'nodejs-request-library',
@@ -14,91 +15,90 @@ module.exports = function(db, token) {
     }
   });
 
-  const baseUrl = 'https://api.discogs.com/';
-
-  // Search for query and return all results
-  function searchGeneric(reqObj, mapFunc) {
-    return dRequest(reqObj)
+  api.defineSearchMethod('artist', (query, request, cb) => {
+    request('database/search', { q: query, type: 'artist' })
     .then(JSON.parse)
-    .then(mapFunc);
-  }
-  const search = {};
-  search.artist = query => searchGeneric({ url: (baseUrl + 'database/search'), qs: { q: query, type: 'artist' } }, data => data.results.map(item => {
-    return {
-      Id: providerName + '-' + item.id, // Prepend provider name
-      ArtistName: item.title,
-      ImageUrl: item.thumb,
-      Url: item.resource_url
-    };
-  }));
-  search.albumByArtist = artistId => {
-    // Split ID
+    .then(data =>
+      cb(data.results.map(data => {
+        return {
+          Id: api.getName() + '-' + data.id, // Prepend provider name
+          ArtistName: data.title,
+          ImageUrl: data.thumb,
+          Url: data.resource_url
+        };
+      }))
+    );
+  });
+  api.defineSearchMethod('albumByArtist', (artistId, request, cb) => {
     artistId = artistId.split('-').slice(1).join('-');
-
-    return searchGeneric({ url: (baseUrl + 'artists/' + artistId + '/releases') }, data => data.releases.map(item => {
-      return {
-        Id: providerName + '-' + item.id, // Prepend provider name
-        AlbumName: item.title,
-        Year: item.year,
-        Label: item.label,
-        ImageUrl: item.thumb,
-        Url: item.resource_url
-      };
-    }));
-  }
-
-  // Get data about a specific item with a specific id
-  function getGeneric(type, id, mapFunc) {
-    return dRequest({ url: (baseUrl + type + '/' + id) })
+    request(`artists/${artistId}/releases`)
     .then(JSON.parse)
-    .then(mapFunc);
-  }
-  const get = {};
-  get.albums = id => getGeneric('releases', id, item => {
-    return {
-      AlbumName: item.title,
-      Artist: {
-        Id: item.artists[0].id,
-        ArtistName: item.artists[0].name,
-        ArtistUrl: item.artists[0].resource_url
-      },
-      Year: item.year,
-      Genres: item.genres,
-      Overview: item.notes,
-      Labels: item.labels.map(item => {
+    .then(data =>
+      cb(data.releases.map(data => {
         return {
-          Name: item.name,
-          CatalogNumber: item.catno,
-          ProviderIds: { [providerName]: id }
+          Id: api.getName() + '-' + data.id, // Prepend provider name
+          AlbumName: data.title,
+          Year: data.year,
+          Label: data.label,
+          ImageUrl: data.thumb,
+          Url: data.resource_url
         };
-      }),
-      Images: item.images.map(item => {
-        return {
-          Url: item.uri,
-          Height: item.height,
-          Width: item.width
-        };
-      }),
-      Url: item.uri,
-      ProviderIds: { [providerName]: id }
-    };
-  });
-  get.artists = id => getGeneric('artists', id, item => {
-    return {
-      ArtistName: item.name,
-      Overview: item.profile,
-      Images: item.images.map(item => {
-        return {
-          Url: item.uri,
-          Height: item.height,
-          Width: item.width
-        };
-      }),
-      Url: item.uri,
-      ProviderIds: { [providerName]: id }
-    };
-  });
-  // TODO: tracks
+      }))
+    );
+  })
 
-  return { search, get };
-}
+  api.defineGetMethod('albums', (id, request, cb) => {
+    request(`releases/${id}`)
+    .then(JSON.parse)
+    .then(data =>
+      cb({
+        AlbumName: data.title,
+        Artist: {
+          Id: data.artists[0].id,
+          ArtistName: data.artists[0].name,
+          ArtistUrl: data.artists[0].resource_url
+        },
+        Year: data.year,
+        Genres: data.genres,
+        Overview: data.notes,
+        Labels: data.labels.map(item => {
+          return {
+            Name: item.name,
+            CatalogNumber: item.catno,
+            ProviderIds: { [api.getName()]: id }
+          };
+        }),
+        Images: data.images.map(item => {
+          return {
+            Url: item.uri,
+            Height: item.height,
+            Width: item.width
+          };
+        }),
+        Url: data.uri,
+        ProviderIds: { [api.getName()]: id }
+      })
+    );
+  });
+  api.defineGetMethod('artists', (id, request, cb) => {
+    request(`artists/${id}`)
+    .then(JSON.parse)
+    .then(data =>
+      cb({
+        ArtistName: data.name,
+        Overview: data.profile,
+        Images: data.images.map(item => {
+          return {
+            Url: item.uri,
+            Height: item.height,
+            Width: item.width
+          };
+        }),
+        Url: data.uri,
+        ProviderIds: { [api.getName()]: id }
+      })
+    );
+  });
+
+  return api;
+};
