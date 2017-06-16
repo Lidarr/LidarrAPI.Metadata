@@ -1,7 +1,7 @@
 const API = require('./api.js');
 
 module.exports = (token) => {
-  let api = new API('Discogs', 'rest', 'https://api.discogs.com/');
+  let api = new API('discogs', 'json', 'https://api.discogs.com/');
 
   api.setRequestDefaults({
     method: 'GET',
@@ -17,44 +17,36 @@ module.exports = (token) => {
 
   api.defineSearchMethod('artist', (query, request, cb) => {
     request('database/search', { q: query, type: 'artist' })
-    .then(JSON.parse)
     .then(data =>
-      cb(data.results.map(data => {
-        return {
-          Id: api.getName() + '-' + data.id, // Prepend provider name
-          ArtistName: data.title,
-          ImageUrl: data.thumb,
-          Url: data.resource_url
-        };
-      }))
+      cb(data.results.map(data => ({
+        Id: api.encodeId(data.id), // Prepend provider name
+        ArtistName: data.title,
+        ImageUrl: data.thumb,
+        Url: data.resource_url
+      })))
     );
   });
   api.defineSearchMethod('albumByArtist', (artistId, request, cb) => {
-    artistId = artistId.split('-').slice(1).join('-');
-    request(`artists/${artistId}/releases`)
-    .then(JSON.parse)
+    request(`artists/${api.decodeId(artistId)}/releases`)
     .then(data =>
-      cb(data.releases.map(data => {
-        return {
-          Id: api.getName() + '-' + data.id, // Prepend provider name
-          AlbumName: data.title,
-          Year: data.year,
-          Label: data.label,
-          ImageUrl: data.thumb,
-          Url: data.resource_url
-        };
-      }))
+      cb(data.releases.map(data => ({
+        Id: api.encodeId(data.id), // Prepend provider name
+        AlbumName: data.title,
+        Year: data.year,
+        Label: data.label,
+        ImageUrl: data.thumb,
+        Url: data.resource_url
+      })))
     );
-  })
+  });
 
   api.defineGetMethod('albums', (id, request, cb) => {
     request(`releases/${id}`)
-    .then(JSON.parse)
     .then(data =>
       cb({
         AlbumName: data.title,
         Artist: {
-          Id: data.artists[0].id,
+          Id: api.encodeId(data.artists[0].id),
           ArtistName: data.artists[0].name,
           ArtistUrl: data.artists[0].resource_url
         },
@@ -82,7 +74,6 @@ module.exports = (token) => {
   });
   api.defineGetMethod('artists', (id, request, cb) => {
     request(`artists/${id}`)
-    .then(JSON.parse)
     .then(data =>
       cb({
         ArtistName: data.name,
