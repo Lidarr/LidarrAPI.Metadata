@@ -17,7 +17,7 @@ const logger = new (winston.Logger)({
 // Setup LowDB
 const db = low('db.json');
 
-const discogsApi = require('./discogsApi')(config.discogs_api.token);
+const discogsApi = require('./apiDefinitions/discogsApi')(config.discogs_api.token);
 
 db.defaults({
   artists: [],
