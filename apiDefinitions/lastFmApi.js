@@ -1,4 +1,4 @@
-const API = require('./api.js');
+const API = require('../api.js');
 
 module.exports = (token) => {
   let api = new API('lastfm', 'json', 'http://ws.audioscrobbler.com/2.0/');
