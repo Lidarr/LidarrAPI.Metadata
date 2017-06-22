@@ -80,17 +80,30 @@ function cleanMultipleIds(req, res, next) {
 function getDB(type, id) {
   return new Promise(function(resolve, reject) {
     // Split ID
+    const origId = id;
     id = id.split('-');
     const provider = id.splice(0, 1)[0];
     id = id.join('-');
 
     logger.debug(`getDB: Getting ${type} with id ${id} from DB`);
+    console.log(provider);
 
     // Search in DB
+    var query = undefined;
+    if (['discogs', 'musicbrainz', 'lastfm'].indexOf(provider) == -1) {
+      // Id lookup
+      query = { Id: origId };
+      console.log('Performing Id lookup');
+      
+    } else {
+      console.log('Performing Provider lookup');
+      query = { ProviderIds: { [provider]: id } };
+    }
     const result = db.get(type)
-    .find({ ProviderIds: { [provider]: id } })
-    .value();
+        .find(query)
+        .value();
 
+    console.log(query);
     // Check result exists and is valid, otherwhise add it or update id
     if (result && (Date.now() - result.LastUpdate) < config.db_record_expiration_days*24*3600*1000) {
       // Return the DB record
@@ -132,9 +145,10 @@ function getDBMultiple(type, ids) {
 
 // Artists
 server.get('/artist/:id/:foo', cleanSingleId, (req, res, next) => {
+  console.log(req.cleanData.id);
   getDB('artists', req.cleanData.id)
   .then(data => res.json(data))
-  .catch(err => res.json({ err: 'The api returned an error.' }));
+  .catch(err => res.json({ err: 'The api returned an error.' + err }));
 });
 server.get('/artists', cleanMultipleIds, (req, res, next) => {
   getDBMultiple('artists', req.cleanData.ids)
