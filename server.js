@@ -132,11 +132,6 @@ function getDBMultiple(type, ids) {
 
 // Artists
 server.get('/artist/:id/:foo', cleanSingleId, (req, res, next) => {
-  logger.debug(`artist/id: `, req);
-  /*return new Promise(function(resolve, reject) {
-      resolve('Yes');
-  });*/
-  debugger;
   getDB('artists', req.cleanData.id)
   .then(data => res.json(data))
   .catch(err => res.json({ err: 'The api returned an error.' }));
