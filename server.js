@@ -4,15 +4,30 @@ const uuid = require('uuid');
 const winston = require('winston');
 const config = require('./config.json');
 
+const bunyan = require('bunyan');
+
 const _PORT = (process.env.PORT || 3000);
 
 // Setup Winston Logging
-const logger = new (winston.Logger)({
+/*const logger = new (winston.Logger)({
   transports: [
-    new (winston.transports.Console)(),
-    new (winston.transports.File)({ filename: 'somefile.log' })
+    new (winston.transports.Console)({ timestamp: true, handleExceptions: true }),
+    new (winston.transports.File)({ 
+      filename: 'server.log',
+      timestamp: true,
+      handleExceptions: true
+    })
   ]
-});
+});*/
+const logger = bunyan.createLogger({
+  name: 'LidarrAPI.Metadata',
+  streams: [
+    {
+      level: 'info',
+      stream: process.stderr,
+    }
+  ]
+})
 
 // Setup LowDB
 const db = low('db.json');
@@ -29,6 +44,12 @@ db.defaults({
 const server = restify.createServer();
 
 server.use(restify.queryParser());
+
+// Dump all requests
+server.on('after', restify.auditLogger({ log: bunyan.createLogger({
+    name: 'audit',
+    stream: process.stdout
+  }), body: true }));
 
 // Express middlewares
 function cleanSingleId(req, res, next) {
@@ -110,17 +131,22 @@ function getDBMultiple(type, ids) {
 // Handle API requests
 
 // Artists
-server.get('/artist/:id', cleanSingleId, (req, res, next) => {
+server.get('/artist/:id/:foo', cleanSingleId, (req, res, next) => {
+  logger.debug(`artist/id: `, req);
+  /*return new Promise(function(resolve, reject) {
+      resolve('Yes');
+  });*/
+  debugger;
   getDB('artists', req.cleanData.id)
   .then(data => res.json(data))
   .catch(err => res.json({ err: 'The api returned an error.' }));
 });
 server.get('/artists', cleanMultipleIds, (req, res, next) => {
   getDBMultiple('artists', req.cleanData.ids)
-  .then(data => res.json({ Artists: data, Count: data.length }))
+  .then(data => res.json(data))
   .catch(err => res.json({ err: 'The api returned an error.' }));
 });
-server.get('/artist/:id/albums', cleanSingleId, (req, res, next) => {
+server.get('/artists/:id/albums', cleanSingleId, (req, res, next) => {
   discogsApi.search('albumByArtist', req.cleanData.id)
   .then(data => res.json({ Items: data, Count: data.length }))
   .catch(err => res.json({ err: 'The api returned an error.' }));
@@ -151,8 +177,8 @@ server.get('/tracks', cleanMultipleIds, (req, res, next) => {
 });
 
 // Other
-server.get('/search', (req, res, next) => {
-  const queryType = req.query.queryType;
+server.get('/search/:foo', (req, res, next) => {
+  const queryType = req.query.type;
   const query = req.query.query;
 
   if (['artist'].indexOf(queryType) == -1) {
@@ -161,7 +187,8 @@ server.get('/search', (req, res, next) => {
   }
 
   discogsApi.search(queryType, query)
-  .then(data => res.json({ Items: data, Count: data.length }))
+  //.then(data => res.json({ Items: data, Count: data.length }))
+  .then(data => res.json(data))
   .catch(err => {
     logger.error(`app.get /search: api error`, { err: err });
     res.json({ err: 'The api returned an error.' });
@@ -171,4 +198,5 @@ server.get('/search', (req, res, next) => {
 server.listen(_PORT, (err, port) => {
   if (err) return logger.error(`App listening error`, { err: err });
   console.log(`Restify app listening at port ${_PORT}...`);
+  logger.info(`Restify app listening at port ${_PORT}...`);
 });
