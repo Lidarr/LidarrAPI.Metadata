@@ -1,0 +1,20 @@
+{
+  "name": "lidarr-api-metadata",
+  "version": "0.0.1",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.1",
+    "lowdb": "^0.16.2",
+    "request": "^2.81.0",
+    "request-promise-native": "^1.0.4",
+    "restify": "^4.3.0",
+    "uuid": "^3.0.1",
+    "winston": "^2.3.1"
+  },
+  "devDependencies": {
+    "bunyan": "^1.8.10"
+  }
+}

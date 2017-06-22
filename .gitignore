@@ -99,3 +99,13 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# nodejs
+node_modules/
+package-lock.json
+
+# config file
+config.json
+
+# Database stuff
+db.json
