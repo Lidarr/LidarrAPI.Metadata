@@ -5,5 +5,11 @@
   "lastfm_api": {
     "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   },
-  "db_record_expiration_days": 7
+  "db_record_expiration_days": 7,
+  "db": {
+    "host": "localhost",
+    "username": "postgres",
+    "password": "password",
+    "database": "LidarrApiMetadata"
+  }
 }
