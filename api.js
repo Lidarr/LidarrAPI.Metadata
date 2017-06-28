@@ -6,38 +6,68 @@ const Ajv = require('ajv');
 
 const ajv = Ajv();
 const validation = {};
-validation.artist = ajv.compile({
-  type: 'object',
-  properties: {
-    name: { type: 'string' }
+validation.search = {};
+validation.get = {};
+validation.search.artist = ajv.compile({
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      mbid: { type: 'string' },
+      name: { type: 'string' },
+      overview: { type: 'string' }
+    },
+    required: [ 'mbid', 'name' ]
   },
-  required: [ 'name' ],
   additionalProperties: false
 });
-validation.album = ajv.compile({
+validation.get.artist = ajv.compile({
   type: 'object',
   properties: {
-    title: { type: 'string' },
-    year: { type: 'integer' }
+    mbid: { type: 'string' },
+    name: { type: 'string' },
+    overview: { type: 'string' },
+    images: {
+      type: 'array',
+      items: { type: 'string' }
+    },
+    albums: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          mbid: { type: 'string' },
+          title: { type: 'string' },
+          date: { type: 'string' },
+          images: {
+            type: 'array',
+            items: { type: 'string' }
+          },
+          tracks: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                mbid: { type: 'string' },
+                title: { type: 'string' },
+                explicit: { type: 'boolean' }
+              },
+              required: [ 'title' ],
+            }
+          }
+        },
+        required: [ 'mbid', 'title', 'tracks' ]
+      }
+    }
   },
-  required: [ 'title', 'year' ],
-  additionalProperties: false
-});
-validation.track = ajv.compile({
-  type: 'object',
-  properties: {
-    title: { type: 'string' },
-    number: { type: 'integer' }
-  },
-  required: [ 'title', 'number' ],
+  required: [ 'mbid', 'name', 'albums' ],
   additionalProperties: false
 });
 
 module.exports = class API {
   constructor(name, parsing, baseUri) {
     this.searchDefinitions = {};
-    // this.getDefinitions = new Map();
-    this.setRequestDefaults({});
+    this.getDefinitions = {};
 
     if (name) this.setName(name);
     if (parsing) this.setParsing(parsing);
@@ -72,18 +102,7 @@ module.exports = class API {
     this.requestWrapper = request.defaults(obj);
   }
 
-  // Search should return an array of items from a query
-  defineArtistSearch(method) {
-    this.searchDefinitions.artist = method;
-  }
-  defineAlbumSearch(method) {
-    this.searchDefinitions.album = method;
-  }
-  defineTrackSearch(method) {
-    this.searchDefinitions.track = method;
-  }
-
-  executeSearch(method, validationFunc, query) {
+  executeRequest(method, validationFunc, query) {
     let $this = this;
     return new Promise((fulfil, reject) => {
       if (!method) reject(new Error('This search is not supported by this api.'));
@@ -95,41 +114,26 @@ module.exports = class API {
           .then(fulfil)
           .catch(reject);
         });
-      }, (parsedData) => {
-        //if (!validationFunc(parsedData)) return reject(new Error('The api returned invalid data.'));
+      }, parsedData => {
+        if (!validationFunc(parsedData)) return reject(new Error('The api returned invalid data.'));
         fulfil(parsedData);
       });
     });
   }
 
+  // Search should return an array of items from a query
+  defineArtistSearch(method) {
+    this.searchDefinitions.artist = method;
+  }
   searchArtist(query) {
-    return this.executeSearch(this.searchDefinitions.artist, validation.artist, query);
-  }
-  searchAlbum(query) {
-    return this.executeSearch(this.searchDefinitions.album, validation.album, query);
-  }
-  searchTrack(query) {
-    return this.executeSearch(this.searchDefinitions.track, validation.track, query);
+    return this.executeRequest(this.searchDefinitions.artist, validation.search.artist, query);
   }
 
-  // Not needed, maybe useful for updating data?
-  // // Get should return a single item from an id
-  // defineGetMethod(searchType, method) {
-  //   this.getDefinitions.set(searchType, method);
-  // }
-  // get(searchType, query) {
-  //   let $this = this;
-  //   let method = $this.getDefinitions.get(searchType);
-  //   return new Promise((fulfil, reject) => {
-  //     method(query, function() {
-  //       let reqObj = (arguments.length > 1) ? { uri: url.resolve($this.baseUri, arguments[0]), qs: arguments[1] } : ((typeof arguments[0] === 'string') ? { uri: url.resolve($this.baseUri, arguments[0]) } : arguments[0]);
-  //       return new Promise((fulfil) => {
-  //         $this.requestWrapper(reqObj)
-  //         .then($this.parsingFunc)
-  //         .then(fulfil)
-  //         .catch(reject);
-  //       });
-  //     }, fulfil);
-  //   });
-  // }
+  // Get should return a single item from an id
+  defineArtistGet(method) {
+    this.getDefinitions.artist = method;
+  }
+  getArtist(query) {
+    return this.executeRequest(this.getDefinitions.artist, validation.get.artist, query);
+  }
 }

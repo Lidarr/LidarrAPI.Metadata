@@ -1,10 +1,9 @@
 module.exports = (sequelize, types) =>
-  sequelize.define('artist', {
+  sequelize.define('image', {
     id: { type: types.UUID, primaryKey: true, defaultValue: types.UUIDV4 },
-    mbid: { type: types.STRING, notNull: true },
 
-    name: { type: types.STRING, notNull: true },
-    overview: { type: types.TEXT }
+    url: { type: types.STRING, validate: { isUrl: true } },
+    media_type: { type: types.STRING }
   }, {
     timestamps: true,
     paranoid: true,

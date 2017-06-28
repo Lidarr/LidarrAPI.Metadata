@@ -1,5 +1,6 @@
 const fs = require('fs');
 const logger = require('./logger');
+const { Artist, Album, Track } = require('./models');
 const config = require('./config.json');
 
 // // Load all apis
@@ -10,9 +11,8 @@ const config = require('./config.json');
 
 // Load all apis in preference order: the first api is going to be called, if it returns an error or empty results, the next api is going to be called. If all the apis return an error or empty results, it's going to assume all the results are empty and return an empty array.
 const apis = [
-  require('./apiDefinitions/discogsApi.js')(config.discogs_api.token),
-  require('./apiDefinitions/lastFmApi.js')(config.discogs_api.token),
-  require('./apiDefinitions/musicbrainzApi.js')(config.discogs_api.token),
+  require('./apiDefinitions/lastFmApi.js')(config.lastfm_api.token),
+  //require('./apiDefinitions/musicbrainzApi.js')(config.discogs_api.token)
 ];
 
 const tryForEachApi = func =>
@@ -21,7 +21,7 @@ const tryForEachApi = func =>
       if (n >= apis.length) return fulfil([]);
       func(apis[n])
       .then(data => {
-        if (!data.length) return tryNext(n+1);
+        if (!data) return tryNext(n+1);
         fulfil(data);
       })
       .catch(err => {
@@ -34,13 +34,54 @@ const tryForEachApi = func =>
 
 const fetch = {};
 
-fetch.Artist = query =>
+fetch.searchArtist = query =>
   tryForEachApi(api => api.searchArtist(query));
 
-fetch.Album = query =>
-  tryForEachApi(api => api.searchAlbum(query));
+fetch.getArtist = id =>
+  new Promise((fulfil, reject) =>
+    tryForEachApi(api => api.getArtist(id))
+    .then(data => {
+      if (!data) return reject(new Error('Artist not found'));
+      Artist.create({
+        mbid: data.mbid,
+        name: data.name,
+        overview: data.overview
+      })
+      .then(artist =>
+        Promise.all(data.albums.map(album => artist.createAlbum({
+          mbid: album.mbid,
+          title: album.title,
+          date: album.date
+        })))
+        .then(albums =>
+          albums.forEach((album, i) => {
+            (album.images ? album.images.forEach(image => album.createImage({
+              url: image.url,
+              media_type: image.type
+            })) : Promise.resolve())
+            .then(Promise.all(data.albums[i].tracks.map(track => album.createTrack({
+              mbid: track.mbid,
+              title: track.title,
+              explicit: track.explicit,
+              artist_id: artist.id
+            }))))
+            .then(() => fulfil(data))
+            .catch(reject);
+          })
+        )
+        .catch(reject)
+      )
+      .catch(reject);
+    })
+  );
 
-fetch.Track = query =>
-  tryForEachApi(api => api.searchTrack(query));
+
+
+
+// fetch.Album = query =>
+//   tryForEachApi(api => api.searchAlbum(query));
+//
+// fetch.Track = query =>
+//   tryForEachApi(api => api.searchTrack(query));
 
 module.exports = fetch;

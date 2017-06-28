@@ -1,10 +1,10 @@
 const Router = require('restify-routing');
 const routes = new Router();
 
-const Get = require('./get');
+const Artist = require('./artist');
 const Search = require('./search');
 
-routes.use('/get', Get);
+routes.use('/artist', Artist);
 routes.use('/search', Search);
 
 module.exports = routes;

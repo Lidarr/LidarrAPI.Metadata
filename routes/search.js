@@ -1,5 +1,5 @@
 const Router = require('restify-routing');
-const { searchController } = require('./../../controllers');
+const { searchController } = require('./../controllers');
 const routes = new Router();
 
 routes.all('**', (req, res, next) => {
@@ -13,7 +13,5 @@ routes.all('**', (req, res, next) => {
 });
 
 routes.get('/artist/:query', searchController.artist);
-routes.get('/album/:query', searchController.album);
-routes.get('/track/:query', searchController.track)
 
 module.exports = routes;
