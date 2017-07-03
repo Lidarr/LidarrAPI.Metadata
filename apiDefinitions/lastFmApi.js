@@ -18,8 +18,8 @@ module.exports = (token) => {
     request('', { method: 'artist.search', artist: query })
     .then(data =>
       cb(data.results.artistmatches.artist.filter(item => item.hasOwnProperty('mbid') && item.mbid).map(item => ({
-        mbid: item.mbid, // Prepend provider name
-        name: item.name
+        Id: item.mbid, // Prepend provider name
+        ArtistName: item.name
       })))
     );
   });
@@ -32,14 +32,14 @@ module.exports = (token) => {
       Promise.all(albums.topalbums.album.filter(item => item.hasOwnProperty('mbid') && item.mbid).map(item => request('', { method: 'album.getinfo', mbid: item.mbid })))
       .then(albumsInfo =>
         cb({
-          mbid: info.artist.mbid,
-          name: info.artist.name,
-          overview: info.artist.bio.summary,
-          albums: albumsInfo.map(item => ({
-            mbid: item.album.mbid,
-            title: item.album.name,
-            tracks: item.album.tracks.track.map(item => ({
-              title: item.name
+          Id: info.artist.mbid,
+          ArtistName: info.artist.name,
+          Overview: info.artist.bio.summary,
+          Albums: albumsInfo.map(item => ({
+            Id: item.album.mbid,
+            Title: item.album.name,
+            Tracks: item.album.tracks.track.map(item => ({
+              Title: item.name
             }))
           }))
         })
