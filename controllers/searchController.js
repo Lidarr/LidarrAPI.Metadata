@@ -7,9 +7,7 @@ const searchController = {};
 searchController.artist = (req, res) => {
   logger.info('Fetching artist from apis.');
   return fetch.searchArtist(req.cleanData.query)
-  .then(data => {
-    res.json({ Success: true, Artists: data, Count: data.length });
-  });
+  .then(data => res.json(data));
 };
 
 module.exports = searchController;

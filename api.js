@@ -13,54 +13,54 @@ validation.search.artist = ajv.compile({
   items: {
     type: 'object',
     properties: {
-      mbid: { type: 'string' },
-      name: { type: 'string' },
-      overview: { type: 'string' }
+      Id: { type: 'string' },
+      ArtistName: { type: 'string' },
+      Overview: { type: 'string' }
     },
-    required: [ 'mbid', 'name' ]
+    required: [ 'Id', 'ArtistName' ]
   },
   additionalProperties: false
 });
 validation.get.artist = ajv.compile({
   type: 'object',
   properties: {
-    mbid: { type: 'string' },
-    name: { type: 'string' },
-    overview: { type: 'string' },
-    images: {
+    Id: { type: 'string' },
+    ArtistName: { type: 'string' },
+    Overview: { type: 'string' },
+    Images: {
       type: 'array',
       items: { type: 'string' }
     },
-    albums: {
+    Albums: {
       type: 'array',
       items: {
         type: 'object',
         properties: {
-          mbid: { type: 'string' },
-          title: { type: 'string' },
-          date: { type: 'string' },
-          images: {
+          Id: { type: 'string' },
+          Title: { type: 'string' },
+          ReleaseDate: { type: 'string' },
+          Images: {
             type: 'array',
             items: { type: 'string' }
           },
-          tracks: {
+          Tracks: {
             type: 'array',
             items: {
               type: 'object',
               properties: {
-                mbid: { type: 'string' },
-                title: { type: 'string' },
-                explicit: { type: 'boolean' }
+                Id: { type: 'string' },
+                Title: { type: 'string' },
+                Explicit: { type: 'boolean' }
               },
-              required: [ 'title' ],
+              required: [ 'Title' ],
             }
           }
         },
-        required: [ 'mbid', 'title', 'tracks' ]
+        required: [ 'Id', 'Title', 'Tracks' ]
       }
     }
   },
-  required: [ 'mbid', 'name', 'albums' ],
+  required: [ 'Id', 'ArtistName', 'Albums' ],
   additionalProperties: false
 });
 

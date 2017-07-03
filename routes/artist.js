@@ -11,6 +11,6 @@ routes.all('**', (req, res, next) => {
 });
 
 routes.get('/:id', artistController.artist);
-routes.get('/:id/albums', artistController.albums);
+// routes.get('/:id/albums', artistController.albums);
 
 module.exports = routes;

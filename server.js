@@ -17,6 +17,7 @@ db.sequelize.authenticate()
   const server = restify.createServer();
 
   server.use(restify.queryParser());
+  server.pre(restify.pre.sanitizePath());
 
   // Dump all requests
   server.on('after', restify.auditLogger({ log: bunyan.createLogger({

@@ -1,10 +1,10 @@
 module.exports = (sequelize, types) =>
-  sequelize.define('artist', {
+  sequelize.define('Artist', {
     id: { type: types.UUID, primaryKey: true, defaultValue: types.UUIDV4 },
-    mbid: { type: types.STRING, notNull: true },
+    Id: { type: types.STRING, notNull: true }, // mbid
 
-    name: { type: types.STRING, notNull: true },
-    overview: { type: types.TEXT }
+    ArtistName: { type: types.STRING, notNull: true },
+    Overview: { type: types.TEXT }
   }, {
     timestamps: true,
     paranoid: true,

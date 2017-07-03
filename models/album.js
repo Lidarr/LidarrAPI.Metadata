@@ -1,10 +1,10 @@
 module.exports = (sequelize, types) =>
-  sequelize.define('album', {
+  sequelize.define('Album', {
     id: { type: types.UUID, primaryKey: true, defaultValue: types.UUIDV4 },
-    mbid: { type: types.STRING, notNull: true },
+    Id: { type: types.STRING, notNull: true },
 
-    title: { type: types.STRING, notNull: true },
-    date: { type: types.DATEONLY, notNull: true }
+    Title: { type: types.STRING, notNull: true },
+    ReleaseDate: { type: types.DATEONLY, notNull: true }
   }, {
     timestamps: true,
     paranoid: true,

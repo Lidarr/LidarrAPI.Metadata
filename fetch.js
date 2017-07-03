@@ -43,15 +43,15 @@ fetch.getArtist = id =>
     .then(data => {
       if (!data) return reject(new Error('Artist not found'));
       Artist.create({
-        mbid: data.mbid,
-        name: data.name,
-        overview: data.overview
+        Id: data.Id,
+        ArtistName: data.ArtistName,
+        Overview: data.Overview
       })
       .then(artist =>
-        Promise.all(data.albums.map(album => artist.createAlbum({
-          mbid: album.mbid,
-          title: album.title,
-          date: album.date
+        Promise.all(data.Albums.map(album => artist.createAlbum({
+          Id: album.Id,
+          Title: album.Title,
+          ReleaseDate: album.ReleaseDate
         })))
         .then(albums =>
           albums.forEach((album, i) => {
@@ -59,10 +59,10 @@ fetch.getArtist = id =>
               url: image.url,
               media_type: image.type
             })) : Promise.resolve())
-            .then(Promise.all(data.albums[i].tracks.map(track => album.createTrack({
-              mbid: track.mbid,
-              title: track.title,
-              explicit: track.explicit,
+            .then(Promise.all(data.Albums[i].Tracks.map(track => album.createTrack({
+              Id: track.Id,
+              Title: track.Title,
+              Explicit: track.Explicit,
               artist_id: artist.id
             }))))
             .then(() => fulfil(data))

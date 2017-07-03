@@ -1,10 +1,10 @@
 module.exports = (sequelize, types) =>
-  sequelize.define('track', {
+  sequelize.define('Track', {
     id: { type: types.UUID, primaryKey: true, defaultValue: types.UUIDV4 },
-    mbid: { type: types.STRING, notNull: true },
+    Id: { type: types.STRING, notNull: true },
 
-    title: { type: types.STRING, notNull: true },
-    explicit: { type: types.BOOLEAN }
+    Title: { type: types.STRING, notNull: true },
+    Explicit: { type: types.BOOLEAN }
   }, {
     timestamps: true,
     paranoid: true,
