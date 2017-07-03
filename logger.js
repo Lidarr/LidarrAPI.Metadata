@@ -7,6 +7,10 @@ module.exports = bunyan.createLogger({
     {
       level: 'info',
       stream: process.stdout,
+    },
+    {
+      level: 'info',
+      path: './logfile.log'
     }
   ]
 });
