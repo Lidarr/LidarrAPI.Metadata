@@ -4,6 +4,7 @@ const cheerio = require('cheerio');
 const xml2js = require('xml2js');
 const Ajv = require('ajv');
 
+// Validation for the data returned by the api
 const ajv = Ajv();
 const validation = {};
 validation.search = {};
@@ -106,6 +107,7 @@ module.exports = class API {
     let $this = this;
     return new Promise((fulfil, reject) => {
       if (!method) reject(new Error('This search is not supported by this api.'));
+      // Call the method with the query, a function to request data that handles errors and parses the data, and a callback
       method(query, function() {
         let reqObj = (arguments.length > 1) ? { uri: url.resolve($this.baseUri, arguments[0]), qs: arguments[1] } : ((typeof arguments[0] === 'string') ? { uri: url.resolve($this.baseUri, arguments[0]) } : arguments[0]);
         return new Promise((fulfil) => {

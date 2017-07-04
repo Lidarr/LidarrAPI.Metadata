@@ -3,6 +3,8 @@ const Sequelize = require('sequelize');
 const logger = require('./../logger');
 const config = require('./../config.json');
 
+// Setup DB, load models and setup relationships
+
 const sequelize = new Sequelize(config.db.database, config.db.username, config.db.password, {
   host: config.db.host,
   dialect: 'postgres',

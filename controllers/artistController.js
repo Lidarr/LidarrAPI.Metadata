@@ -5,6 +5,7 @@ const { Artist, Album, Track } = require('./../models');
 const artistController = {};
 
 artistController.artist = (req, res) =>
+  // Find artist in the DB
   Artist.findOne({
     where: { Id: req.cleanData.id },
     attributes: [ 'Id', 'ArtistName', 'Overview' ],
@@ -12,6 +13,7 @@ artistController.artist = (req, res) =>
   })
   .then(artist => {
     if (!artist) {
+      // If not found, fetch it from the apis
       fetch.getArtist(req.cleanData.id)
       .then(data => {
         logger.info('Saved new artist in the database');

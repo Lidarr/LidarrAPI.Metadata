@@ -2,12 +2,14 @@ const Router = require('restify-routing');
 const { artistController } = require('./../controllers');
 const routes = new Router();
 
+// Middleware to clean the id
 routes.all('**', (req, res, next) => {
   req.cleanData = {};
   req.cleanData.id = req.params.id.trim();
   if (req.cleanData.id) return next();
   logger.silly(`cleanSingleId: id is invalid`);
-  return res.status(400).json({ err: 'Invalid id.' });
+  res.status(400);
+  res.send('Invalid id.');
 });
 
 routes.get('/:id', artistController.artist);
