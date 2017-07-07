@@ -15,10 +15,10 @@ const apis = [
   //require('./apiDefinitions/musicbrainzApi.js')(config.discogs_api.token)
 ];
 
-const tryForEachApi = func =>
+const tryForEachApi = (func, empty) =>
   new Promise(fulfil => {
     const tryNext = n => {
-      if (n >= apis.length) return fulfil([]);
+      if (n >= apis.length) return fulfil(empty);
       func(apis[n])
       .then(data => {
         if (!data) return tryNext(n+1);
@@ -35,11 +35,11 @@ const tryForEachApi = func =>
 const fetch = {};
 
 fetch.searchArtist = query =>
-  tryForEachApi(api => api.searchArtist(query));
+  tryForEachApi(api => api.searchArtist(query), []);
 
 fetch.getArtist = id =>
   new Promise((fulfil, reject) =>
-    tryForEachApi(api => api.getArtist(id))
+    tryForEachApi(api => api.getArtist(id), null)
     .then(data => {
       if (!data) return reject(new Error('Artist not found'));
       Artist.create({

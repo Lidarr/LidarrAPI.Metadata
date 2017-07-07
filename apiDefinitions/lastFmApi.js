@@ -14,6 +14,10 @@ module.exports = (token) => {
     }
   });
 
+  api.setErrorCheck(json => {
+    if (json.error) throw json.error;
+  })
+
   api.defineArtistSearch((query, request, cb) => {
     request('', { method: 'artist.search', artist: query })
     .then(data =>

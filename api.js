@@ -73,6 +73,8 @@ module.exports = class API {
     if (name) this.setName(name);
     if (parsing) this.setParsing(parsing);
     if (baseUri) this.setBaseUri(baseUri);
+
+    this.setRequestDefaults({});
   }
   setName(name) {
     this.name = name;
@@ -96,10 +98,14 @@ module.exports = class API {
     if (parsingOptions[parsing]) return this.parsingFunc = parsingOptions[parsing];
     throw new Error('Invalid parsing option.');
   }
+  setErrorCheck(func) {
+    this.errorCheckFunc = data => { func(); return data; };
+  }
   setBaseUri(uri) {
     this.baseUri = uri;
   }
   setRequestDefaults(obj) {
+    obj.simple = true; // Rejects codes other then 2xx
     this.requestWrapper = request.defaults(obj);
   }
 
@@ -111,10 +117,11 @@ module.exports = class API {
       method(query, function() {
         let reqObj = (arguments.length > 1) ? { uri: url.resolve($this.baseUri, arguments[0]), qs: arguments[1] } : ((typeof arguments[0] === 'string') ? { uri: url.resolve($this.baseUri, arguments[0]) } : arguments[0]);
         return new Promise((fulfil) => {
-          $this.requestWrapper(reqObj)
-          .then($this.parsingFunc)
-          .then(fulfil)
-          .catch(reject);
+          let req = $this.requestWrapper(reqObj)
+          .then($this.parsingFunc);
+          if ($this.errorCheckFunc) req = req.then($this.errorCheckFunc);
+          req.then(fulfil)
+          .catch(reject)
         });
       }, parsedData => {
         if (!validationFunc(parsedData)) return reject(new Error('The api returned invalid data.'));
