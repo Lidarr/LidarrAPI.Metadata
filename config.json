@@ -1,9 +1,0 @@
-{
-  "discogs_api": {
-    "token": "VHuwcMaSdSaUhgNUuQWHOKlXjYTHjwhIZCJEnvRl"
-  },
-  "lastfm_api": {
-    "token": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-  },
-  "db_record_expiration_days": 7
-}
