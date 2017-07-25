@@ -2,7 +2,11 @@ import os, os.path, cherrypy
 from api import app
 from models import *
 
-if __name__ == '__main__':
+def main():
+	"""
+	Entry point for script
+	"""
+
 	cherrypy.tree.graft(app, '/')
 	cherrypy.config.update({
 		'log.screen': True,
@@ -15,3 +19,6 @@ if __name__ == '__main__':
 
 	cherrypy.engine.start()
 	cherrypy.engine.block()
+
+if __name__ == '__main__':
+	main()
