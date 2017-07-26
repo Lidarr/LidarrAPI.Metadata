@@ -1,5 +1,3 @@
-import os
-import os.path
 import cherrypy
 from api import app
 import models

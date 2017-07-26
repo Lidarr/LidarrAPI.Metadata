@@ -1,4 +1,3 @@
-import requests
 import pylast
 
 # class APIProvider():
