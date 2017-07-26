@@ -1,35 +1,36 @@
 import os
-from peewee import *
+
+import peewee
 
 DATABASE_PATH = os.path.abspath('./music.db')
-database = SqliteDatabase(DATABASE_PATH, threadlocals=True)
+database = peewee.SqliteDatabase(DATABASE_PATH, threadlocals=True)
 
 
-class BaseModel(Model):
+class BaseModel(peewee.Model):
     class Meta:
         database = database
 
 
 class Album(BaseModel):
-    mbId = CharField(null=False)
-    title = CharField(null=False)
-    release_date = DateTimeField(null=False)
+    mbId = peewee.CharField(null=False)
+    title = peewee.CharField(null=False)
+    release_date = peewee.DateTimeField(null=False)
 
 
 class Artist(BaseModel):
-    mbId = CharField(null=False)
-    artist_name = CharField(null=False)
-    overview = CharField(null=True)
+    mbId = peewee.CharField(null=False)
+    artist_name = peewee.CharField(null=False)
+    overview = peewee.CharField(null=True)
     #expires = TimestampField(null=False)
 
 
 class Image(BaseModel):
-    url = CharField(null=False)
-    media_type = CharField(null=True)
+    url = peewee.CharField(null=False)
+    media_type = peewee.CharField(null=True)
 
 
 class Track(BaseModel):
-    mbId = CharField(null=False)
-    title = CharField(null=False)
-    explicit = BooleanField(null=True)
-    track_number = IntegerField(null=True)
+    mbId = peewee.CharField(null=False)
+    title = peewee.CharField(null=False)
+    explicit = peewee.BooleanField(null=True)
+    track_number = peewee.IntegerField(null=True)

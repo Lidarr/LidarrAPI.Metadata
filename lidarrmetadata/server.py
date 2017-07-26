@@ -2,7 +2,7 @@ import os
 import os.path
 import cherrypy
 from api import app
-from models import *
+import models
 
 
 def main():
@@ -16,9 +16,13 @@ def main():
         'server.socket_port': 8888
     })
 
-    database.connect()
-    database.create_tables([Artist, Album, Track, Image], safe=True)
-    database.close()
+    models.database.connect()
+    models.database.create_tables([models.Artist,
+                                   models.Album,
+                                   models.Track,
+                                   models.Image],
+                                  safe=True)
+    models.database.close()
 
     cherrypy.engine.start()
     cherrypy.engine.block()

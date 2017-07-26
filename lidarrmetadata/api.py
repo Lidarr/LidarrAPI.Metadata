@@ -1,10 +1,10 @@
 import os
 import sys
 import json
-from peewee import *
+import peewee
 from werkzeug.exceptions import HTTPException
 import logging
-from models import *
+import models
 from flask import Flask, abort, request, jsonify, send_file
 
 import provider
@@ -21,13 +21,13 @@ if not isProd:
 
 @app.before_request
 def before_request():
-    database.connect()
+    models.database.connect()
 
 
 @app.teardown_request
 def teardown_request(response):
-    if not database.is_closed():
-        database.close()
+    if not models.database.is_closed():
+        models.database.close()
 
 
 @app.errorhandler(404)
