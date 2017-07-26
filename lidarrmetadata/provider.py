@@ -17,14 +17,25 @@ network = pylast.LastFMNetwork(api_key=API_KEY, api_secret=API_SECRET)
 
 
 def convert_artist(artist_obj):
-    return {'ArtistName': artist_obj.name, 'Id': artist_obj.get_mbid(), 'Overview': artist_obj.get_bio_summary(),
-            'AristUrl': artist_obj.get_url(), 'Genres': [], 'Images': [{'Url': artist_obj.get_cover_image(), 'media_type': 'cover'}],
+    return {'ArtistName': artist_obj.name,
+            'Id': artist_obj.get_mbid(),
+            'Overview': artist_obj.get_bio_summary(),
+            'AristUrl': artist_obj.get_url(),
+            'Genres': [],
+            'Images': [{'Url': artist_obj.get_cover_image(),
+                        'media_type': 'cover'}],
             'Albums': []}
 
 
 def convert_album(album_obj):
-    return {'Title': album_obj.title, 'Id': album_obj.get_mbid(), 'ReleaseDate': album_obj.get_release_date(), 'Artist': album_obj.artist,
-            'Images': [{'Url': album_obj.get_cover_image(), 'media_type': 'cover'}], 'Tracks': [], 'Url': album_obj.get_url()}
+    return {'Title': album_obj.title,
+            'Id': album_obj.get_mbid(),
+            'ReleaseDate': album_obj.get_release_date(),
+            'Artist': album_obj.artist,
+            'Images': [{'Url': album_obj.get_cover_image(),
+                        'media_type': 'cover'}],
+            'Tracks': [],
+            'Url': album_obj.get_url()}
 
 
 def search_artist(artist, limit_to=5):
