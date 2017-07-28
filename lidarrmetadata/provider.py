@@ -41,7 +41,8 @@ class Provider(object):
                 break
 
         if cache_results:
-            [artist.save() for artist in results if artist.mbId]
+            [artist.save() for artist in results
+                if artist.mbId and not artist.select().where(models.Artist.mbId == artist.mbId)]
 
         return results
 
