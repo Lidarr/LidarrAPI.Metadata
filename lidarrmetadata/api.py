@@ -42,7 +42,7 @@ def index():
 
 @app.route('/artist/<mbid>', methods=['GET'])
 def get_artist_info(mbid):
-    print mbid
+    print(mbid)
     artist_info = provider.get_artist_info(mbid)
     return jsonify(artist_info)
 
@@ -81,7 +81,7 @@ def search_artist():
     query = request.args.get('query')
 
     artists = provider.search_artist(query)
-    print "Found %s results" % str(len(artists))
+    print("Found %s results" % str(len(artists)))
 
     # TODO: Transform response into our structure & store in the db
 

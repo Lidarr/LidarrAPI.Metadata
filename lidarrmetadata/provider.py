@@ -59,7 +59,7 @@ def get_artist_info(mbid):
 
     for album in albums_result:
         # TODO: Get all tracks for each
-        print 'Converting %s' % album.item.title
+        print('Converting %s' % album.item.title)
         artist['Albums'].append(convert_album(album.item))
 
     return artist
