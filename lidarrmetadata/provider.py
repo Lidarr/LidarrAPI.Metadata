@@ -1,5 +1,7 @@
 import pylast
 
+from lidarrmetadata import models
+
 
 class Provider(object):
     """
@@ -87,16 +89,16 @@ class LastFmProvider(Provider):
         :return:
         """
         results = self._client.search_for_artist(artist).get_next_page()
-        return [self.parse_artist(result) for result in results]
+        return [self._parse_artist(result) for result in results]
 
     @staticmethod
-    def parse_artist(result):
+    def _parse_artist(result):
         """
         Parses LastFM response as our artist class
         :param result: LastFM response
         :return: List of Artists corresponding to response
         """
-        return result.name
+        return models.Artist(mbId=result.get_mbid(), artist_name=result.name, overview=result.get_bio_summary())
 
 
 class MusicbrainzProvider(Provider):
