@@ -66,7 +66,7 @@ class DatabaseProvider(Provider):
         :param artist:
         :return:
         """
-        return [result for result in models.Artist.select() if artist.lower() in str(result.artist_name).lower()]
+        return models.Artist.select().where(models.Artist.artist_name.contains(artist))
 
 
 class LastFmProvider(Provider):
