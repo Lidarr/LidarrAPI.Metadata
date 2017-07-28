@@ -22,11 +22,12 @@ class Provider(object):
         self.providers.sort(key=lambda p: p.priority)
 
     @classmethod
-    def search_artist(cls, artist, stop_on_result=True):
+    def search_artist(cls, artist, stop_on_result=True, cache_results=False):
         """
         Searches all providers for artists via their ``_search_artist`` method.
         :param artist: Artist to search for
         :param stop_on_result: Whether or not to stop on the first provider to return a result. Defaults to True.
+        :param cache_results: Whether or not to cache results. Defaults to False.
         :return: List of artist results
         """
         results = []
@@ -36,6 +37,9 @@ class Provider(object):
 
             if provider_results and stop_on_result:
                 break
+
+        if cache_results:
+            [artist.save() for artist in results if artist.mbId]
 
         return results
 
@@ -54,7 +58,7 @@ class DatabaseProvider(Provider):
     """
 
     def __init__(self):
-        Provider.__init__(priority=self.PRIORITY_FIRST)
+        Provider.__init__(self, priority=self.PRIORITY_FIRST)
 
     def _search_artist(self, artist):
         """
@@ -62,7 +66,7 @@ class DatabaseProvider(Provider):
         :param artist:
         :return:
         """
-        raise NotImplementedError()
+        return [result for result in models.Artist.select() if artist.lower() in str(result.artist_name).lower()]
 
 
 class LastFmProvider(Provider):
@@ -122,4 +126,5 @@ if __name__ == '__main__':
     LASTFM_KEY = ''
     LASTFM_SECRET = ''
     LastFmProvider(api_key=LASTFM_KEY, api_secret=LASTFM_SECRET)
-    print(Provider.search_artist('afi'))
+    DatabaseProvider()
+    print(Provider.search_artist('afi', cache_results=True))
