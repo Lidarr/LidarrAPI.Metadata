@@ -1,65 +1,123 @@
 import pylast
 
-# class APIProvider():
-# 	def __init__(self, api_url, api_key, response_type):
-# 		self.api_url = api_url
-# 		self.api_key = api_key
-# 		self.response_type = response_type
 
-# 	def search(self, )
+class Provider(object):
+    """
+    Base provider class
+    """
 
-headers = {'user-agent': 'nodejs-request-library'}
+    # Search priorities to determine which order providers are used in
+    PRIORITY_FIRST = -1
+    PRIORITY_NORMAL = 0
+    PRIORITY_LAST = 1
 
-API_KEY = 'XXXXXXXXXXXXXXXXX'
-API_SECRET = 'XXXXXXXXXXXXXXXXXXXXXXX'
+    # List of provider instances to use for queries
+    providers = []
 
-network = pylast.LastFMNetwork(api_key=API_KEY, api_secret=API_SECRET)
+    def __init__(self, priority=PRIORITY_NORMAL):
+        self.priority = priority
+        self.providers.append(self)
+        self.providers.sort(key=lambda p: p.priority)
 
+    @classmethod
+    def search_artist(cls, artist, stop_on_result=True):
+        """
+        Searches all providers for artists via their ``_search_artist`` method.
+        :param artist: Artist to search for
+        :param stop_on_result: Whether or not to stop on the first provider to return a result. Defaults to True.
+        :return: List of artist results
+        """
+        results = []
+        for provider in cls.providers:
+            provider_results = provider._search_artist(artist)
+            results.extend(provider_results)
 
-def convert_artist(artist_obj):
-    return {'ArtistName': artist_obj.name,
-            'Id': artist_obj.get_mbid(),
-            'Overview': artist_obj.get_bio_summary(),
-            'AristUrl': artist_obj.get_url(),
-            'Genres': [],
-            'Images': [{'Url': artist_obj.get_cover_image(),
-                        'media_type': 'cover'}],
-            'Albums': []}
+            if provider_results and stop_on_result:
+                break
 
+        return results
 
-def convert_album(album_obj):
-    return {'Title': album_obj.title,
-            'Id': album_obj.get_mbid(),
-            'ReleaseDate': album_obj.get_release_date(),
-            'Artist': album_obj.artist,
-            'Images': [{'Url': album_obj.get_cover_image(),
-                        'media_type': 'cover'}],
-            'Tracks': [],
-            'Url': album_obj.get_url()}
-
-
-def search_artist(artist, limit_to=5):
-    result = network.search_for_artist(artist)
-    # Get all sequences of results
-    artist_search_page = result.get_next_page()[:limit_to]
-    artists = []
-    for item in artist_search_page:
-        images = [{'Url': item.get_cover_image(), 'media_type': 'cover'}]
-        # TODO: Search for albums and populate
-        artists.append(convert_artist(item))
-
-    return artists
+    def _search_artist(self, artist):
+        """
+        Function to implement to search artist
+        :param artist: Artist to search for
+        :return: List of Artist objects
+        """
+        raise NotImplementedError()
 
 
-def get_artist_info(mbid):
-    ''' Returns information about an Artist via artist name or mbid '''
-    result = network.get_artist_by_mbid(mbid)
-    artist = convert_artist(result)
-    albums_result = result.get_top_albums()
+class DatabaseProvider(Provider):
+    """
+    Provider to get data from cache/data database
+    """
 
-    for album in albums_result:
-        # TODO: Get all tracks for each
-        print('Converting %s' % album.item.title)
-        artist['Albums'].append(convert_album(album.item))
+    def __init__(self):
+        Provider.__init__(priority=self.PRIORITY_FIRST)
 
-    return artist
+    def _search_artist(self, artist):
+        """
+
+        :param artist:
+        :return:
+        """
+        raise NotImplementedError()
+
+
+class LastFmProvider(Provider):
+    """
+    Provider to get LastFM data
+    """
+
+    def __init__(self, api_key, api_secret):
+        """
+
+        :param api_key: LastFM API key
+        :param api_secret: LastFM API access secret
+        :return:
+        """
+        Provider.__init__(self)
+
+        # LastFM client
+        self._client = pylast.LastFMNetwork(api_key=api_key, api_secret=api_secret)
+
+    def _search_artist(self, artist):
+        """
+
+        :param artist:
+        :return:
+        """
+        results = self._client.search_for_artist(artist).get_next_page()
+        return [self.parse_artist(result) for result in results]
+
+    @staticmethod
+    def parse_artist(result):
+        """
+        Parses LastFM response as our artist class
+        :param result: LastFM response
+        :return: List of Artists corresponding to response
+        """
+        return result.name
+
+
+class MusicbrainzProvider(Provider):
+    """
+    Provider to get Musicbrainz data
+    """
+
+    def __init__(self):
+        Provider.__init__()
+
+    def _search_artist(self, artist):
+        """
+
+        :param artist:
+        :return:
+        """
+        raise NotImplementedError()
+
+
+if __name__ == '__main__':
+    LASTFM_KEY = ''
+    LASTFM_SECRET = ''
+    LastFmProvider(api_key=LASTFM_KEY, api_secret=LASTFM_SECRET)
+    print(Provider.search_artist('afi'))
