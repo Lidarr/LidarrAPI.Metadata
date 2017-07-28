@@ -21,7 +21,9 @@ class Artist(BaseModel):
     mbId = peewee.CharField(null=False)
     artist_name = peewee.CharField(null=False)
     overview = peewee.CharField(null=True)
-    #expires = TimestampField(null=False)
+
+    def __repr__(self):
+        return '<{class_name} {artist_name}>'.format(class_name=self.__class__.__name__, artist_name=self.artist_name)
 
 
 class Image(BaseModel):
