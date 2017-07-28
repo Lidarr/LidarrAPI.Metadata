@@ -1,5 +1,7 @@
 import pylast
+import musicbrainzngs
 
+import lidarrmetadata
 from lidarrmetadata import models
 
 
@@ -110,8 +112,10 @@ class MusicbrainzProvider(Provider):
     Provider to get Musicbrainz data
     """
 
-    def __init__(self):
-        Provider.__init__()
+    def __init__(self, musicbrainz_server='musicbrainz.org'):
+        Provider.__init__(self)
+        musicbrainzngs.set_useragent('lidarrmetadata', lidarrmetadata.__version__)
+        musicbrainzngs.set_hostname(musicbrainz_server)
 
     def _search_artist(self, artist):
         """
@@ -119,7 +123,17 @@ class MusicbrainzProvider(Provider):
         :param artist:
         :return:
         """
-        raise NotImplementedError()
+        results = musicbrainzngs.search_artists(artist)['artist-list']
+        return [self._parse_artist(result) for result in results]
+
+    @staticmethod
+    def _parse_artist(result):
+        """
+        Parsing of artists returned by musicbrainz api
+        :param result: Artist object corresponding to result
+        :return:
+        """
+        return models.Artist(mbId=result['id'], artist_name=result['name'], overview='')
 
 
 if __name__ == '__main__':
@@ -127,4 +141,5 @@ if __name__ == '__main__':
     LASTFM_SECRET = ''
     LastFmProvider(api_key=LASTFM_KEY, api_secret=LASTFM_SECRET)
     DatabaseProvider()
+    MusicbrainzProvider()
     print(Provider.search_artist('afi', cache_results=True))

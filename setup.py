@@ -34,6 +34,7 @@ setup(
     install_requires=['cherrypy',
                       'flasgger',
                       'flask',
+                      'musicbrainzngs',
                       'peewee',
                       'pylast'],
 
