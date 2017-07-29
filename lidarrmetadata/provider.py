@@ -36,12 +36,12 @@ class Provider(object):
         self.providers.sort(key=lambda p: p.priority)
 
     @classmethod
-    def search_artist(cls, artist, stop_on_result=True, cache_results=False):
+    def search_artist(cls, artist, stop_on_result=True, cache_results=True):
         """
         Searches all providers for artists via their ``_search_artist`` method.
         :param artist: Artist to search for
         :param stop_on_result: Whether or not to stop on the first provider to return a result. Defaults to True.
-        :param cache_results: Whether or not to cache results. Defaults to False.
+        :param cache_results: Whether or not to cache results. Defaults to True.
         :return: List of artist results
         """
         results = []
