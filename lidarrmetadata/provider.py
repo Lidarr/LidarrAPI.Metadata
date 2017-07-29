@@ -1,8 +1,20 @@
+import sys
+
 import pylast
 import musicbrainzngs
 
 import lidarrmetadata
+from lidarrmetadata import config
 from lidarrmetadata import models
+
+
+def provider_by_name(name):
+    """
+    Gets a provider by string name
+    :param name: Name of provider
+    :return:
+    """
+    return getattr(sys.modules[__name__], name)
 
 
 class Provider(object):
@@ -137,10 +149,11 @@ class MusicbrainzProvider(Provider):
         return models.Artist(mbId=result['id'], artist_name=result['name'], overview='')
 
 
+def search_artist(artist): return Provider.search_artist(artist)
+
+
 if __name__ == '__main__':
-    LASTFM_KEY = ''
-    LASTFM_SECRET = ''
-    LastFmProvider(api_key=LASTFM_KEY, api_secret=LASTFM_SECRET)
+    LastFmProvider(api_key=config.CONFIG.LASTFM_KEY, api_secret=config.CONFIG.LASTFM_SECRET)
     DatabaseProvider()
     MusicbrainzProvider()
-    print(Provider.search_artist('afi', cache_results=True))
+    print(Provider.search_artist('afi', cache_results=True, stop_on_result=True))

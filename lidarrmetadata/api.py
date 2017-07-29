@@ -1,15 +1,17 @@
 from flask import Flask, request, jsonify, send_file
 from werkzeug.exceptions import HTTPException
 
-import models
-import provider
+from lidarrmetadata import config
+from lidarrmetadata import models
+from lidarrmetadata import provider
 
 
 isProd = False
 app = Flask(__name__)
+app.config.from_object(config.CONFIG)
 
-if not isProd:
-    ''' Run our API Doc server '''
+if not app.config['PRODUCTION']:
+    # Run api doc server if not running in production
     from flasgger import Swagger
     swagger = Swagger(app)
 

@@ -2,8 +2,9 @@ import os
 
 import peewee
 
-DATABASE_PATH = os.path.abspath('./music.db')
-database = peewee.SqliteDatabase(DATABASE_PATH, threadlocals=True)
+from lidarrmetadata import config
+
+database = peewee.SqliteDatabase(config.CONFIG.DB_FILE, threadlocals=True)
 
 
 class BaseModel(peewee.Model):
