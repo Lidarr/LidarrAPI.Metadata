@@ -26,6 +26,13 @@ class Artist(BaseModel):
     def __repr__(self):
         return '<{class_name} {artist_name}>'.format(class_name=self.__class__.__name__, artist_name=self.artist_name)
 
+    def to_dict(self):
+        """
+        Dictionary representation of artist
+        :return: Dictionary representation of artist
+        """
+        return {'mbId': self.mbId, 'name': self.artist_name, 'overview': self.overview}
+
 
 class Image(BaseModel):
     url = peewee.CharField(null=False)

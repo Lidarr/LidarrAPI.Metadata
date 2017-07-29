@@ -6,9 +6,13 @@ from lidarrmetadata import models
 from lidarrmetadata import provider
 
 
-isProd = False
 app = Flask(__name__)
 app.config.from_object(config.CONFIG)
+
+# Set up providers
+for provider_name, (args, kwargs) in config.CONFIG.PROVIDERS.items():
+    provider_class = provider.provider_by_name(provider_name)
+    provider_class(*args, **kwargs)
 
 if not app.config['PRODUCTION']:
     # Run api doc server if not running in production
@@ -85,9 +89,4 @@ def search_artist():
     artists = provider.search_artist(query)
     print("Found %s results" % str(len(artists)))
 
-    # TODO: Transform response into our structure & store in the db
-
-    # with database.atomic():
-    # 	Artist.insert_many(result_list)
-
-    return jsonify(artists)
+    return jsonify([artist.to_dict() for artist in artists])
