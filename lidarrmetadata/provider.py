@@ -207,7 +207,8 @@ class MusicbrainzProvider(Provider):
         :return:
         """
         results = musicbrainzngs.search_releases(album)['release-list']
-        return [x for x in [self._parse_album(result) for result in results] if x]
+        albums = [self._parse_album(result) for result in results]
+        return [album for album in albums if album]
 
     def _search_artist(self, artist):
         """
