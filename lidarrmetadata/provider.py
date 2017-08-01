@@ -241,6 +241,7 @@ class MusicbrainzProvider(Provider):
         return models.Artist(mbId=result['id'], artist_name=result['name'], overview='')
 
 
+def search_album(album): return Provider.search_album(album)
 def search_artist(artist): return Provider.search_artist(artist)
 
 

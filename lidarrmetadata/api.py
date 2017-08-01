@@ -53,6 +53,32 @@ def get_artist_info(mbid):
     return jsonify(artist_info)
 
 
+@app.route('/search/album/')
+def search_album():
+    """Search for a human-readable album
+    ---
+    parameters:
+     - name: query
+       in: path
+       type: string
+       required: true
+    responses:
+      200:
+            description: Returns a set of albums
+            schema:
+              $ref: /search/album/dark%20side%20%of%20the%20moon
+            examples:
+              {
+                "mbId": "a1ad30cb-b8c4-4d68-9253-15b18fcde1d1",
+                "release_date": "Mon, 14 Nov 2005 00:00:00 GMT",
+                "title": "Dark Side of the Moon"
+              }
+    """
+    query = request.args.get('query', '')
+    albums = provider.search_album(query)
+    return jsonify([album.to_dict() for album in albums])
+
+
 @app.route('/search/artist/', methods=['GET'])
 def search_artist():
     """Search for a human-readable artist
