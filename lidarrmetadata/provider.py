@@ -1,4 +1,5 @@
 import sys
+import warnings
 
 import pylast
 import musicbrainzngs
@@ -46,7 +47,11 @@ class Provider(object):
         """
         results = []
         for provider in cls.providers:
-            provider_results = provider._search_artist(artist)
+            try:
+                provider_results = provider._search_artist(artist)
+            except NotImplementedError:
+                warnings.warn('Artist search not implemented for {class_name}'.format(class_name=provider.__class__.__name__))
+                continue
             results.extend(provider_results)
 
             if provider_results and stop_on_result:
