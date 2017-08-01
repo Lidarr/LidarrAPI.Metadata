@@ -37,6 +37,35 @@ class Provider(object):
         self.providers.sort(key=lambda p: p.priority)
 
     @classmethod
+    def search_album(cls, album, stop_on_result=True, cache_results=True):
+        """
+        Searches all providers for album via their ``_search_album`` method.
+        :param album: Album to search for
+        :param stop_on_result: Whether or not to stop on the first provider to return a result. Defaults to True.
+        :param cache_results: Whether or not to cache results. Defaults to True.
+        :return: List of artist results
+        """
+        results = []
+        for provider in cls.providers:
+            try:
+                provider_results = provider._search_album(album)
+            except NotImplementedError:
+                warnings.warn(
+                    'Album search not implemented for {class_name}'.format(class_name=provider.__class__.__name__))
+                continue
+
+            results.extend(provider_results)
+
+            if provider_results and stop_on_result:
+                break
+
+        if cache_results:
+            [album.save() for album in results
+             if album.mbId and album.release_date and not album.select().where(models.Album.mbId == album.mbId)]
+
+        return results
+
+    @classmethod
     def search_artist(cls, artist, stop_on_result=True, cache_results=True):
         """
         Searches all providers for artists via their ``_search_artist`` method.
@@ -50,7 +79,8 @@ class Provider(object):
             try:
                 provider_results = provider._search_artist(artist)
             except NotImplementedError:
-                warnings.warn('Artist search not implemented for {class_name}'.format(class_name=provider.__class__.__name__))
+                warnings.warn(
+                    'Artist search not implemented for {class_name}'.format(class_name=provider.__class__.__name__))
                 continue
             results.extend(provider_results)
 
@@ -59,9 +89,17 @@ class Provider(object):
 
         if cache_results:
             [artist.save() for artist in results
-                if artist.mbId and not artist.select().where(models.Artist.mbId == artist.mbId)]
+             if artist.mbId and not artist.select().where(models.Artist.mbId == artist.mbId)]
 
         return results
+
+    def _search_album(self, album):
+        """
+        Function to implement to search album
+        :param album: Album to search for
+        :return: List of Album objects
+        """
+        raise NotImplementedError()
 
     def _search_artist(self, artist):
         """
@@ -79,6 +117,14 @@ class DatabaseProvider(Provider):
 
     def __init__(self):
         Provider.__init__(self, priority=self.PRIORITY_FIRST)
+
+    def _search_album(self, album):
+        """
+
+        :param album:
+        :return:
+        """
+        return models.Album.select().where(models.Album.title.contains(album))
 
     def _search_artist(self, artist):
         """
@@ -106,6 +152,16 @@ class LastFmProvider(Provider):
         # LastFM client
         self._client = pylast.LastFMNetwork(api_key=api_key, api_secret=api_secret)
 
+    def _search_album(self, album):
+        """
+
+        :param album:
+        :return:
+        """
+        raise NotImplementedError()
+        results = self._client.search_for_album(album).get_next_page()
+        return [self._parse_album(result) for result in results]
+
     def _search_artist(self, artist):
         """
 
@@ -114,6 +170,15 @@ class LastFmProvider(Provider):
         """
         results = self._client.search_for_artist(artist).get_next_page()
         return [self._parse_artist(result) for result in results]
+
+    @staticmethod
+    def _parse_album(result):
+        """
+        Parses LastFM response as our artist class
+        :param result: LastFM response
+        :return: Album corresponding to resposne
+        """
+        return models.Album(mbId=result.get_mbid(), title=result.title, release_date=result.get_release_date())
 
     @staticmethod
     def _parse_artist(result):
@@ -135,6 +200,15 @@ class MusicbrainzProvider(Provider):
         musicbrainzngs.set_useragent('lidarrmetadata', lidarrmetadata.__version__)
         musicbrainzngs.set_hostname(musicbrainz_server)
 
+    def _search_album(self, album):
+        """
+
+        :param album:
+        :return:
+        """
+        results = musicbrainzngs.search_releases(album)['release-list']
+        return [x for x in [self._parse_album(result) for result in results] if x]
+
     def _search_artist(self, artist):
         """
 
@@ -143,6 +217,19 @@ class MusicbrainzProvider(Provider):
         """
         results = musicbrainzngs.search_artists(artist)['artist-list']
         return [self._parse_artist(result) for result in results]
+
+    @staticmethod
+    def _parse_album(result):
+        """
+        Parses musicbrainz release to get Album
+        :param result: Musicbrainz release result
+        :return: Album object corresponding to release
+        """
+        if 'id' not in result or 'title' not in result or 'date' not in result:
+            warnings.warn('Missing field while parsing {result}'.format(result=result))
+            return
+
+        return models.Album(mbId=result['id'], title=result['title'], release_date=result['date'])
 
     @staticmethod
     def _parse_artist(result):
@@ -162,3 +249,4 @@ if __name__ == '__main__':
     DatabaseProvider()
     MusicbrainzProvider()
     print(Provider.search_artist('afi', cache_results=True, stop_on_result=True))
+    print(Provider.search_album('dark side of the moon', cache_results=True, stop_on_result=False))

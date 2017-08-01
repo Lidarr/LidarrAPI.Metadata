@@ -17,6 +17,16 @@ class Album(BaseModel):
     title = peewee.CharField(null=False)
     release_date = peewee.DateTimeField(null=False)
 
+    def __repr__(self):
+        return '<{class_name} {title}>'.format(class_name=self.__class__.__name__, title=self.title)
+
+    def to_dict(self):
+        """
+        Dictionary representation of artist
+        :return: Dictionary representation of artist
+        """
+        return {'mbId': self.mbId, 'title': self.title, 'release_date': self.release_date}
+
 
 class Artist(BaseModel):
     mbId = peewee.CharField(null=False)
