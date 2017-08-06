@@ -6,6 +6,11 @@ import dateutil.parser
 import flask
 import musicbrainzngs
 
+try:
+    from functools import lru_cache
+except ImportError:
+    from functools32 import lru_cache
+
 # Config stuff
 PORT = 5000
 MUSICBRAINZ_HOST = 'musicbrainz.org'
@@ -63,6 +68,7 @@ def _parse_mv_track(mb_track):
             'DurationMs': int(mb_track.get('length', -1))}
 
 
+@lru_cache()
 def _album_search(query, **kwargs):
     """
     Searches musicbrainz for album query
@@ -74,6 +80,7 @@ def _album_search(query, **kwargs):
     return [_parse_mb_album(mb_album) for mb_album in mb_response]
 
 
+@lru_cache()
 def _artist_search(query):
     """
     Searches musicbrainz for artist query
@@ -84,6 +91,7 @@ def _artist_search(query):
     return [_parse_mb_artist(mb_artist) for mb_artist in mb_response]
 
 
+@lru_cache()
 def _track_search(query, **kwargs):
     """
     Searches musicbrainz for a track
