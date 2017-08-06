@@ -2,6 +2,7 @@
 Simple metadata server using only musicbrainz
 """
 
+import dateutil.parser
 import flask
 import musicbrainzngs
 
@@ -29,7 +30,7 @@ def _parse_mb_album(mb_release_group):
     return {'Id': mb_release_group['id'],
             'Title': mb_release_group['title'],
             'Artists': artists,
-            'ReleaseDate': mb_release['date'] if 'date' in mb_release else '',
+            'ReleaseDate': dateutil.parser.parse(mb_release['date']) if 'date' in mb_release else '',
             'Genres': [],
             'Overview': '',
             'Label': '',
@@ -102,6 +103,7 @@ def artist_route(mbid):
 
     artist['Albums'] = albums
     return flask.jsonify(artist)
+
 
 @app.route('/search/album')
 def search_album_route():
