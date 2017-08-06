@@ -51,13 +51,14 @@ def _parse_mb_artist(mb_artist):
             'Genres': ''}
 
 
-def _album_search(query):
+def _album_search(query, **kwargs):
     """
     Searches musicbrainz for album query
     :param query: Search query
+    :param kwargs: Keyword args passed as fields to muscbrainz search
     :return: Dict of album object
     """
-    mb_response = musicbrainzngs.search_release_groups(query)['release-group-list']
+    mb_response = musicbrainzngs.search_release_groups(query, **kwargs)['release-group-list']
     return [_parse_mb_album(mb_album) for mb_album in mb_response]
 
 
@@ -91,7 +92,7 @@ def artist_route(mbid):
     """
     mb_response = musicbrainzngs.get_artist_by_id(mbid)['artist']
     artist = _parse_mb_artist(mb_response)
-    queried_albums = _album_search(artist['ArtistName'])
+    queried_albums = _album_search('', artistname=artist['ArtistName'])
     albums = []
     for album in queried_albums:
         for album_artist in album['Artists']:
