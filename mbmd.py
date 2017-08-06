@@ -101,7 +101,7 @@ def _track_search(query, **kwargs):
     """
     mb_response = musicbrainzngs.search_recordings(query, **kwargs)['recording-list']
     tracks = [_parse_mv_track(track) for track in mb_response]
-    for i, track in enumerate(mb_response):
+    for i, track in enumerate(tracks):
         track['TrackNumber'] = i + 1
     return tracks
 
