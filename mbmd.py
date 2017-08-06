@@ -52,6 +52,17 @@ def _parse_mb_artist(mb_artist):
             'Genres': ''}
 
 
+def _parse_mv_track(mb_track):
+    """
+    Parses track/recording response from musicbrainz
+    :param mb_track: Recording result from musicbrainz
+    :return: Dict of format wanted by api
+    """
+    return {'Id': mb_track['id'],
+            'TrackName': mb_track['title'],
+            'DurationMs': int(mb_track.get('length', -1))}
+
+
 def _album_search(query, **kwargs):
     """
     Searches musicbrainz for album query
@@ -71,6 +82,20 @@ def _artist_search(query):
     """
     mb_response = musicbrainzngs.search_artists(query)['artist-list']
     return [_parse_mb_artist(mb_artist) for mb_artist in mb_response]
+
+
+def _track_search(query, **kwargs):
+    """
+    Searches musicbrainz for a track
+    :param query: Search query
+    :param kwargs: Arguments to pass to musicbrainz as field names
+    :return: Dict representing track
+    """
+    mb_response = musicbrainzngs.search_recordings(query, **kwargs)['recording-list']
+    tracks = [_parse_mv_track(track) for track in mb_response]
+    for i, track in enumerate(mb_response):
+        track['TrackNumber'] = i + 1
+    return tracks
 
 
 @app.route('/albums/<mbid>/')
@@ -100,6 +125,10 @@ def artist_route(mbid):
             if artist['ArtistName'] == album_artist['ArtistName']:
                 albums.append(album)
                 break
+
+    for album in albums:
+        tracks = _track_search('', rgid=album['Id'])
+        album['Tracks'] = tracks
 
     artist['Albums'] = albums
     return flask.jsonify(artist)
