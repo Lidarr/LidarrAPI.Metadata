@@ -33,6 +33,8 @@ def _parse_mb_album(mb_release_group):
     artists = [{'Id': artist['artist']['id'], 'ArtistName': artist['artist']['name']}
                for artist in mb_release_group['artist-credit'] if isinstance(artist, dict)]
 
+    mb_image = musicbrainzngs.get_release_group_image_list(mb_release_group['id'])
+
     return {'Id': mb_release_group['id'],
             'Title': mb_release_group['title'],
             'Artists': artists,
@@ -40,9 +42,9 @@ def _parse_mb_album(mb_release_group):
             'Genres': [],
             'Overview': '',
             'Label': '',
-            'Images': [],
+            'Images': list(filter(None,[_parse_mb_image(image) for image in mb_image['images']])),
             'Type': mb_release_group.get('type', 'Unknown'),
-            'Tracks': [_parse_mv_track(track) for track in mb_release['medium-list'][0]['track-list']]}
+            'Tracks': [_parse_mb_track(track) for track in mb_release['medium-list'][0]['track-list']]}
 
 
 def _parse_mb_artist(mb_artist):
@@ -58,7 +60,7 @@ def _parse_mb_artist(mb_artist):
             'Genres': ''}
 
 
-def _parse_mv_track(mb_track):
+def _parse_mb_track(mb_track):
     """
     Parses track/recording response from musicbrainz
     :param mb_track: Recording result from musicbrainz
@@ -68,6 +70,19 @@ def _parse_mv_track(mb_track):
             'TrackName': mb_track['recording']['title'],
             'TrackNumber': mb_track['number'],
             'DurationMs': int(mb_track.get('length', -1))}
+
+def _parse_mb_image(mb_image):
+    """
+    Parses image response from musicbrainz cover art archive
+    :param mb_image: Recording result from musicbrainz cover art archive
+    :return: Dict of format wanted by api
+    """
+    print(mb_image['front'])
+    if mb_image['front']:
+        return {'CoverType': 'Cover',
+                'Url': mb_image['image']}
+    else:
+        return None
 
 
 @lru_cache()
