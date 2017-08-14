@@ -33,7 +33,10 @@ def _parse_mb_album(mb_release_group):
     artists = [{'Id': artist['artist']['id'], 'ArtistName': artist['artist']['name']}
                for artist in mb_release_group['artist-credit'] if isinstance(artist, dict)]
 
-    mb_image = musicbrainzngs.get_release_group_image_list(mb_release_group['id'])
+    try:
+        mb_image = musicbrainzngs.get_release_group_image_list(mb_release_group['id'])
+    except musicbrainzngs.ResponseError:
+        mb_image = {'images': []}
 
     return {'Id': mb_release_group['id'],
             'Title': mb_release_group['title'],
