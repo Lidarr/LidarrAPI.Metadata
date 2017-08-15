@@ -2,9 +2,12 @@
 Simple metadata server using only musicbrainz
 """
 
+import collections
+
 import dateutil.parser
 import flask
 import musicbrainzngs
+import psycopg2
 
 try:
     from functools import lru_cache
@@ -15,6 +18,45 @@ except ImportError:
 PORT = 5000
 MUSICBRAINZ_HOST = 'musicbrainz.org'
 AGENT = ('lidarr', '0.0.0')
+MODE = 'MB'  # DB for direct DB connection, MB for musicbrainz API
+DB_HOST = ''
+DB_PORT = 5432
+DB_NAME = 'musicbrainz_db'
+DB_USER = 'abc'
+DB_PASSWORD = 'abc'
+
+if MODE == 'DB':
+    db_connection = psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD)
+    db_cursor = db_connection.cursor()
+else:
+    db_connection = None
+    db_cursor = None
+
+
+def query_from_file(filename, *args, **kwargs):
+    """
+    Executes query from sql file
+    :param filename: Filename of sql query
+    :param args: Positional args to pass to cursor.execute
+    :param kwargs: Keyword args to pass to cursor.execute
+    :return: List of dict with column: value results
+    """
+    with open(filename, 'r') as sql:
+        return map_query(sql.read(), *args, **kwargs)
+
+
+def map_query(*args, **kwargs):
+    """
+    Maps a SQL query to a list of dicts of column name: value
+    :param args: Args to pass to cursor.execute
+    :param kwargs: Keyword args to pass to cursor.execute
+    :return: List of dict with column: value
+    """
+    db_cursor.execute(*args, **kwargs)
+    columns = collections.OrderedDict((column.name, None) for column in db_cursor.description)
+    results = db_cursor.fetchall()
+    return [{column: result[i] for i, column in enumerate(columns.keys())} for result in results]
+
 
 musicbrainzngs.set_hostname(MUSICBRAINZ_HOST)
 musicbrainzngs.set_useragent(*AGENT)
@@ -71,8 +113,9 @@ def _parse_mb_track(mb_track):
     """
     return {'Id': mb_track['id'],
             'TrackName': mb_track['recording']['title'],
-            'TrackNumber': mb_track['number'],
+            'TrackNumber': mb_track['position'],
             'DurationMs': int(mb_track.get('length', -1))}
+
 
 def _parse_mb_image(mb_image):
     """
@@ -88,6 +131,58 @@ def _parse_mb_image(mb_image):
         return None
 
 
+def _parse_db_artist(db_artist):
+    """
+    Parses a db artist from SQL query
+    :param db_artist: SQL query return
+    :return: Parsed artist JSON
+    """
+    print(db_artist['gid'])
+    return {
+        'Id': db_artist['gid'],
+        'ArtistName': db_artist['name'],
+        'Overview': '',
+        'Genres': '',
+        'Images': [],
+        'Albums': []
+    }
+
+
+def _parse_db_album(db_album):
+    """
+    Parses a db artist from SQL query
+    :param db_album: SQL query return
+    :return: Parsed album JSON
+    """
+    print(db_album.keys())
+    return {
+        'Id': db_album['gid'],
+        'Title': db_album['name'],
+        'Artists': [],
+        'ReleaseDate': db_album.get('last_updated', ''),
+        'Genres': [],
+        'Overview': '',
+        'Label': '',
+        'Images': [],
+        'Type': '',
+        'Tracks': []
+    }
+
+
+def _parse_db_track(db_track):
+    """
+    Parses a db track from SQL query
+    :param db_track: SQL query return
+    :return: Parsed track JSON
+    """
+    return {
+        'Id': db_track['gid'],
+        'TrackName': db_track['name'],
+        'TrackNumber': db_track['position'],
+        'Duration': db_track['length']
+    }
+
+
 @lru_cache()
 def _album_search(query, **kwargs):
     """
@@ -96,8 +191,9 @@ def _album_search(query, **kwargs):
     :param kwargs: Keyword args passed as fields to muscbrainz search
     :return: Dict of album object
     """
-    mb_response = musicbrainzngs.search_release_groups(query, **kwargs)['release-group-list']
-    return [_parse_mb_album(mb_album) for mb_album in mb_response]
+    if MODE == 'MB':
+        mb_response = musicbrainzngs.search_release_groups(query, **kwargs)['release-group-list']
+        return [_parse_mb_album(mb_album) for mb_album in mb_response]
 
 
 @lru_cache()
@@ -107,8 +203,13 @@ def _artist_search(query):
     :param query: Search query
     :return: Dict of artist object
     """
-    mb_response = musicbrainzngs.search_artists(query)['artist-list']
-    return [_parse_mb_artist(mb_artist) for mb_artist in mb_response]
+    if MODE == 'MB':
+        mb_response = musicbrainzngs.search_artists(query)['artist-list']
+        return [_parse_mb_artist(mb_artist) for mb_artist in mb_response]
+    elif MODE == 'DB':
+        artists = query_from_file('./sql/artist_search_name.sql', [query])
+        print(artists)
+        return [_parse_db_artist(artist) for artist in artists]
 
 
 @app.route('/albums/<mbid>/')
@@ -129,9 +230,22 @@ def artist_route(mbid):
     :param mbid: Musicbrainz ID of artist
     :return:
     """
-    mb_response = musicbrainzngs.get_artist_by_id(mbid)['artist']
-    artist = _parse_mb_artist(mb_response)
-    artist['Albums'] = _album_search('', arid=artist['Id'])
+    if MODE == 'MB':
+        mb_response = musicbrainzngs.get_artist_by_id(mbid)['artist']
+        artist = _parse_mb_artist(mb_response)
+        artist['Albums'] = _album_search('', arid=artist['Id'])
+    elif MODE == 'DB':
+        artist = query_from_file('./sql/artist_search_mbid.sql', [mbid])[0]
+        artist = _parse_db_artist(artist)
+        albums = query_from_file('./sql/album_search_artist_mbid.sql', [mbid])
+        artist['Albums'] = [_parse_db_album(album) for album in albums]
+
+        for album in artist['Albums']:
+            tracks = query_from_file('./sql/track_album_mbid.sql', (album['Id'],))
+            album['Tracks'] = [_parse_db_track(track) for track in tracks]
+    else:
+        raise ValueError('Invalid mode')
+
     return flask.jsonify(artist)
 
 
