@@ -3,11 +3,15 @@ Simple metadata server using only musicbrainz
 """
 
 import collections
+import logging
+import logging.handlers
+
 
 import dateutil.parser
 import flask
 import musicbrainzngs
 import psycopg2
+import requests
 
 try:
     from functools import lru_cache
@@ -58,10 +62,39 @@ def map_query(*args, **kwargs):
     return [{column: result[i] for i, column in enumerate(columns.keys())} for result in results]
 
 
+class DiscordHandler(logging.handlers.HTTPHandler):
+    """
+    Logs to discord server
+    """
+    DISCORD_URL = ''
+
+    def __init__(self):
+        super(DiscordHandler, self).__init__(None, None)
+
+    def emit(self, record):
+        """
+        Sends log message
+        :param record: Record of error
+        :return:
+        """
+        requests.post(self.DISCORD_URL, data=self.mapLogRecord(record))
+
+    def mapLogRecord(self, record):
+        """
+        Maps log record to request dict
+        :param record: Record of error
+        :return: Representation of data to send to discord
+        """
+        return {'content': record.exc_text}
+
+
 musicbrainzngs.set_hostname(MUSICBRAINZ_HOST)
 musicbrainzngs.set_useragent(*AGENT)
 
 app = flask.Flask(__name__)
+discord_handler = DiscordHandler()
+discord_handler.setLevel(logging.ERROR)
+app.logger.addHandler(discord_handler)
 
 
 def _parse_mb_album(mb_release_group):
@@ -299,4 +332,4 @@ def search_route():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=PORT)
+    app.run(debug=False, port=PORT)
