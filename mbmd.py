@@ -85,7 +85,7 @@ class DiscordHandler(logging.handlers.HTTPHandler):
         :param record: Record of error
         :return: Representation of data to send to discord
         """
-        return {'content': record.exc_text}
+        return {'content': '```\n{}\n```'.format(record.exc_text)}
 
 
 musicbrainzngs.set_hostname(MUSICBRAINZ_HOST)
