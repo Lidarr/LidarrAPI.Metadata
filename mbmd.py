@@ -133,7 +133,7 @@ def _parse_mb_artist(mb_artist):
     """
     return {'Id': mb_artist['id'],
             'ArtistName': mb_artist['name'],
-            'Overview': '',
+            'Overview': mb_artist.get('disambiguation', ''),
             'Images': [],
             'Genres': ''}
 
