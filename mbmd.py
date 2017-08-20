@@ -168,7 +168,6 @@ def _parse_mb_image(mb_image):
     :param mb_image: Recording result from musicbrainz cover art archive
     :return: Dict of format wanted by api
     """
-    print(mb_image['front'])
     if mb_image['front']:
         return {'CoverType': 'Cover',
                 'Url': mb_image['image']}
@@ -229,15 +228,22 @@ def _parse_db_track(db_track):
 
 
 @lru_cache()
-def _album_search(query, **kwargs):
+def _album_search(query, limit=100, offset=0, **kwargs):
     """
     Searches musicbrainz for album query
     :param query: Search query
+    :param limit: Limit of results for a single page
+    :param offset: Search offset. Use this if searching multiple times
     :param kwargs: Keyword args passed as fields to muscbrainz search
     :return: Dict of album object
     """
     if MODE == 'MB':
-        mb_response = musicbrainzngs.search_release_groups(query, **kwargs)['release-group-list']
+        mb_response = musicbrainzngs.search_release_groups(query,
+                                                           limit=limit,
+                                                           offset=offset,
+                                                           **kwargs)[
+            'release-group-list']
+
         return [_parse_mb_album(mb_album) for mb_album in mb_response]
 
 
@@ -278,7 +284,17 @@ def artist_route(mbid):
     if MODE == 'MB':
         mb_response = musicbrainzngs.get_artist_by_id(mbid)['artist']
         artist = _parse_mb_artist(mb_response)
-        artist['Albums'] = _album_search('', arid=artist['Id'])
+        i = 0
+        limit = 100
+        artist['Albums'] = []
+
+        while len(artist['Albums']) == i * limit:
+            artist['Albums'].extend(_album_search('',
+                                                  limit=limit,
+                                                  offset=i * limit,
+                                                  arid=artist['Id']))
+            i += 1
+
     elif MODE == 'DB':
         artist = query_from_file('./sql/artist_search_mbid.sql', [mbid])[0]
         artist = _parse_db_artist(artist)
