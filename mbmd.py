@@ -94,7 +94,17 @@ musicbrainzngs.set_useragent(*AGENT)
 app = flask.Flask(__name__)
 discord_handler = DiscordHandler()
 discord_handler.setLevel(logging.ERROR)
-app.logger.addHandler(discord_handler)
+
+
+def _mb_album_type(mb_release_group):
+    """
+    Gets album type from musicbrainz release group
+    :param mb_release_group: Release group from musicbrainz response
+    :return: Album type as string
+    """
+    return mb_release_group.get('secondary-type-list',
+                                [mb_release_group.get('primary-type',
+                                                      'Unknown')])[0]
 
 
 def _parse_mb_album(mb_release_group):
@@ -120,9 +130,11 @@ def _parse_mb_album(mb_release_group):
             'Genres': [],
             'Overview': '',
             'Label': '',
-            'Images': list(filter(None,[_parse_mb_image(image) for image in mb_image['images']])),
-            'Type': mb_release_group.get('type', 'Unknown'),
-            'Tracks': [_parse_mb_track(track) for track in mb_release['medium-list'][0]['track-list']]}
+            'Images': list(filter(None, [_parse_mb_image(image) for image in
+                                         mb_image['images']])),
+            'Type': _mb_album_type(mb_release_group),
+            'Tracks': [_parse_mb_track(track) for track in
+                       mb_release['medium-list'][0]['track-list']]}
 
 
 def _parse_mb_artist(mb_artist):
