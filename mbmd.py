@@ -96,6 +96,22 @@ discord_handler = DiscordHandler()
 discord_handler.setLevel(logging.ERROR)
 
 
+def _mb_escaped_query(query):
+    """
+    Escapes a query for musicbrainz
+    :param query: Query to escape
+    :return: Escapes special characters with \
+    """
+    escaped_query = ''
+    for c in query:
+        if not c.isalnum() and c not in ['-', '.', '-', '/']:
+            escaped_query += '\\'
+
+        escaped_query += c
+
+    return escaped_query
+
+
 def _mb_album_type(mb_release_group):
     """
     Gets album type from musicbrainz release group
@@ -238,11 +254,12 @@ def _album_search(query, limit=100, offset=0, **kwargs):
     :return: Dict of album object
     """
     if MODE == 'MB':
-        mb_response = musicbrainzngs.search_release_groups(query,
-                                                           limit=limit,
-                                                           offset=offset,
-                                                           **kwargs)[
-            'release-group-list']
+        mb_response = \
+            musicbrainzngs.search_release_groups(_mb_escaped_query(query),
+                                                 limit=limit,
+                                                 offset=offset,
+                                                 **kwargs)[
+                'release-group-list']
 
         return [_parse_mb_album(mb_album) for mb_album in mb_response]
 
@@ -255,7 +272,8 @@ def _artist_search(query):
     :return: Dict of artist object
     """
     if MODE == 'MB':
-        mb_response = musicbrainzngs.search_artists(query)['artist-list']
+        mb_response = musicbrainzngs.search_artists(_mb_escaped_query(query))[
+            'artist-list']
         return [_parse_mb_artist(mb_artist) for mb_artist in mb_response]
     elif MODE == 'DB':
         artists = query_from_file('./sql/artist_search_name.sql', [query])
