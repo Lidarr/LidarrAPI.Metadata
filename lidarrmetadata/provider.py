@@ -1,261 +1,248 @@
+import abc
 import collections
 import imp
 import itertools
+import urllib
+
+import dateutil.parser
 import six
 import sys
 
+import psycopg2
 import pylast
+import requests
+import wikipedia
 
 import lidarrmetadata
+from lidarrmetadata import util
 
 
-def provider_by_name(name):
+def get_providers_implementing(cls):
     """
-    Gets a provider by string name
-    :param name: Name of provider
-    :return:
+    Gets list of providers implementing mixin
+    :param cls: Mixin class for implementation
+    :return: List of providers inheriting from cls
     """
-    return getattr(sys.modules[__name__], name)
+    return [p for p in Provider.providers if isinstance(p, cls)]
 
 
-def qualitied_func_name(func):
+class MixinBase(six.with_metaclass(abc.ABCMeta, object)):
+    pass
+
+
+class ArtistByIdMixin(MixinBase):
     """
-    Gets qualitied function name
-    :param func:
-    :return:
-    """
-    if six.PY3:
-        return func.__qualname__
-
-    func_class = getattr(func, 'im_class', None)
-
-    if func_class:
-        return func_class.__name__ + '.' + func.__name__
-
-    return func.__name__
-
-
-def _perm_length(fields, providers):
-    """
-    Calculates number of steps for the given providers to get the given fields
-    :param fields: Fields to get
-    :param providers: Providers to use
-    :return: Number of steps to use if providers can provide fields, None if
-             they cannot.
-    """
-    fields = set(fields)
-
-    # Check to make sure all the desired fields can be provided by providers
-    provided_fields = {key for provider in providers for key in
-                       provider.fields.keys()}
-    if provided_fields.intersection(fields) != fields:
-        return None
-
-    steps = 0
-    remaining_fields = fields
-    for provider in providers:
-        steps += 1
-        remaining_fields = remaining_fields.difference(provider.fields)
-
-        if not remaining_fields:
-            return steps
-
-
-def _provider_route(fields):
-    """
-    Gets the route of provider to use to obtain the given fields. Results are
-    cached to avoid having to redo permutations multiple times.
-
-    :param fields: List of fields to search for
-    :return: List of providers to use
-    """
-    lengths = {}
-    for n in range(1, len(Provider.providers) + 1):
-        for providers_perm in itertools.permutations(Provider.providers, n):
-            steps = _perm_length(fields, providers_perm)
-            if steps is not None:
-                lengths[providers_perm] = steps
-
-        # If there's a solution with n providers, there won't be a shorter
-        # solution with n + 1 providers, so we can stop here
-        if any(lengths.values()):
-            break
-
-    return min(lengths, key=lengths.get) if lengths else None
-
-
-def search_fields(fields):
-    """
-    Searched for the desired fields
-    :param fields: Dictionary of fields -> FuncCall to search where the
-                   args and kwargs are passed to the search function
-    :return: Dict of field -> result
-    """
-    route = _provider_route(fields.keys())
-
-    results = []
-    for provider in route:
-        field_names = set(fields.keys()).intersection(provider.fields.keys())
-        provider_fields = {field_name: fields[field_name]
-                           for field_name in field_names}
-        results.extend(provider.search_fields(provider_fields))
-
-    return results
-
-
-# Resource, field tuple for identifying search functions
-ResourceField = collections.namedtuple('ResourceField', ['resource', 'field'])
-
-
-class FuncCall(object):
-    """
-    Encapsulates a function call into a class so we don't have to keep passing
-    around (func, (args, kwargs)) tuples
+    Gets artist by id
     """
 
-    def __init__(self, func, *args, **kwargs):
+    @abc.abstractmethod
+    def get_artist_by_id(self, artist_id):
         """
-        Class initialization
-        :param func: Encapsulated function
-        :param args: Args to provide to function
-        :param kwargs: Keyword args to provide to function
+        Gets artist by id
+        :param artist_id: ID of artist
+        :return: Artist matching ID or None
         """
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
+        pass
 
-    def __call__(self, *args, **kwargs):
-        """
-        Calls FuncCall. Allows calling like a function
-        :param args: Additional args to call with
-        :param kwargs: Additional kwargs to call with
-        :return: Result of function called with args and kwargs class was
-                 initialized with along with passed args and kwargs
-        """
-        args = self.args + args
-        kwargs.update(self.kwargs)
-        return self.func(*args, **kwargs)
 
-    def __eq__(self, other):
-        """
-        Tests equality of FuncCalls
-        :param other: Other object
-        :return: True if function, args, and kwargs are equivalent. False
-                 otherwise
-        """
-        return (self.func == other.func
-                and self.args == other.args
-                and self.kwargs == other.kwargs)
+class ArtistNameSearchMixin(MixinBase):
+    """
+    Searches for artist with artist name
+    """
 
-    def __hash__(self):
+    @abc.abstractmethod
+    def search_artist_name(self, name):
         """
-        Hashing for function. Just hashes the representation string. Probably
-        not the most optimal, but it'll work for our purposes.
-        :return:
+        Searches for artist with name
+        :param name: Name to search for
+        :return: List of possible matches
         """
-        return hash(repr(self))
+        pass
 
-    def __repr__(self):
+
+class AlbumByArtistMixin(MixinBase):
+    """
+    Gets albums for artist
+    """
+
+    @abc.abstractmethod
+    def get_albums_by_artist(self, artist_id):
         """
-        Gets string representation of func call
-        :return: String representation of func call
+        Gets albums by artist by ID
+        :param artist_id: ID of artist
+        :return: List of albums by artist
         """
-        args_str = ', '.join(self.args)
-        kwargs_str = ', '.join(['{key}={value}'.format(key=key, value=value)
-                                for key, value in self.kwargs.items()])
-        return '{name}({args}, {kwargs})'.format(
-            name=qualitied_func_name(self.func),
-            args=args_str,
-            kwargs=kwargs_str)
+        pass
+
+
+class TracksByAlbumMixin(MixinBase):
+    """
+    Gets tracks by album is
+    """
+
+    @abc.abstractmethod
+    def get_album_tracks(self, album_id):
+        """
+        Gets tracks in album
+        :param album_id: ID of album
+        :return: List of tracks in album
+        """
+        pass
+
+
+class ArtistOverviewMixin(MixinBase):
+    """
+    Gets overview for artist
+    """
+
+    @abc.abstractmethod
+    def get_artist_overview(self, artist_id):
+        pass
+
+
+class ArtistArtworkMixin(MixinBase):
+    """
+    Gets art for artist
+    """
+
+    @abc.abstractmethod
+    def get_artist_images(self, artist_id):
+        """
+        Gets images for artist with ID
+        :param artist_id: ID of artist
+        :return: List of results
+        """
+        pass
+
+
+class AlbumArtworkMixin(MixinBase):
+    """
+    Gets art for album
+    """
+
+    @abc.abstractmethod
+    def get_album_images(self, album_id):
+        """
+        Gets images for album with ID
+        :param album_id: ID of album
+        :return: List of results
+        """
+        pass
+
+
+class ArtistLinkMixin(MixinBase):
+    """
+    Gets links for artist
+    """
+
+    @abc.abstractmethod
+    def get_artist_links(self, artist_id):
+        """
+        Gets links for artist with id
+        :param artist_id: ID of artist
+        :return: List of links
+        """
+        pass
 
 
 class Provider(object):
     """
-    Base provider class
+    Provider base class
     """
 
-    # Search priorities to determine which order providers are used in
-    PRIORITY_FIRST = -1
-    PRIORITY_NORMAL = 0
-    PRIORITY_LAST = 1
-
-    # List of provider instances to use for queries
+    # List of provider instances
     providers = []
 
-    def __init__(self, priority=PRIORITY_NORMAL):
-        self.priority = priority
+    def __init__(self):
         self.providers.append(self)
-        self.providers.sort(key=lambda p: p.priority)
 
-        self.fields = {}
 
-    def search_fields(self, fields):
+class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
+    def __init__(self,
+                 api_key,
+                 base_url='webservice.fanart.tv/v3/music/',
+                 use_https=True):
         """
-        Searches for the given fields, minimizing the number of function calls
-        in case on function provides multiple fields
-        :param fields: Dictionary of field -> FuncCall
-        :return: Dictionary of ResourceField -> result
+        Class initialization
+
+        :param api_key: fanart.tv API key
+        :param base_url: Base URL of API. Defaults to
+                         webservice.fanart.tv/v3/music
+        :param use_https: Whether or not to use https. Defaults to True.
         """
-        search_funcs = collections.defaultdict(list)
-        for field, call in fields.items():
-            # Update the call's function since we start it with None
-            call.func = self.fields[field]
-            search_funcs[call].append(field)
+        super(FanArtTvProvider, self).__init__()
 
-        print('sf', search_funcs)
+        self._api_key = api_key
+        self._base_url = base_url
+        self.use_https = use_https
 
-        results = []
-        for func, _fields in search_funcs.items():
-            print('func call', func)
-            # TODO Handle merging results. Should probably find a way to always
-            # have an ID and join on that
-            result = func()
-            results.extend(result)
+    def get_artist_images(self, artist_id):
+        results = self.get_by_mbid(artist_id)
+        return self.parse_artist_images(results)
 
-        # Remove fields that weren't wanted
-        for result in results:
-            [result.pop(extra_field)
-             for extra_field in set(result.keys()).difference(fields.keys())]
+    def get_album_images(self, album_id):
+        results = self.get_by_mbid(album_id)
+        return self.parse_album_images(results, album_id)
 
-        return results
-
-
-class MusicbrainzApiProvider(Provider):
-    """
-    Provider that utilizes the musicbrainz API
-    """
-
-    def __init__(self, host='musicbrainz.org'):
-        super(MusicbrainzApiProvider, self).__init__()
-
-        # Set up client. Since musicbrainzngs has its functions operate on a
-        # module namespace, we need to have a module import for each instance
-        self.client = imp.load_module('self.client',
-                                      *imp.find_module('musicbrainzngs'))
-        self.client.set_useragent('lidarr-metadata', lidarrmetadata.__version__)
-        self.client.set_hostname(host)
-
-        # Set up provider fields
-        self.fields[ResourceField('Artist', 'Id')] = self._search_artist
-        self.fields[ResourceField('Artist', 'ArtistName')] = self._search_artist
-
-    def _search_artist(self, query, **kwargs):
+    def get_by_mbid(self, mbid):
+        # TODO Cache results
         """
-        Searches for an artist
-        :param query: Artist query
-        :param kwargs: Keyword arguments to send to musicbrainzngs search
-        :return:
+        Gets the fanart.tv response for resource with Musicbrainz id mbid
+        :param mbid: Musicbrainz ID
+        :return: fanart.tv response for mbid
         """
-        mb_response = self.client.search_artists(query, **kwargs)['artist-list']
-        return [{ResourceField('Artist', 'Id'): artist['id'],
-                 ResourceField('Artist', 'ArtistName'): artist['name']}
-                for artist in mb_response]
+        url = self.build_url(mbid)
+        return requests.get(url).json()
+
+    def build_url(self, mbid):
+        """
+        Builds query url
+        :param mbid: Musicbrainz ID of resource
+        :return: URL to query
+        """
+        scheme = 'https://' if self.use_https else 'http://'
+        url = scheme + self._base_url
+        if url[-1] != '/':
+            url += '/'
+        url += mbid
+        url += '/?api_key={api_key}'.format(api_key=self._api_key)
+        return url
+
+    @staticmethod
+    def parse_album_images(response, album_id):
+        """
+        Parses album images to our expected format
+        :param response: API response
+        :return: List of images in our expected format
+        """
+        album_images = response.get('albums', {}).get(album_id, {})
+        images = {'Cover': util.first_key_item(album_images, 'albumcover'),
+                  'Disc': util.first_key_item(album_images, 'cdart')}
+        return [{'CoverType': key, 'Url': value['url']}
+                for key, value in images.items() if value]
+
+    @staticmethod
+    def parse_artist_images(response):
+        """
+        Parses artist images to our expected format
+        :param response: API response
+        :return: List of images in our expected format
+        """
+        images = {'Banner': util.first_key_item(response, 'musicbanner'),
+                  'Fanart': util.first_key_item(response, 'artistbackground'),
+                  'Poster': util.first_key_item(response, 'artistthumb')}
+        return [{'CoverType': key, 'Url': value['url']}
+                for key, value in images.items() if value]
 
 
-class LastFmProvider(Provider):
+class LastFmProvider(Provider,
+                     ArtistNameSearchMixin,
+                     ArtistOverviewMixin,
+                     AlbumArtworkMixin):
     """
     Provider that uses LastFM API
     """
+
     def __init__(self, api_key, api_secret):
         """
         Class initialization
@@ -267,22 +254,287 @@ class LastFmProvider(Provider):
         self._client = pylast.LastFMNetwork(api_key=api_key,
                                             api_secret=api_secret)
 
-        # Set up supported fields
-        self.fields = {ResourceField('Artist', 'Id'): self.search_artist,
-                       ResourceField('Artist', 'Overview'): self.search_artist}
-
     def search_artist(self, name):
         results = self._client.search_for_artist(name).get_next_page()
-        return [{ResourceField('Artist', 'Id'): result.get_mbid(),
-                ResourceField('Artist', 'Overview'): result.get_bio_summary()}
+        return [{'Id': result.get_mbid(),
+                 'Overview': result.get_bio_summary()}
                 for result in results]
 
-if __name__ == '__main__':
-    provider = MusicbrainzApiProvider()
-    LastFmProvider('',
-                   '')
-    results = search_fields(
-        {ResourceField('Artist', 'ArtistName'): FuncCall(None, '3oh3'),
-         ResourceField('Artist', 'Id'): FuncCall(None, '3oh3'),
-         ResourceField('Artist', 'Overview'): FuncCall(None, '3oh3')})
-    print(results)
+
+class MusicbrainzApiProvider(Provider,
+                             ArtistByIdMixin,
+                             ArtistLinkMixin,
+                             ArtistNameSearchMixin,
+                             AlbumByArtistMixin,
+                             TracksByAlbumMixin):
+    """
+     Provider that utilizes the musicbrainz API
+    """
+
+    def __init__(self, host='musicbrainz.org'):
+        super(MusicbrainzApiProvider, self).__init__()
+
+        # Set up client. Since musicbrainzngs has its functions operate on a
+        # module namespace, we need to have a module import for each instance
+        self.client = imp.load_module('self.client',
+                                      *imp.find_module('musicbrainzngs'))
+        self.client.set_rate_limit(False)
+        self.client.set_useragent('lidarr-metadata', lidarrmetadata.__version__)
+        self.client.set_hostname(host)
+
+    def get_artist_by_id(self, artist_id):
+        mb_response = self.client.get_artist_by_id(artist_id,
+                                                   includes=['url-rels'])
+        return self._parse_mb_artist(mb_response['artist'])
+
+    def get_artist_links(self, artist_id):
+        return self.get_artist_by_id(artist_id)['Links']
+
+    def get_album_tracks(self, album_id):
+        return self.search_album('', rgid=album_id)[0]['Tracks']
+
+    def get_albums_by_artist(self, artist_id):
+        return self.search_album('', arid=artist_id)
+
+    def search_artist_name(self, name):
+        return self.search_artist(name)
+
+    def _search_artist(self, query, **kwargs):
+        """
+        Searches for an artist
+        :param query: Artist query
+        :param kwargs: Keyword arguments to send to musicbrainzngs search
+        :return:
+        """
+        query = self._mb_escaped_query(query)
+        mb_response = self.client.search_artists(query, **kwargs)['artist-list']
+        return [{'Id': artist['id'],
+                 'ArtistName': artist['name']}
+                for artist in mb_response]
+
+    def artist_by_id(self, mbid, **kwargs):
+        """
+        Gets artist by ID
+        :param mbid: Musicbrainz ID of artist
+        :param kwargs: Keyword args to supply to musicbrainz call
+        :return: Dictionary of result
+        """
+        mb_response = self.client.get_artist_by_id(mbid, **kwargs)['artist']
+        artist = self._parse_mb_artist(mb_response)
+        i = 0
+        limit = 100
+        artist['Albums'] = []
+
+        while len(artist['Albums']) == i * limit:
+            artist['Albums'].extend(self.search_album('',
+                                                      limit=limit,
+                                                      offset=i * limit,
+                                                      arid=artist['Id']))
+            i += 1
+
+        return artist
+
+    def search_artist(self, query, **kwargs):
+        """
+        Searches musicbrainz for artist
+        :param query: Artist query
+        :param kwargs: Keyword args to supply to search call
+        :return: List of dictionaries of result
+        """
+        query = self._mb_escaped_query(query)
+        mb_response = self.client.search_artists(query, **kwargs)['artist-list']
+        return [self._parse_mb_artist(artist) for artist in mb_response]
+
+    def search_album(self, query, limit=100, offset=0, **kwargs):
+        """
+        Searches musicbrainz for album query
+        :param query: Search query
+        :param limit: Limit of results for a single page
+        :param offset: Search offset. Use this if searching multiple times
+        :param kwargs: Keyword args passed as fields to muscbrainz search
+        :return: Dict of album object
+        """
+        mb_response = \
+            self.client.search_release_groups(self._mb_escaped_query(query),
+                                              limit=limit,
+                                              offset=offset,
+                                              **kwargs)['release-group-list']
+
+        return [self._parse_mb_album(mb_album) for mb_album in mb_response]
+
+    @staticmethod
+    def _mb_escaped_query(query):
+        """
+        Escapes a query for musicbrainz
+        :param query: Query to escape
+        :return: Escapes special characters with \
+        """
+        escaped_query = ''
+        for c in query:
+            if not c.isalnum() and c not in ['-', '.', '-', '/']:
+                escaped_query += '\\'
+
+            escaped_query += c
+
+        return escaped_query
+
+    @staticmethod
+    def _mb_album_type(mb_release_group):
+        """
+        Gets album type from musicbrainz release group
+        :param mb_release_group: Release group from musicbrainz response
+        :return: Album type as string
+        """
+        return mb_release_group.get('secondary-type-list',
+                                    [mb_release_group.get('primary-type',
+                                                          'Unknown')])[0]
+
+    def _parse_mb_album(self, mb_release_group):
+        """
+        Parses album (release) response from musicbrainz
+        :param mb_release_group: Response from muscbrainz
+        :return: Dict of the format wanted by api
+        """
+        try:
+            mb_release = \
+                self.client.get_release_by_id(
+                    mb_release_group['release-list'][0]['id'],
+                    includes=['recordings'])['release']
+        except self.client.ResponseError:
+            mb_release = {}
+
+        artists = [
+            {'Id': artist['artist']['id'],
+             'ArtistName': artist['artist']['name']}
+            for artist in mb_release_group['artist-credit'] if
+            isinstance(artist, dict)]
+
+        return {'Id': mb_release_group['id'],
+                'Title': mb_release_group['title'],
+                'Artists': artists,
+                'ReleaseDate': dateutil.parser.parse(
+                    mb_release['date']) if 'date' in mb_release else '',
+                'Genres': [],
+                'Overview': '',
+                'Label': '',
+                'Type': self._mb_album_type(mb_release_group),
+                'Tracks': [self._parse_mb_track(track) for track in
+                           mb_release.get('medium-list',
+                                          [{}])[0].get('track-list', [])]}
+
+    @staticmethod
+    def _parse_mb_artist(mb_artist):
+        """
+        Parses artist response from musicbrainz
+        :param mb_artist: Resposne from muscbrainz
+        :return: Dict of the format wanted by API
+        """
+        return {'Id': mb_artist['id'],
+                'ArtistName': mb_artist['name'],
+                'Overview': mb_artist.get('disambiguation', ''),
+                'Images': [],
+                'Genres': '',
+                'Links': mb_artist.get('url-relation-list', [])}
+
+    @staticmethod
+    def _parse_mb_track(mb_track):
+        """
+        Parses track/recording response from musicbrainz
+        :param mb_track: Recording result from musicbrainz
+        :return: Dict of format wanted by api
+        """
+        return {'Id': mb_track['id'],
+                'TrackName': mb_track['recording']['title'],
+                'TrackNumber': mb_track['position'],
+                'DurationMs': int(mb_track.get('length', 0)) or None}
+
+
+class MusicbrainzDbProvider(Provider,
+                            ArtistNameSearchMixin,
+                            AlbumByArtistMixin,
+                            TracksByAlbumMixin):
+    """
+    Provider for directly querying musicbrainz database
+    """
+
+    def __init__(self,
+                 db_host='localhost',
+                 db_port=5432,
+                 db_name='musicbrainz_db',
+                 db_user='abc',
+                 db_password='abc'):
+        """
+        Class initialization
+
+        Note that these defaults are reasonable if the linuxserverio/musicbrainz
+        docker image is running locally with port 5432 exposed.
+
+        :param db_host: Host of musicbrainz db. Defaults to localhost
+        :param db_port: Port of musicbrainz db. Defaults to 5432
+        :param db_name: Name of musicbrainz db. Defaults to musicbrainz_db
+        :param db_user: User for musicbrainz db. Defaults to abc
+        :param db_password: Password for musicbrainz db. Defaults to abc
+        """
+        super(MusicbrainzDbProvider, self).__init__()
+
+        self._db_host = db_host
+        self._db_port = db_port
+        self._db_name = db_name
+        self._db_user = db_user
+        self._db_password = db_password
+
+        self.db_connection = psycopg2.connect(host=db_host,
+                                              port=db_host,
+                                              dbname=db_name,
+                                              user=db_user,
+                                              password=db_password)
+        self.db_cursor = self.db_connection.cursor()
+
+    def get_album_tracks(self, album_id):
+        pass
+
+    def get_artist_overview(self, artist_id):
+        pass
+
+    def get_albums_by_artist(self, artist_id):
+        pass
+
+
+class WikipediaProvider(Provider, ArtistOverviewMixin):
+    """
+    Provider for querying wikipedia
+    """
+
+    def __init__(self):
+        """
+        Class initialization
+        """
+        super(WikipediaProvider, self).__init__()
+
+    def get_artist_overview(self, url):
+        return self.get_summary(url)
+
+    @classmethod
+    def get_summary(cls, url):
+        """
+        Gets summary of a wikipedia page
+        :param url: URL of wikipedia page
+        :return: Summary String
+        """
+        try:
+            title = cls.title_from_url(url)
+            return wikipedia.summary(title)
+        except wikipedia.PageError as error:
+            raise ValueError(error)
+
+    @staticmethod
+    def title_from_url(url):
+        """
+        Gets the wikipedia page title from url. This may not work for URLs with
+        certain special characters
+        :param url: URL of wikipedia page
+        :return: Title of page at URL
+        """
+        page = url.split('/')[-1]
+        encoded_title = page.replace('_', ' ')
+        return urllib.unquote(encoded_title)

@@ -6,6 +6,8 @@ import os
 import re
 import sys
 
+from lidarrmetadata import provider
+
 # Environment key to use for configuration setting. This environment variable
 # may be set to override the default config if no CLI argument is given
 ENV_KEY = 'LIDARR_METADATA_CONFIG'
@@ -82,6 +84,9 @@ class DefaultConfig(object):
     # Debug mode
     DEBUG = False
 
+    # Fanart.tv API credentials
+    FANART_KEY = ''
+
     # LastFM API connection details
     LASTFM_KEY = ''
     LASTFM_SECRET = ''
@@ -89,10 +94,10 @@ class DefaultConfig(object):
     # Whether or not running in production
     PRODUCTION = False
 
-    # Providers to use as class -> (args, kwargs) dictionary
-    PROVIDERS = {'DatabaseProvider': ([], {}),
-                 'LastFmProvider': ([], {'api_key': LASTFM_KEY, 'api_secret': LASTFM_SECRET}),
-                 'MusicbrainzProvider': ([], {})}
+    # List of providers
+    PROVIDERS = [provider.FanArtTvProvider(FANART_KEY),
+                provider.MusicbrainzApiProvider(),
+                 provider.WikipediaProvider()],
 
     # Testing mode
     TESTING = False
