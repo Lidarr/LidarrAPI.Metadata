@@ -32,7 +32,7 @@ def teardown_request(response):
 
 
 @app.errorhandler(404)
-@app.errorhandler(Exception)
+@app.errorhandler(500)
 def handle_error(e):
     code = 500
     if isinstance(e, HTTPException):
