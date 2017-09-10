@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, send_file
+import flask_cache
 from werkzeug.exceptions import HTTPException
 
 from lidarrmetadata import config
@@ -7,6 +8,10 @@ from lidarrmetadata import provider
 
 app = Flask(__name__)
 app.config.from_object(config.CONFIG)
+
+cache = flask_cache.Cache(config=app.config['CACHE_CONFIG'])
+if app.config['USE_CACHE']:
+    cache.init_app(app)
 
 if not app.config['PRODUCTION']:
     # Run api doc server if not running in production
@@ -36,6 +41,7 @@ def handle_error(e):
 
 
 @app.route('/artists/<mbid>/', methods=['GET'])
+@cache.cached()
 def get_artist_info(mbid):
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(
@@ -122,6 +128,7 @@ def search_album():
 
 
 @app.route('/search/artist/', methods=['GET'])
+@cache.cached(key_prefix=lambda: request.full_path)
 def search_artist():
     """Search for a human-readable artist
     ---

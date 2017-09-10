@@ -78,6 +78,10 @@ class DefaultConfig(object):
 
     APPLICATION_ROOT = None
 
+    # Cache options
+    USE_CACHE = True
+    CACHE_CONFIG = {'CACHE_TYPE': 'simple'}
+
     # File to use for DB
     DB_FILE = os.path.abspath('./music-metadata.db')
 
