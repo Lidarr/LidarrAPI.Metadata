@@ -1,8 +1,11 @@
-SELECT
-  release_group.id,
-  release_group.gid,
-  release_group.name,
-  release_group.last_updated
-FROM release_group
-  JOIN artist ON release_group.artist_credit = artist.id
-WHERE artist.gid = %s
+SELECT release.name as album,
+  release.gid as gid,
+  area.name as country,
+  release_country.date_day as day,
+  release_country.date_month as month,
+  release_country.date_year as year
+FROM release
+  JOIN release_country on release.id = release_country.release
+  JOIN area on release_country.country = area.id
+  JOIN artist on release.artist_credit = artist.id
+  WHERE artist.gid = %s AND area.name = %s

@@ -38,7 +38,9 @@ setup(
                       'musicbrainzngs',
                       'peewee',
                       'pylast',
-                      'python-dateutil'],
+                      'python-dateutil',
+                      'requests',
+                      'wikipedia'],
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow

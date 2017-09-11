@@ -82,8 +82,9 @@ def get_artist_info(mbid):
         artist['Links'] = link_providers[0].get_artist_links(mbid)
 
     if overview_providers:
-        wikipedia_links = filter(lambda link: 'wikipedia' in link.values(),
-                                 artist['Links'])
+        wikipedia_links = filter(
+            lambda link: 'wikipedia' in link.get('target', ''),
+            artist['Links'])
         if wikipedia_links:
             artist['Overview'] = overview_providers[0].get_artist_overview(
                 wikipedia_links[0]['target'])
@@ -100,6 +101,7 @@ def get_artist_info(mbid):
             album['Images'] = []
 
     return jsonify(artist)
+
 
 @app.route('/search/album/')
 def search_album():
@@ -181,11 +183,13 @@ def search_artist():
             artist['Links'] = link_providers[0].get_artist_links(artist['Id'])
 
             # FIXME Repeated above
-            wikipedia_links = filter(lambda link: 'wikipedia' in link.values(),
-                                     artist['Links'])
+            wikipedia_links = filter(
+                lambda link: 'wikipedia' in link.get('target', ''),
+                artist['Links'])
             if wikipedia_links:
                 try:
-                    artist['Overview'] = overview_providers[0].get_artist_overview(
+                    artist['Overview'] = overview_providers[
+                        0].get_artist_overview(
                         wikipedia_links[0]['target'])
                 except ValueError:
                     pass

@@ -100,7 +100,8 @@ class DefaultConfig(object):
 
     # List of providers
     PROVIDERS = [provider.FanArtTvProvider(FANART_KEY),
-                provider.MusicbrainzApiProvider(),
+                 provider.MusicbrainzDbProvider(),
+                 provider.MusicbrainzApiProvider(),
                  provider.WikipediaProvider()],
 
     # Testing mode

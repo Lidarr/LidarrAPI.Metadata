@@ -1,12 +1,11 @@
 import abc
 import collections
+import datetime
 import imp
-import itertools
 import urllib
 
 import dateutil.parser
 import six
-import sys
 
 import psycopg2
 import pylast
@@ -450,6 +449,7 @@ class MusicbrainzApiProvider(Provider,
 
 
 class MusicbrainzDbProvider(Provider,
+                            ArtistLinkMixin,
                             ArtistNameSearchMixin,
                             AlbumByArtistMixin,
                             TracksByAlbumMixin):
@@ -484,20 +484,69 @@ class MusicbrainzDbProvider(Provider,
         self._db_password = db_password
 
         self.db_connection = psycopg2.connect(host=db_host,
-                                              port=db_host,
+                                              port=db_port,
                                               dbname=db_name,
                                               user=db_user,
                                               password=db_password)
         self.db_cursor = self.db_connection.cursor()
 
+    def search_artist_name(self, name):
+        results = self.query_from_file('../sql/artist_search_name.sql', [name])
+        return [{'Id': result['gid'], 'ArtistName': result['name']}
+                for result in results]
+
     def get_album_tracks(self, album_id):
-        pass
+        results = self.query_from_file('../sql/track_album_mbid.sql',
+                                       [album_id])
+        return [{'Id': result['gid'],
+                 'TrackName': result['name'],
+                 'TrackNumber': result['position'],
+                 'DurationMs': result['length']}
+                for result in results]
 
-    def get_artist_overview(self, artist_id):
-        pass
+    def get_albums_by_artist(self, artist_id, country='United States'):
+        results = self.query_from_file('../sql/album_search_artist_mbid.sql',
+                                       [artist_id, country])
+        print('album results', results)
+        return [{'Id': result['gid'],
+                 'AlbumName': result['album'],
+                 'Country': result['country'],
+                 'ReleaseDate': datetime.datetime(result['year'] or 1,
+                                                  result['month'] or 1,
+                                                  result['day'] or 1)}
+                for result in results]
 
-    def get_albums_by_artist(self, artist_id):
-        pass
+    def get_artist_links(self, artist_id):
+        results = self.query_from_file('../sql/links_artist_mbid.sql',
+                                       [artist_id])
+        return [{'target': result['url']}
+                for result in results]
+
+    def query_from_file(self, filename, *args, **kwargs):
+        """
+        Executes query from sql file
+        :param filename: Filename of sql query
+        :param args: Positional args to pass to cursor.execute
+        :param kwargs: Keyword args to pass to cursor.execute
+        :return: List of dict with column: value results
+        """
+        with open(filename, 'r') as sql:
+            return self.map_query(sql.read(), *args, **kwargs)
+
+    def map_query(self, *args, **kwargs):
+        """
+        Maps a SQL query to a list of dicts of column name: value
+        :param args: Args to pass to cursor.execute
+        :param kwargs: Keyword args to pass to cursor.execute
+        :return: List of dict with column: value
+        """
+        self.db_cursor.execute(*args, **kwargs)
+        columns = collections.OrderedDict(
+            (column.name, None) for column in self.db_cursor.description)
+        results = self.db_cursor.fetchall()
+        return [{column: result[i] for i, column in enumerate(columns.keys())}
+                for
+                result in results]
 
 
 class WikipediaProvider(Provider, ArtistOverviewMixin):
