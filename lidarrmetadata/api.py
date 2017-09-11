@@ -197,6 +197,11 @@ def search_artist():
                 except ValueError:
                     pass
 
+        else:
+            artist['Overview'] = ''
+
+        artist['Images'] = []
+
     return jsonify(artists)
 
 
