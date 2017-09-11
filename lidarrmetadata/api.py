@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, send_file
 import flask_cache
+import raven.contrib.flask
 from werkzeug.exceptions import HTTPException
 
 from lidarrmetadata import config
@@ -9,10 +10,12 @@ from lidarrmetadata import provider
 app = Flask(__name__)
 app.config.from_object(config.CONFIG)
 
+sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
+
 cache = flask_cache.Cache(config=app.config['CACHE_CONFIG'])
 if app.config['USE_CACHE']:
     cache.init_app(app)
-
+    
 if not app.config['PRODUCTION']:
     # Run api doc server if not running in production
     from flasgger import Swagger

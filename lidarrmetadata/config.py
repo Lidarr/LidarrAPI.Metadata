@@ -104,6 +104,10 @@ class DefaultConfig(object):
                  provider.MusicbrainzApiProvider(),
                  provider.WikipediaProvider()],
 
+    # Connection info for sentry
+    SENTRY_DSN = ('https://c94975eddcf84d91901ebc1fdba99327:'
+                  '605f0689da43434bae633d07c0357c46@sentry.io/215082')
+
     # Testing mode
     TESTING = False
 

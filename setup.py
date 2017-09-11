@@ -39,6 +39,7 @@ setup(
                       'peewee',
                       'pylast',
                       'python-dateutil',
+                      'raven[flask]',
                       'requests',
                       'wikipedia'],
 
