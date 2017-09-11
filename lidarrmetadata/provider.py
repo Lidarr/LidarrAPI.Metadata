@@ -509,7 +509,7 @@ class MusicbrainzDbProvider(Provider,
                                        [artist_id, country])
         print('album results', results)
         return [{'Id': result['gid'],
-                 'AlbumName': result['album'],
+                 'Title': result['album'],
                  'Country': result['country'],
                  'ReleaseDate': datetime.datetime(result['year'] or 1,
                                                   result['month'] or 1,
