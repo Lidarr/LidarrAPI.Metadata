@@ -548,7 +548,8 @@ class MusicbrainzDbProvider(Provider,
     def get_artist_links(self, artist_id):
         results = self.query_from_file('../sql/links_artist_mbid.sql',
                                        [artist_id])
-        return [{'target': result['url']}
+        return [{'target': result['url'],
+                 'type': self.parse_url_source(result['url'])}
                 for result in results]
 
     def query_from_file(self, filename, *args, **kwargs):
@@ -576,6 +577,20 @@ class MusicbrainzDbProvider(Provider,
         return [{column: result[i] for i, column in enumerate(columns.keys())}
                 for
                 result in results]
+
+    @staticmethod
+    def parse_url_source(url):
+        """
+        Parses URL for name
+        :param url: URL to parse
+        :return: Website name of url
+        """
+        domain = url.split('/')[2]
+        split_domain = domain.split('.')
+        try:
+            return split_domain[-2] if split_domain[-2] != 'co' else split_domain[-3]
+        except IndexError:
+            return domain
 
 
 class WikipediaProvider(Provider, ArtistOverviewMixin):
