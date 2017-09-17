@@ -507,7 +507,6 @@ class MusicbrainzDbProvider(Provider,
 
     def get_artist_by_id(self, artist_id):
         results = self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])[0]
-        print(results)
         return {'Id': results['gid'],
                 'ArtistName': results['name'],
                 'Status': 'ended' if results['ended'] else 'active'}
