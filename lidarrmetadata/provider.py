@@ -242,6 +242,7 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         """
         images = {'Banner': util.first_key_item(response, 'musicbanner'),
                   'Fanart': util.first_key_item(response, 'artistbackground'),
+                  'Logo': util.first_key_item(response, 'hdmusiclogo'),
                   'Poster': util.first_key_item(response, 'artistthumb')}
         return [{'CoverType': key, 'Url': value['url']}
                 for key, value in images.items() if value]
