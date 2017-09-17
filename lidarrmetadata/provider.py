@@ -187,10 +187,10 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
 
         return self.parse_artist_images(results)
 
-    def get_album_images(self, album_id):
-        results = self.cache.get(album_id)
+    def get_album_images(self, album_id, cache_only=False):
+        results = self.cache.get(album_id, {})
 
-        if not results:
+        if not results and not cache_only:
             results = self.get_by_mbid(album_id)
             self.cache.put(album_id, results)
 

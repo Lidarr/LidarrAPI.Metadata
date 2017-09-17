@@ -99,7 +99,7 @@ def get_artist_info(mbid):
     if album_art_providers:
         for album in artist['Albums']:
             album['Images'] = album_art_providers[0].get_album_images(
-                album['Id'])
+                album['Id'], cache_only=True)
     else:
         for album in artist['Albums']:
             album['Images'] = []
