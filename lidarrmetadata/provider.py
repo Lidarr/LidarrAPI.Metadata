@@ -504,17 +504,25 @@ class MusicbrainzDbProvider(Provider,
                  'DurationMs': result['length']}
                 for result in results]
 
-    def get_albums_by_artist(self, artist_id, country='United States'):
+    def get_albums_by_artist(self, artist_id):
         results = self.query_from_file('../sql/album_search_artist_mbid.sql',
-                                       [artist_id, country])
+                                       [artist_id])
         print('album results', results)
-        return [{'Id': result['gid'],
-                 'Title': result['album'],
-                 'Country': result['country'],
-                 'ReleaseDate': datetime.datetime(result['year'] or 1,
-                                                  result['month'] or 1,
-                                                  result['day'] or 1)}
-                for result in results]
+        albums = [{'Id': result['gid'],
+                   'Title': result['album'],
+                   'Type': result['primary_type'],
+                   'Releases': result['releases'],
+                   'SecondaryTypes': result['secondary_types'],
+                   'ReleaseDate': datetime.datetime(result['year'] or 1,
+                                                    result['month'] or 1,
+                                                    result['day'] or 1)}
+                  for result in results]
+
+        for album in albums:
+            if isinstance(album['Releases'], str):
+                album['Releases'] = album['Releases'].strip('{}').split(',')
+
+        return albums
 
     def get_artist_links(self, artist_id):
         results = self.query_from_file('../sql/links_artist_mbid.sql',

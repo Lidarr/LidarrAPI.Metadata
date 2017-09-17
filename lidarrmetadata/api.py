@@ -76,7 +76,8 @@ def get_artist_info(mbid):
 
     if track_providers:
         for album in artist['Albums']:
-            album['Tracks'] = track_providers[0].get_album_tracks(album['Id'])
+            if album['Releases'] and album['Releases'][0]:
+                album['Tracks'] = track_providers[0].get_album_tracks(album['Releases'][0])
     else:
         # 500 error if we don't have a track provider since it's essential
         return jsonify(error='No track provider available'), 500
