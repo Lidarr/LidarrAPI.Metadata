@@ -16,7 +16,7 @@ SELECT
     LEFT JOIN release_country ON release_country.release = release.id
     LEFT JOIN area ON release_country.country = area.id
     WHERE release.release_group = release_group.id AND release.status = '1'
-    ORDER BY date_year, date_month, date_day ASC
+    ORDER BY date_year, date_month, date_day ASC, status DESC
   ) releases
 
 FROM release_group
