@@ -227,9 +227,10 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         :param response: API response
         :return: List of images in our expected format
         """
-        album_images = response.get('albums', {}).get(album_id, {})
-        images = {'Cover': util.first_key_item(album_images, 'albumcover'),
-                  'Disc': util.first_key_item(album_images, 'cdart')}
+        if 'albums' in response:
+            response = response.get('albums')
+        images = {'Cover': util.first_key_item(response, 'albumcover'),
+                  'Disc': util.first_key_item(response, 'cdart')}
         return [{'CoverType': key, 'Url': value['url']}
                 for key, value in images.items() if value]
 
