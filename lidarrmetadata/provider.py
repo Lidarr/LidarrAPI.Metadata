@@ -529,19 +529,32 @@ class MusicbrainzDbProvider(Provider,
     def get_albums_by_artist(self, artist_id):
         results = self.query_from_file('../sql/album_search_artist_mbid.sql',
                                        [artist_id])
-        albums = [{'Id': result['gid'],
-                   'Title': result['album'],
-                   'Type': result['primary_type'],
-                   'Releases': result['releases'],
-                   'SecondaryTypes': result['secondary_types'],
-                   'ReleaseDate': datetime.datetime(result['year'] or 1,
-                                                    result['month'] or 1,
-                                                    result['day'] or 1)}
-                  for result in results]
 
-        for album in albums:
-            if isinstance(album['Releases'], str):
-                album['Releases'] = album['Releases'].strip('{}').split(',')
+        albums = []
+        for result in results:
+            album = {'Id': result['gid'],
+                     'Title': result['album'],
+                     'Type': result['primary_type'],
+                     'SecondaryTypes': result['secondary_types'],
+                     'ReleaseDate': datetime.datetime(result['year'] or 1,
+                                                      result['month'] or 1,
+                                                      result['day'] or 1)}
+
+            release_ids = result['releases'].strip('{}').split(',')
+            release_ids = [x for x in release_ids if x]
+
+            releases = []
+            for rid in release_ids:
+                release_results = self.query_from_file('../sql/release_by_mbid.sql', [rid])
+                for release in release_results:
+                    releases.append({'Id': release['gid'],
+                                     'Country': release['country'],
+                                     'Label': release['label'],
+                                     'ReleaseDate': datetime.datetime(release['year'] or 1, release['month'] or 1,
+                                                                      release['day'] or 1)})
+
+            album['Releases'] = releases
+            albums.append(album)
 
         return albums
 
