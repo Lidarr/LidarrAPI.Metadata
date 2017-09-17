@@ -463,6 +463,7 @@ class MusicbrainzApiProvider(Provider,
 
 
 class MusicbrainzDbProvider(Provider,
+                            ArtistByIdMixin,
                             ArtistLinkMixin,
                             ArtistNameSearchMixin,
                             AlbumByArtistMixin,
@@ -503,6 +504,13 @@ class MusicbrainzDbProvider(Provider,
                                               user=db_user,
                                               password=db_password)
         self.db_cursor = self.db_connection.cursor()
+
+    def get_artist_by_id(self, artist_id):
+        results = self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])[0]
+        print(results)
+        return {'Id': results['gid'],
+                'ArtistName': results['name'],
+                'Status': 'ended' if results['ended'] else 'active'}
 
     def search_artist_name(self, name):
         results = self.query_from_file('../sql/artist_search_name.sql', [name])

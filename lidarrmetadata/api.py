@@ -82,7 +82,7 @@ def get_artist_info(mbid):
         # 500 error if we don't have a track provider since it's essential
         return jsonify(error='No track provider available'), 500
 
-    if link_providers and not artist['Links']:
+    if link_providers and not artist.get('Links', None):
         artist['Links'] = link_providers[0].get_artist_links(mbid)
 
     if overview_providers:
@@ -169,6 +169,8 @@ def search_artist():
 
     search_providers = provider.get_providers_implementing(
         provider.ArtistNameSearchMixin)
+    artist_providers = provider.get_providers_implementing(
+        provider.ArtistByIdMixin)
     overview_providers = provider.get_providers_implementing(
         provider.ArtistOverviewMixin)
     link_providers = provider.get_providers_implementing(
@@ -185,6 +187,7 @@ def search_artist():
     artists = search_providers[0].search_artist_name(query)
 
     for artist in artists:
+        artist.update(artist_providers[0].get_artist_by_id(artist['Id']))
         if link_providers:
             artist['Links'] = link_providers[0].get_artist_links(artist['Id'])
 
