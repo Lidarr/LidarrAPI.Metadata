@@ -173,6 +173,8 @@ def search_artist():
         provider.ArtistOverviewMixin)
     link_providers = provider.get_providers_implementing(
         provider.ArtistLinkMixin)
+    artist_art_providers = provider.get_providers_implementing(
+        provider.ArtistArtworkMixin)
 
     if not search_providers:
         response = jsonify(error='No search providers available')
@@ -201,7 +203,10 @@ def search_artist():
         else:
             artist['Overview'] = ''
 
-        artist['Images'] = []
+        if artist_art_providers:
+            artist['Images'] = artist_art_providers[0].get_artist_images(artist['Id'])
+        else:
+            artist['Images'] = []
 
     return jsonify(artists)
 
