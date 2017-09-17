@@ -521,7 +521,6 @@ class MusicbrainzDbProvider(Provider,
     def get_albums_by_artist(self, artist_id):
         results = self.query_from_file('../sql/album_search_artist_mbid.sql',
                                        [artist_id])
-        print('album results', results)
         albums = [{'Id': result['gid'],
                    'Title': result['album'],
                    'Type': result['primary_type'],
