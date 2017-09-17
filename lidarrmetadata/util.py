@@ -17,3 +17,38 @@ def first_key_item(dictionary, key, default=None):
         return value[0]
 
     return value
+
+
+class Cache(object):
+    """
+    Cache to store info
+    """
+
+    def __init__(self):
+        """
+        Initialization
+        """
+        self._backend = {}
+
+    def __getitem__(self, item):
+        return self.get(item)
+
+    def __setitem__(self, key, value):
+        return self.put(key, value)
+
+    def get(self, key, default=None):
+        """
+        Gets item with key
+        :param key: Key of item to get
+        :param default: Default value to return if no item at key
+        :return: Item at key
+        """
+        return self._backend.get(key, default)
+
+    def put(self, key, item):
+        """
+        Puts item at key
+        :param key: Key to put item at
+        :param item: Value to put
+        """
+        self._backend[key] = item

@@ -171,16 +171,29 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         """
         super(FanArtTvProvider, self).__init__()
 
+        self.cache = util.Cache()
         self._api_key = api_key
         self._base_url = base_url
         self.use_https = use_https
 
     def get_artist_images(self, artist_id):
-        results = self.get_by_mbid(artist_id)
+        results = self.cache.get(artist_id)
+
+        if not results:
+            results = self.get_by_mbid(artist_id)
+            self.cache.put(artist_id, results)
+            for id, album_result in results.get('albums', {}).items():
+                self.cache.put(id, album_result)
+
         return self.parse_artist_images(results)
 
     def get_album_images(self, album_id):
-        results = self.get_by_mbid(album_id)
+        results = self.cache.get(album_id)
+
+        if not results:
+            results = self.get_by_mbid(album_id)
+            self.cache.put(album_id, results)
+
         return self.parse_album_images(results, album_id)
 
     def get_by_mbid(self, mbid):
