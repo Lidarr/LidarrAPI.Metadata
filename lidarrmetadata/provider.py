@@ -560,7 +560,6 @@ class MusicbrainzDbProvider(Provider,
                                                                                  release['day'] or 1)}
 
             album['Releases'] = releases.values()
-            assert album['Id'] == oldis
             albums.append(album)
 
         return albums
