@@ -9,7 +9,7 @@ SELECT
 FROM release
   LEFT JOIN release_label ON release.id = release_label.release
   LEFT JOIN label ON release_label.label = label.id
-  JOIN release_country ON release.id = release_country.release
-  JOIN country_area ON release_country.country = country_area.area
-  JOIN area ON country_area.area = area.id
+  LEFT JOIN release_country ON release.id = release_country.release
+  LEFT JOIN country_area ON release_country.country = country_area.area
+  LEFT JOIN area ON country_area.area = area.id
 WHERE release.gid = %s
