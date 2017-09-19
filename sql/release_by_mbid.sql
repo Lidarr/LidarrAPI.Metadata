@@ -7,8 +7,8 @@ SELECT
   label.name AS label,
   area.name AS country
 FROM release
-  JOIN release_label ON release.id = release_label.release
-  JOIN label ON release_label.label = label.id
+  LEFT JOIN release_label ON release.id = release_label.release
+  LEFT JOIN label ON release_label.label = label.id
   JOIN release_country ON release.id = release_country.release
   JOIN country_area ON release_country.country = country_area.area
   JOIN area ON country_area.area = area.id
