@@ -1,4 +1,4 @@
-SELECT
+SELECT DISTINCT
   track.id,
   track.gid,
   track.name,
@@ -8,6 +8,7 @@ FROM track
   JOIN medium ON track.medium = medium.id
   JOIN release ON medium.release = release.id
   JOIN release_group ON release.release_group = release_group.id
-  LEFT JOIN artist ON release_group.artist_credit = artist.id
+  JOIN artist_credit_name ON release.artist_credit = artist_credit_name.artist_credit
+  JOIN artist ON artist_credit_name.artist = artist.id
   JOIN recording ON track.recording = recording.id
 WHERE release.gid = %s
