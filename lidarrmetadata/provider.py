@@ -510,11 +510,16 @@ class MusicbrainzDbProvider(Provider,
         results = self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])[0]
         return {'Id': results['gid'],
                 'ArtistName': results['name'],
-                'Status': 'ended' if results['ended'] else 'active'}
+                'Status': 'ended' if results['ended'] else 'active',
+                'Type': results['type'],
+                'Disambiguation': results['comment']}
 
     def search_artist_name(self, name):
         results = self.query_from_file('../sql/artist_search_name.sql', [name])
-        return [{'Id': result['gid'], 'ArtistName': result['name']}
+        return [{'Id': result['gid'],
+                 'ArtistName': result['name'],
+                 'Type': result['type'],
+                 'Disambiguation': result['comment']}
                 for result in results]
 
     def get_album_tracks(self, album_id):
