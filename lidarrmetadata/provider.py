@@ -559,7 +559,7 @@ class MusicbrainzDbProvider(Provider,
 
                     releases[release['gid']] = {'Id': release['gid'],
                                                 'Country': release['country'],
-                                                'Label': [release['label']],
+                                                'Label': [release['label']] if release['label'] else [],
                                                 'ReleaseDate': datetime.datetime(release['year'] or 1,
                                                                                  release['month'] or 1,
                                                                                  release['day'] or 1)}
