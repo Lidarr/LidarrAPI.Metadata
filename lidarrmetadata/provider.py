@@ -538,6 +538,7 @@ class MusicbrainzDbProvider(Provider,
         albums = []
         for result in results:
             album = {'Id': result['gid'],
+                     'Disambiguation': result['comment'],
                      'Title': result['album'],
                      'Type': result['primary_type'],
                      'SecondaryTypes': result['secondary_types'],

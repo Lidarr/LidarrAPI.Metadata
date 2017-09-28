@@ -1,5 +1,6 @@
 SELECT
   release_group.gid  AS gid,
+  release_group.comment,
   release_group_primary_type.name as primary_type,
   release_group.name AS album,
   release_group_meta.first_release_date_year AS year,
