@@ -647,7 +647,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         except wikipedia.PageError as error:
             logger.error('Wikipedia PageError from {url}: {e}'.format(e=error, url=url))
             return ''
-        except wikipedia.DisambiguationError:
+        except wikipedia.DisambiguationError as error:
             logger.error('Wikipedia DisambiguationError from {url}: {e}'.format(e=error, url=url))
             return ''
 
