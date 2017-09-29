@@ -2,6 +2,7 @@ import abc
 import collections
 import datetime
 import imp
+import logging
 import urllib
 
 import dateutil.parser
@@ -15,6 +16,7 @@ import wikipedia
 import lidarrmetadata
 from lidarrmetadata import util
 
+logger = logging.getLogger(__name__)
 
 def get_providers_implementing(cls):
     """
@@ -641,8 +643,13 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         try:
             title = cls.title_from_url(url)
             return wikipedia.summary(title)
+        # FIXME Both of these may be recoverable
         except wikipedia.PageError as error:
-            raise ValueError(error)
+            logger.error('Wikipedia PageError from {url}: {e}'.format(e=error, url=url))
+            return ''
+        except wikipedia.DisambiguationError:
+            logger.error('Wikipedia DisambiguationError from {url}: {e}'.format(e=error, url=url))
+            return ''
 
     @staticmethod
     def title_from_url(url):
