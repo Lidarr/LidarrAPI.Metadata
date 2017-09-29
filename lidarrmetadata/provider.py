@@ -499,13 +499,6 @@ class MusicbrainzDbProvider(Provider,
         self._db_user = db_user
         self._db_password = db_password
 
-        self.db_connection = psycopg2.connect(host=db_host,
-                                              port=db_port,
-                                              dbname=db_name,
-                                              user=db_user,
-                                              password=db_password)
-        self.db_cursor = self.db_connection.cursor()
-
     def get_artist_by_id(self, artist_id):
         results = self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])[0]
         return {'Id': results['gid'],
@@ -595,10 +588,16 @@ class MusicbrainzDbProvider(Provider,
         :param kwargs: Keyword args to pass to cursor.execute
         :return: List of dict with column: value
         """
-        self.db_cursor.execute(*args, **kwargs)
+        connection = psycopg2.connect(host=self._db_host,
+                                      port=self._db_port,
+                                      dbname=self._db_name,
+                                      user=self._db_user,
+                                      password=self._db_password)
+        cursor = connection.cursor()
+        cursor.execute(*args, **kwargs)
         columns = collections.OrderedDict(
-            (column.name, None) for column in self.db_cursor.description)
-        results = self.db_cursor.fetchall()
+            (column.name, None) for column in cursor.description)
+        results = cursor.fetchall()
         return [{column: result[i] for i, column in enumerate(columns.keys())}
                 for
                 result in results]
