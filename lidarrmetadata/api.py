@@ -44,7 +44,7 @@ def handle_error(e):
 
 
 @app.route('/artists/<mbid>/', methods=['GET'])
-@cache.cached()
+@cache.cached(key_prefix=lambda: request.full_path)
 def get_artist_info(mbid):
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(
@@ -106,6 +106,19 @@ def get_artist_info(mbid):
     else:
         for album in artist['Albums']:
             album['Images'] = []
+
+    # Filter album types
+    # TODO Should types be part of album query?
+    primary_types = request.args.get('primTypes', None)
+    if primary_types:
+        primary_types = primary_types.split('|')
+        artist['Albums'] = filter(lambda album: album.get('Type') in primary_types, artist['Albums'])
+    secondary_types = request.args.get('secTypes', None)
+    if secondary_types:
+        secondary_types = set(secondary_types.split('|'))
+        artist['Albums'] = filter(lambda album: (album['SecondaryTypes'] == [] and 'Studio' in secondary_types)
+                                                or secondary_types.intersection(album.get('SecondaryTypes')),
+                                  artist['Albums'])
 
     return jsonify(artist)
 
