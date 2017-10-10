@@ -233,7 +233,7 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
             response = response.get('albums')
         images = {'Cover': util.first_key_item(response, 'albumcover'),
                   'Disc': util.first_key_item(response, 'cdart')}
-        return [{'CoverType': key, 'Url': value['url']}
+        return [{'CoverType': key, 'Url': value['url'].replace('https', 'http')}
                 for key, value in images.items() if value]
 
     @staticmethod
@@ -247,7 +247,7 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
                   'Fanart': util.first_key_item(response, 'artistbackground'),
                   'Logo': util.first_key_item(response, 'hdmusiclogo'),
                   'Poster': util.first_key_item(response, 'artistthumb')}
-        return [{'CoverType': key, 'Url': value['url']}
+        return [{'CoverType': key, 'Url': value['url'].replace('https', 'http')}
                 for key, value in images.items() if value]
 
 
