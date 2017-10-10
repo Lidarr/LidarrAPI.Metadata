@@ -26,4 +26,4 @@ FROM release_group
   JOIN artist ON artist_credit_name.artist = artist.id
   JOIN release_group_primary_type ON release_group.type = release_group_primary_type.id
 
-WHERE artist.gid = %s
+WHERE artist.gid = %s AND artist_credit_name.position = 0
