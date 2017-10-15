@@ -222,7 +222,7 @@ def search_artist():
         else:
             artist['Overview'] = ''
 
-        if artist_art_providers:
+        if artist_art_providers and request.args.get('images', 'True').lower() == 'true':
             artist['Images'] = artist_art_providers[0].get_artist_images(artist['Id'])
         else:
             artist['Images'] = []
