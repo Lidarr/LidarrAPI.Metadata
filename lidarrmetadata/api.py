@@ -46,6 +46,9 @@ def handle_error(e):
 @app.route('/artists/<mbid>/', methods=['GET'])
 @cache.cached(key_prefix=lambda: request.full_path)
 def get_artist_info(mbid):
+    if mbid in config.CONFIG.BLACKLISTED_ARTISTS:
+        return jsonify(error='Blacklisted artist'), 403
+
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(
         provider.ArtistByIdMixin)
