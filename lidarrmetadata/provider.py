@@ -503,7 +503,11 @@ class MusicbrainzDbProvider(Provider,
         self._db_password = db_password
 
     def get_artist_by_id(self, artist_id):
-        results = self.query_from_file('artist_search_mbid.sql', [artist_id])[0]
+        results = self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])
+        if results:
+            results = results[0]
+        else:
+            return {}
         return {'Id': results['gid'],
                 'ArtistName': results['name'],
                 'Status': 'ended' if results['ended'] else 'active',
