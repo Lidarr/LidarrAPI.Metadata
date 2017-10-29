@@ -1,3 +1,5 @@
+import uuid
+
 from flask import Flask, request, jsonify, send_file
 import flask_cache
 import raven.contrib.flask
@@ -46,6 +48,12 @@ def handle_error(e):
 @app.route('/artists/<mbid>/', methods=['GET'])
 @cache.cached(key_prefix=lambda: request.full_path)
 def get_artist_info(mbid):
+    try:
+        uuid.UUID(mbid, version=4)
+        print('Valid UUID')
+    except ValueError:
+        return jsonify(error='Invalid UUID'), 400
+
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(
         provider.ArtistByIdMixin)
@@ -65,6 +73,8 @@ def get_artist_info(mbid):
     # TODO Figure out preferred providers
     if artist_providers:
         artist = artist_providers[0].get_artist_by_id(mbid)
+        if not artist:
+            return jsonify(error='Artist not found'), 404
     else:
         # 500 error if we don't have an artist provider since it's essential
         return jsonify(error='No artist provider available'), 500
