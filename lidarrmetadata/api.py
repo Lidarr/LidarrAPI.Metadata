@@ -53,6 +53,9 @@ def get_artist_info(mbid):
         print('Valid UUID')
     except ValueError:
         return jsonify(error='Invalid UUID'), 400
+      
+    if mbid in config.CONFIG.BLACKLISTED_ARTISTS:
+        return jsonify(error='Blacklisted artist'), 403
 
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(
