@@ -73,6 +73,8 @@ def get_artist_info(mbid):
     # TODO Figure out preferred providers
     if artist_providers:
         artist = artist_providers[0].get_artist_by_id(mbid)
+        if not artist:
+            return jsonify(error='Artist not found'), 404
     else:
         # 500 error if we don't have an artist provider since it's essential
         return jsonify(error='No artist provider available'), 500
