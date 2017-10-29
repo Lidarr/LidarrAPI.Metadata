@@ -3,6 +3,7 @@ import collections
 import datetime
 import imp
 import logging
+import pkg_resources
 import urllib
 
 import dateutil.parser
@@ -502,7 +503,11 @@ class MusicbrainzDbProvider(Provider,
         self._db_password = db_password
 
     def get_artist_by_id(self, artist_id):
-        results = self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])[0]
+        results = self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])
+        if results:
+            results = results[0]
+        else:
+            return {}
         return {'Id': results['gid'],
                 'ArtistName': results['name'],
                 'Status': 'ended' if results['ended'] else 'active',
@@ -510,7 +515,7 @@ class MusicbrainzDbProvider(Provider,
                 'Disambiguation': results['comment']}
 
     def search_artist_name(self, name):
-        results = self.query_from_file('../sql/artist_search_name.sql', [name])
+        results = self.query_from_file('artist_search_name.sql', [name])
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
                  'Type': result['type'],
@@ -518,7 +523,7 @@ class MusicbrainzDbProvider(Provider,
                 for result in results]
 
     def get_album_tracks(self, album_id):
-        results = self.query_from_file('../sql/track_album_mbid.sql',
+        results = self.query_from_file('track_album_mbid.sql',
                                        [album_id])
         return [{'Id': result['gid'],
                  'TrackName': result['name'],
@@ -527,7 +532,7 @@ class MusicbrainzDbProvider(Provider,
                 for result in results]
 
     def get_albums_by_artist(self, artist_id):
-        results = self.query_from_file('../sql/album_search_artist_mbid.sql',
+        results = self.query_from_file('album_search_artist_mbid.sql',
                                        [artist_id])
 
         albums = []
@@ -546,7 +551,7 @@ class MusicbrainzDbProvider(Provider,
 
             releases = {}
             for rid in release_ids:
-                release_results = self.query_from_file('../sql/release_by_mbid.sql', [rid])
+                release_results = self.query_from_file('release_by_mbid.sql', [rid])
                 for release in release_results:
                     # Just append label if we already have this release
                     if release['gid'] in releases:
@@ -566,20 +571,21 @@ class MusicbrainzDbProvider(Provider,
         return albums
 
     def get_artist_links(self, artist_id):
-        results = self.query_from_file('../sql/links_artist_mbid.sql',
+        results = self.query_from_file('links_artist_mbid.sql',
                                        [artist_id])
         return [{'target': result['url'],
                  'type': self.parse_url_source(result['url'])}
                 for result in results]
 
-    def query_from_file(self, filename, *args, **kwargs):
+    def query_from_file(self, sql_file, *args, **kwargs):
         """
         Executes query from sql file
-        :param filename: Filename of sql query
+        :param sql_file: Filename of sql file
         :param args: Positional args to pass to cursor.execute
         :param kwargs: Keyword args to pass to cursor.execute
         :return: List of dict with column: value results
         """
+        filename = pkg_resources.resource_filename('lidarrmetadata.sql', sql_file)
         with open(filename, 'r') as sql:
             return self.map_query(sql.read(), *args, **kwargs)
 
