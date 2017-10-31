@@ -4,6 +4,7 @@ import datetime
 import imp
 import logging
 import pkg_resources
+import re
 import urllib
 
 import dateutil.parser
@@ -18,6 +19,7 @@ import lidarrmetadata
 from lidarrmetadata import util
 
 logger = logging.getLogger(__name__)
+
 
 def get_providers_implementing(cls):
     """
@@ -476,6 +478,8 @@ class MusicbrainzDbProvider(Provider,
     Provider for directly querying musicbrainz database
     """
 
+    TRACK_NUMBER_REGEX = re.compile(r'(?P<disk>[A-Z]*)(?P<track>\d+)')
+
     def __init__(self,
                  db_host='localhost',
                  db_port=5432,
@@ -525,11 +529,26 @@ class MusicbrainzDbProvider(Provider,
     def get_album_tracks(self, album_id):
         results = self.query_from_file('track_album_mbid.sql',
                                        [album_id])
-        return [{'Id': result['gid'],
-                 'TrackName': result['name'],
-                 'TrackNumber': result['position'],
-                 'DurationMs': result['length']}
-                for result in results]
+
+        tracks = []
+        for result in results:
+            track = {'Id': result['gid'],
+                     'TrackName': result['name'],
+                     'DurationMs': result['length']}
+
+            match = self.TRACK_NUMBER_REGEX.match(result['number'])
+
+            if match:
+                # Uppercase letters are ascii table 65 to 90
+                track['DiskNumber'] = ord(match.group('disk')) - 64 if match.group('disk') else 1
+                track['TrackNumber'] = int(match.group('track'))
+            else:
+                track['DiskNumber'] = None
+                track['TrackNumber'] = None
+
+            tracks.append(track)
+
+        return tracks
 
     def get_albums_by_artist(self, artist_id):
         results = self.query_from_file('album_search_artist_mbid.sql',

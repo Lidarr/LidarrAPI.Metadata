@@ -2,7 +2,7 @@ SELECT DISTINCT
   track.id,
   track.gid,
   track.name,
-  track.position,
+  track.number,
   recording.length
 FROM track
   JOIN medium ON track.medium = medium.id
