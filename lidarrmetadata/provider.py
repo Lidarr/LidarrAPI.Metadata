@@ -530,25 +530,21 @@ class MusicbrainzDbProvider(Provider,
         results = self.query_from_file('track_album_mbid.sql',
                                        [album_id])
 
-        tracks = []
+        mediums = {}
         for result in results:
+            if result['medium_position'] not in mediums:
+                mediums[result['medium_position']] = {'Format': result['medium_format'],
+                                                      'Position': result['medium_position'],
+                                                      'Tracks': []}
+
             track = {'Id': result['gid'],
                      'TrackName': result['name'],
-                     'DurationMs': result['length']}
+                     'DurationMs': result['length'],
+                     'TrackNumber': result['number'],
+                     'TrackPosition': result['position']}
+            mediums[result['medium_position']]['Tracks'].append(track)
 
-            match = self.TRACK_NUMBER_REGEX.match(result['number'])
-
-            if match:
-                # Uppercase letters are ascii table 65 to 90
-                track['DiskNumber'] = ord(match.group('disk')) - 64 if match.group('disk') else 1
-                track['TrackNumber'] = int(match.group('track'))
-            else:
-                track['DiskNumber'] = None
-                track['TrackNumber'] = None
-
-            tracks.append(track)
-
-        return tracks
+        return mediums.values()
 
     def get_albums_by_artist(self, artist_id):
         results = self.query_from_file('album_search_artist_mbid.sql',
