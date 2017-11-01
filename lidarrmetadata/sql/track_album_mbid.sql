@@ -5,6 +5,7 @@ SELECT
   track.position,
   track.number,
   track.length,
+  medium.name        AS medium_name,
   medium.position    AS medium_position,
   medium_format.name AS medium_format
 FROM track

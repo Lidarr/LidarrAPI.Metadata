@@ -534,6 +534,7 @@ class MusicbrainzDbProvider(Provider,
         for result in results:
             if result['medium_position'] not in mediums:
                 mediums[result['medium_position']] = {'Format': result['medium_format'],
+                                                      'Name': result['medium_name'],
                                                       'Position': result['medium_position'],
                                                       'Tracks': []}
 
