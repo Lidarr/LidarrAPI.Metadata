@@ -70,6 +70,7 @@ def get_artist_info(mbid):
         provider.AlbumByArtistMixin)
     album_art_providers = provider.get_providers_implementing(
         provider.AlbumArtworkMixin)
+    media_providers = provider.get_providers_implementing(provider.MediaByAlbumMixin)
     track_providers = provider.get_providers_implementing(
         provider.TracksByAlbumMixin)
 
@@ -90,7 +91,8 @@ def get_artist_info(mbid):
     if track_providers:
         for album in artist['Albums']:
             if album['Releases'] and album['Releases'][0]:
-                album['Mediums'] = track_providers[0].get_album_tracks(album['Releases'][0]['Id'])
+                album['Media'] = media_providers[0].get_album_media(album['Releases'][0]['Id'])
+                album['Tracks'] = track_providers[0].get_album_tracks(album['Releases'][0]['Id'])
                 album['Label'] = album['Releases'][0]['Label']
             else:
                 album['Label'] = []

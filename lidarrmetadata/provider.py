@@ -79,6 +79,20 @@ class AlbumByArtistMixin(MixinBase):
         pass
 
 
+class MediaByAlbumMixin(MixinBase):
+    """
+    Gets medium for album
+    """
+
+    @abc.abstractmethod
+    def get_album_media(self, album_id):
+        """
+        Gets media for album
+        :param album_id: ID of album
+        :return: List of media
+        """
+
+
 class TracksByAlbumMixin(MixinBase):
     """
     Gets tracks by album is
@@ -473,6 +487,7 @@ class MusicbrainzDbProvider(Provider,
                             ArtistLinkMixin,
                             ArtistNameSearchMixin,
                             AlbumByArtistMixin,
+                            MediaByAlbumMixin,
                             TracksByAlbumMixin):
     """
     Provider for directly querying musicbrainz database
@@ -526,26 +541,25 @@ class MusicbrainzDbProvider(Provider,
                  'Disambiguation': result['comment']}
                 for result in results]
 
+    def get_album_media(self, album_id):
+        results = self.query_from_file('media_album_mbid.sql',
+                                       [album_id])
+        return [{'Format': result['medium_format'],
+                 'Name': result['medium_name'],
+                 'Position': result['medium_position']}
+                for result in results]
+
     def get_album_tracks(self, album_id):
         results = self.query_from_file('track_album_mbid.sql',
                                        [album_id])
 
-        mediums = {}
-        for result in results:
-            if result['medium_position'] not in mediums:
-                mediums[result['medium_position']] = {'Format': result['medium_format'],
-                                                      'Name': result['medium_name'],
-                                                      'Position': result['medium_position'],
-                                                      'Tracks': []}
-
-            track = {'Id': result['gid'],
-                     'TrackName': result['name'],
-                     'DurationMs': result['length'],
-                     'TrackNumber': result['number'],
-                     'TrackPosition': result['position']}
-            mediums[result['medium_position']]['Tracks'].append(track)
-
-        return mediums.values()
+        return [{'Id': result['gid'],
+                 'TrackName': result['name'],
+                 'DurationMs': result['length'],
+                 'MediumNumber': result['medium_position'],
+                 'TrackNumber': result['number'],
+                 'TrackPosition': result['position']}
+                for result in results]
 
     def get_albums_by_artist(self, artist_id):
         results = self.query_from_file('album_search_artist_mbid.sql',
