@@ -4,6 +4,7 @@ import datetime
 import imp
 import logging
 import pkg_resources
+import re
 import urllib
 
 import dateutil.parser
@@ -18,6 +19,7 @@ import lidarrmetadata
 from lidarrmetadata import util
 
 logger = logging.getLogger(__name__)
+
 
 def get_providers_implementing(cls):
     """
@@ -75,6 +77,20 @@ class AlbumByArtistMixin(MixinBase):
         :return: List of albums by artist
         """
         pass
+
+
+class MediaByAlbumMixin(MixinBase):
+    """
+    Gets medium for album
+    """
+
+    @abc.abstractmethod
+    def get_album_media(self, album_id):
+        """
+        Gets media for album
+        :param album_id: ID of album
+        :return: List of media
+        """
 
 
 class TracksByAlbumMixin(MixinBase):
@@ -471,6 +487,7 @@ class MusicbrainzDbProvider(Provider,
                             ArtistLinkMixin,
                             ArtistNameSearchMixin,
                             AlbumByArtistMixin,
+                            MediaByAlbumMixin,
                             TracksByAlbumMixin):
     """
     Provider for directly querying musicbrainz database
@@ -510,6 +527,7 @@ class MusicbrainzDbProvider(Provider,
             return {}
         return {'Id': results['gid'],
                 'ArtistName': results['name'],
+                'SortName': results['sort_name'],
                 'Status': 'ended' if results['ended'] else 'active',
                 'Type': results['type'],
                 'Disambiguation': results['comment']}
@@ -522,13 +540,24 @@ class MusicbrainzDbProvider(Provider,
                  'Disambiguation': result['comment']}
                 for result in results]
 
+    def get_album_media(self, album_id):
+        results = self.query_from_file('media_album_mbid.sql',
+                                       [album_id])
+        return [{'Format': result['medium_format'],
+                 'Name': result['medium_name'],
+                 'Position': result['medium_position']}
+                for result in results]
+
     def get_album_tracks(self, album_id):
         results = self.query_from_file('track_album_mbid.sql',
                                        [album_id])
+
         return [{'Id': result['gid'],
                  'TrackName': result['name'],
-                 'TrackNumber': result['position'],
-                 'DurationMs': result['length']}
+                 'DurationMs': result['length'],
+                 'MediumNumber': result['medium_position'],
+                 'TrackNumber': result['number'],
+                 'TrackPosition': result['position']}
                 for result in results]
 
     def get_albums_by_artist(self, artist_id):
