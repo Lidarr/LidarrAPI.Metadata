@@ -493,8 +493,6 @@ class MusicbrainzDbProvider(Provider,
     Provider for directly querying musicbrainz database
     """
 
-    TRACK_NUMBER_REGEX = re.compile(r'(?P<disk>[A-Z]*)(?P<track>\d+)')
-
     def __init__(self,
                  db_host='localhost',
                  db_port=5432,
