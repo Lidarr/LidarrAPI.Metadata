@@ -11,5 +11,5 @@ SELECT
 FROM track
   JOIN medium ON track.medium = medium.id
   JOIN release ON medium.release = release.id
-  JOIN medium_format ON medium.format = medium_format.id
+  FULL JOIN medium_format ON medium.format = medium_format.id
 WHERE release.gid = %s
