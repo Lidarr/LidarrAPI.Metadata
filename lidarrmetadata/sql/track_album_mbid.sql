@@ -9,5 +9,5 @@ SELECT
 FROM track
   JOIN medium ON track.medium = medium.id
   JOIN release ON medium.release = release.id
-  FULL JOIN medium_format ON medium.format = medium_format.id
+  LEFT JOIN medium_format ON medium.format = medium_format.id
 WHERE release.gid = %s
