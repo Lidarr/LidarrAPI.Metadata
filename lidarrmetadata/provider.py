@@ -543,7 +543,7 @@ class MusicbrainzDbProvider(Provider,
     def get_album_media(self, album_id):
         results = self.query_from_file('media_album_mbid.sql',
                                        [album_id])
-        return [{'Format': result['medium_format'],
+        return [{'Format': result['medium_format'] or '',
                  'Name': result['medium_name'],
                  'Position': result['medium_position']}
                 for result in results]
