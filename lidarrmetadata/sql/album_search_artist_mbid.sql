@@ -28,9 +28,9 @@ FROM release_group
   JOIN artist_credit_name ON artist_credit_name.artist_credit = release_group.artist_credit
   JOIN artist ON artist_credit_name.artist = artist.id
   JOIN release_group_primary_type ON release_group.type = release_group_primary_type.id
-  JOIN release_group_alias ON release_group_alias.release_group = release_group.id
+  FULL JOIN release_group_alias ON release_group_alias.release_group = release_group.id
 
-WHERE artist.name = %s AND artist_credit_name.position = 0
+WHERE artist.gid = %s AND artist_credit_name.position = 0
 GROUP BY release_group.gid, release_group.comment,
   release_group_primary_type.name,
   release_group.name,
