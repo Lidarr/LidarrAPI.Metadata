@@ -93,7 +93,7 @@ def get_artist_info(mbid):
             if album['Releases'] and album['Releases'][0]:
                 album['Media'] = media_providers[0].get_album_media(album['Releases'][0]['Id'])
                 album['Tracks'] = track_providers[0].get_album_tracks(album['Releases'][0]['Id'])
-                album['Label'] = album['Releases'][0]['Label']
+                album['Label'] = album['Releases'][0]['Labels']
             else:
                 album['Label'] = []
     else:

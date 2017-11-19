@@ -581,14 +581,24 @@ class MusicbrainzDbProvider(Provider,
             releases = {}
             for rid in release_ids:
                 release_results = self.query_from_file('release_by_mbid.sql', [rid])
-                releases = {release['gid']: {'Id': release['gid'],
-                                             'Country': release['country'],
-                                             'Label': [release['label']] if release['label'] else [],
-                                             'ReleaseDate': datetime.datetime(release['year'] or 1,
-                                                                              release['month'] or 1,
-                                                                              release['day'] or 1)}
-                            for release in release_results}
+                for release in release_results:
+                    # Just append label if we already have this release
+                    id_ = release['gid']
+                    if id_ in releases:
+                        if release['label'] not in releases[id_]['Labels']:
+                            releases[id_]['Labels'].append(release['label'])
 
+                        if release['country'] not in releases[id_]['Countries']:
+                            releases[id_]['Countries'].append(release['country'])
+
+                        continue
+
+                    releases[id_] = {'Id': id_,
+                                     'Countries': [release['country']] if release['country'] else [],
+                                     'Labels': [release['label']] if release['label'] else [],
+                                     'ReleaseDate': datetime.datetime(release['year'] or 1,
+                                                                      release['month'] or 1,
+                                                                      release['day'] or 1)}
             album['Releases'] = releases.values()
             albums.append(album)
 
