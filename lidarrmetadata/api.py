@@ -89,13 +89,16 @@ def get_artist_info(mbid):
         return jsonify(error='No album provider available'), 500
 
     if track_providers:
+        no_releases = []
         for album in artist['Albums']:
             if album['Releases'] and album['Releases'][0]:
                 album['Media'] = media_providers[0].get_album_media(album['Releases'][0]['Id'])
                 album['Tracks'] = track_providers[0].get_album_tracks(album['Releases'][0]['Id'])
-                album['Label'] = album['Releases'][0]['Label']
+                album['Labels'] = album['Releases'][0]['Labels']
             else:
-                album['Label'] = []
+                no_releases.append(album)
+
+        artist['Albums'] = [album for album in artist['Albums'] if album not in no_releases]
     else:
         # 500 error if we don't have a track provider since it's essential
         return jsonify(error='No track provider available'), 500
