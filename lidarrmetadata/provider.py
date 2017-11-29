@@ -529,14 +529,14 @@ class MusicbrainzDbProvider(Provider,
                 'ArtistName': results['name'],
                 'SortName': results['sort_name'],
                 'Status': 'ended' if results['ended'] else 'active',
-                'Type': results['type'],
+                'Type': results['type'] or 'Artist',
                 'Disambiguation': results['comment']}
 
     def search_artist_name(self, name):
         results = self.query_from_file('artist_search_name.sql', [name])
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
-                 'Type': result['type'],
+                 'Type': result['type'] or 'Artist',
                  'Disambiguation': result['comment']}
                 for result in results]
 
