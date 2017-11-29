@@ -4,5 +4,5 @@ SELECT
   comment,
   artist_type.name AS type
 FROM artist
-  JOIN artist_type ON artist.type = artist_type.id
+  LEFT JOIN artist_type ON artist.type = artist_type.id
 WHERE UPPER(artist.name) LIKE UPPER(%s)
