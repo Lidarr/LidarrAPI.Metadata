@@ -114,6 +114,9 @@ def get_artist_info(mbid):
             artist['Overview'] = overview_providers[0].get_artist_overview(
                 wikipedia_links[0]['target'])
 
+    if 'Overview' not in artist:
+        artist['Overview'] = ''
+
     if artist_art_providers:
         artist['Images'] = artist_art_providers[0].get_artist_images(mbid)
 
@@ -237,7 +240,7 @@ def search_artist():
                 except ValueError:
                     pass
 
-        else:
+        if 'Overview' not in artist:
             artist['Overview'] = ''
 
         if artist_art_providers and request.args.get('images', 'True').lower() == 'true':
