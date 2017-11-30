@@ -682,7 +682,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         try:
             title = cls.title_from_url(url)
-            return wikipedia.summary(title)
+            return wikipedia.summary(title, auto_suggest=False)
         # FIXME Both of these may be recoverable
         except wikipedia.PageError as error:
             logger.error('Wikipedia PageError from {url}: {e}'.format(e=error, url=url))
