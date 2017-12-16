@@ -664,6 +664,8 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
     Provider for querying wikipedia
     """
 
+    URL_REGEX = re.compile(r'https?://\w+\.wikipedia\.org/wiki/(?P<title>.+)')
+
     def __init__(self):
         """
         Class initialization
@@ -682,7 +684,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         try:
             title = cls.title_from_url(url)
-            return wikipedia.summary(title)
+            return wikipedia.summary(title, auto_suggest=False)
         # FIXME Both of these may be recoverable
         except wikipedia.PageError as error:
             logger.error('Wikipedia PageError from {url}: {e}'.format(e=error, url=url))
@@ -691,14 +693,13 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             logger.error('Wikipedia DisambiguationError from {url}: {e}'.format(e=error, url=url))
             return ''
 
-    @staticmethod
-    def title_from_url(url):
+    @classmethod
+    def title_from_url(cls, url):
         """
         Gets the wikipedia page title from url. This may not work for URLs with
         certain special characters
         :param url: URL of wikipedia page
         :return: Title of page at URL
         """
-        page = url.split('/')[-1]
-        encoded_title = page.replace('_', ' ')
-        return urllib.unquote(encoded_title)
+        title = cls.URL_REGEX.match(url).group('title')
+        return urllib.unquote(title)
