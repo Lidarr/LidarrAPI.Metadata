@@ -2,6 +2,8 @@
 Utility functionality that isn't specific to a given module
 """
 
+import functools
+
 
 def first_key_item(dictionary, key, default=None):
     """
@@ -17,6 +19,66 @@ def first_key_item(dictionary, key, default=None):
         return value[0]
 
     return value
+
+
+def map_strings(iterable, func):
+    """
+    Maps all strings in iterable
+
+    !!!
+    This function was a fun one to write. Don't modify until tests are added unless there's an issue.
+    !!!
+
+    :param iterable: Iterable to find strings in
+    :param func: String mapping function
+    :return: Iterable with mapped strings
+    """
+    mapped = type(iterable)()
+    assign_func = mapped.setdefault if isinstance(mapped, dict) else mapped.insert
+    enumerate_func = iterable.items if isinstance(iterable, dict) else functools.partial(enumerate, iterable)
+
+    for i, v in enumerate_func():
+        if isinstance(v, str):
+            assign_func(i, func(v))
+        elif hasattr(v, '__iter__'):
+            assign_func(i, map_strings(v, func))
+        else:
+            assign_func(i, v)
+
+    return mapped
+
+
+def translate_string(s, table):
+    """
+    Translated a string based on translation table
+    :param s: String to translate
+    :param table: Tranalation table as dictionary
+    :return: Translated string
+    """
+    return ''.join([table.get(c, c) for c in s])
+
+
+class BidirectionalDictionary(dict):
+    """
+    Bidirectional dictionary. Thanks to https://stackoverflow.com/a/21894086/2383721. Modified to only have unique
+    values
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(BidirectionalDictionary, self).__init__(*args, **kwargs)
+        self.inverse = {}
+        for key, value in self.items():
+            self.inverse.setdefault(value, key)
+
+    def __setitem__(self, key, value):
+        if key in self:
+            self.inverse[self[key]].remove(key)
+        super(BidirectionalDictionary, self).__setitem__(key, value)
+        self.inverse.setdefault(value, key)
+
+    def __delitem__(self, key):
+        del self.inverse[self[key]]
+        super(BidirectionalDictionary, self).__delitem__(key)
 
 
 class Cache(object):
