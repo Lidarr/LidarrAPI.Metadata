@@ -654,7 +654,7 @@ class MusicbrainzDbProvider(Provider,
                    result in results]
 
         # Decode strings
-        results = util.map_strings(results, self.mb_decode)
+        results = util.map_iterable_values(results, self.mb_decode, str)
 
         return results
 

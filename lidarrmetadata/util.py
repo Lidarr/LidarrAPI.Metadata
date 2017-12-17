@@ -21,7 +21,7 @@ def first_key_item(dictionary, key, default=None):
     return value
 
 
-def map_strings(iterable, func):
+def map_iterable_values(iterable, func, types=object):
     """
     Maps all strings in iterable
 
@@ -31,17 +31,20 @@ def map_strings(iterable, func):
 
     :param iterable: Iterable to find strings in
     :param func: String mapping function
+    :param types: Type restriction as single type or iterable of types. Defaults to object (no type restriction)
     :return: Iterable with mapped strings
     """
+    types = (types,) if isinstance(types, type) else tuple(types)
+
     mapped = type(iterable)()
     assign_func = mapped.setdefault if isinstance(mapped, dict) else mapped.insert
     enumerate_func = iterable.items if isinstance(iterable, dict) else functools.partial(enumerate, iterable)
 
     for i, v in enumerate_func():
-        if isinstance(v, str):
+        if isinstance(v, types):
             assign_func(i, func(v))
         elif hasattr(v, '__iter__'):
-            assign_func(i, map_strings(v, func))
+            assign_func(i, map_iterable_values(v, func, types))
         else:
             assign_func(i, v)
 
