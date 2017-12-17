@@ -36,6 +36,10 @@ def map_iterable_values(iterable, func, types=object):
     """
     types = (types,) if isinstance(types, type) else tuple(types)
 
+    original_type = type(iterable)
+    if original_type not in [dict, list]:
+        iterable = list(iterable)
+
     mapped = type(iterable)()
     assign_func = mapped.setdefault if isinstance(mapped, dict) else mapped.insert
     enumerate_func = iterable.items if isinstance(iterable, dict) else functools.partial(enumerate, iterable)
@@ -47,6 +51,9 @@ def map_iterable_values(iterable, func, types=object):
             assign_func(i, map_iterable_values(v, func, types))
         else:
             assign_func(i, v)
+
+    if original_type not in [dict, list]:
+        mapped = original_type(mapped)
 
     return mapped
 
