@@ -1,8 +1,10 @@
 LidarrAPI.Metadata
 ==================
 
-[![Travis Build Status](https://travis-ci.org/lidarr/LidarrAPI.Metadata.svg?branch=develop)](https://travis-ci.org/lidarr/LidarrAPI.Metadata)
-[![Appveyor Build status](https://ci.appveyor.com/api/projects/status/fek6wd3ljyb7ty4h?svg=true)](https://ci.appveyor.com/project/Lidarr/lidarrapi-metadata)
+.. image:: https://travis-ci.org/lidarr/LidarrAPI.Metadata.svg?branch=develop
+    :target: https://travis-ci.org/lidarr/LidarrAPI.Metadata
+.. image:: https://ci.appveyor.com/api/projects/status/fek6wd3ljyb7ty4h?svg=true
+    :target: https://ci.appveyor.com/project/Lidarr/lidarrapi-metadata
 
 This hosts the custom metadata API and resources Lidarr relies on.
 
