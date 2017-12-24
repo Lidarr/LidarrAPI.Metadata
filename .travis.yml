@@ -8,3 +8,11 @@ python:
   - "3.4"
 install: pip install tox-travis
 script: tox
+
+matrix:
+  include:
+    - language: generic
+      os: osx
+      before_install:
+        - brew update
+        - brew install python python3
