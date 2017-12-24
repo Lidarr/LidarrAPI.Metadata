@@ -15,7 +15,7 @@ def first_key_item(dictionary, key, default=None):
     """
     value = dictionary.get(key, default)
 
-    if value and value != default:
+    if value and value != default and hasattr(value, '__getitem__'):
         return value[0]
 
     return value
