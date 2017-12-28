@@ -82,7 +82,7 @@ class BidirectionalDictionary(dict):
 
     def __setitem__(self, key, value):
         if key in self:
-            self.inverse[self[key]].remove(key)
+            del self.inverse[value]
         super(BidirectionalDictionary, self).__setitem__(key, value)
         self.inverse.setdefault(value, key)
 
