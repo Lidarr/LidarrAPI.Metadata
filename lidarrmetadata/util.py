@@ -47,7 +47,7 @@ def map_iterable_values(iterable, func, types=object):
     for i, v in enumerate_func():
         if isinstance(v, types):
             assign_func(i, func(v))
-        elif hasattr(v, '__iter__'):
+        elif hasattr(v, '__iter__') and not isinstance(v, str):
             assign_func(i, map_iterable_values(v, func, types))
         else:
             assign_func(i, v)
