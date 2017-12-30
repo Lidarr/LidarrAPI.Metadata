@@ -1,6 +1,10 @@
 LidarrAPI.Metadata
 ==================
 
+.. image:: https://api.codacy.com/project/badge/Grade/80dc9be416934129a9959b4620522e8f
+   :alt: Codacy Badge
+   :target: https://www.codacy.com/app/Lidarr/LidarrAPI.Metadata?utm_source=github.com&utm_medium=referral&utm_content=lidarr/LidarrAPI.Metadata&utm_campaign=badger
+
 This hosts the custom metadata API and resources Lidarr relies on.
 
 Installation
