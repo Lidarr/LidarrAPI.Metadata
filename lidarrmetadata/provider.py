@@ -496,7 +496,6 @@ class MusicbrainzDbProvider(Provider,
     TRANSLATION_TABLE = util.BidirectionalDictionary({
         u'\u2026': '...',  # HORIZONTAL ELLIPSIS (U+2026)
         u'\u0027': "'",  # APOSTROPHE (U+0027)
-        u'\u2013': '-',  # EN DASH (U+2013)
         u'\u2010': '-',  # HYPHEN (U+2010)
         u'\u8243': u'\u2033',  # DOUBLE PRIME (U+8243)
     })
