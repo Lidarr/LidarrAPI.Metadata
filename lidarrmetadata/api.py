@@ -167,11 +167,12 @@ def search_album():
               }
     """
     query = request.args.get('query')
+    artist_name = request.args.get('artist', '')
     search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
     album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)
 
     if search_providers:
-        albums = search_providers[0].search_album_name(query)
+        albums = search_providers[0].search_album_name(query, artist_name)
     else:
         response = jsonify(error="No album search providers")
         response.status_code = 500

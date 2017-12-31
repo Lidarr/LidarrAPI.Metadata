@@ -565,9 +565,25 @@ class MusicbrainzDbProvider(Provider,
                  'Disambiguation': result['comment']}
                 for result in results]
 
-    def search_album_name(self, name):
+    def search_album_name(self, name, artist_name=''):
         name = self.mb_encode(name)
-        results = self.query_from_file('album_search_name.sql', [name])
+
+        filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'album_search_name.sql')
+        with open(filename, 'r') as input:
+            query = input.read()
+
+        if artist_name:
+            # TODO Clean this up with some connection/cursor method or allow building of sql
+            connection = psycopg2.connect(host=self._db_host,
+                                          port=self._db_port,
+                                          dbname=self._db_name,
+                                          user=self._db_user,
+                                          password=self._db_password)
+            cursor = connection.cursor()
+            query += cursor.mogrify(' AND UPPER(artist.name) LIKE UPPER(%s)', [artist_name])
+
+        results = self.map_query(query, [name])
+
         return [{'Id': result['gid'],
                  'Disambiguation': result['comment'],
                  'Title': result['album'],
