@@ -226,9 +226,10 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
 
         if not results and not cache_only:
             results = self.get_by_mbid(album_id)
+            results = results.get('albums', results).get(album_id, results)
             self.cache.put(album_id, results)
 
-        return self.parse_album_images(results, album_id)
+        return self.parse_album_images(results)
 
     def get_by_mbid(self, mbid):
         # TODO Cache results
@@ -255,14 +256,12 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         return url
 
     @staticmethod
-    def parse_album_images(response, album_id):
+    def parse_album_images(response):
         """
         Parses album images to our expected format
         :param response: API response
         :return: List of images in our expected format
         """
-        if 'albums' in response:
-            response = response.get('albums')
         images = {'Cover': util.first_key_item(response, 'albumcover'),
                   'Disc': util.first_key_item(response, 'cdart')}
         return [{'CoverType': key, 'Url': value['url'].replace('https', 'http')}
