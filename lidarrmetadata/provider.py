@@ -163,6 +163,21 @@ class ArtistLinkMixin(MixinBase):
         pass
 
 
+class AlbumNameSearchMixin(MixinBase):
+    """
+    Searches for album by name
+    """
+
+    @abc.abstractmethod
+    def search_album_name(self, name):
+        """
+        Searches for album with name
+        :param name: Name of album
+        :return: List of albums
+        """
+        pass
+
+
 class Provider(object):
     """
     Provider base class
@@ -487,6 +502,7 @@ class MusicbrainzDbProvider(Provider,
                             ArtistLinkMixin,
                             ArtistNameSearchMixin,
                             AlbumByArtistMixin,
+                            AlbumNameSearchMixin,
                             MediaByAlbumMixin,
                             TracksByAlbumMixin):
     """
@@ -542,10 +558,25 @@ class MusicbrainzDbProvider(Provider,
     def search_artist_name(self, name):
         name = self.mb_encode(name)
         results = self.query_from_file('artist_search_name.sql', [name])
+
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
                  'Type': result['type'] or 'Artist',
                  'Disambiguation': result['comment']}
+                for result in results]
+
+    def search_album_name(self, name):
+        name = self.mb_encode(name)
+        results = self.query_from_file('album_search_name.sql', [name])
+        return [{'Id': result['gid'],
+                 'Disambiguation': result['comment'],
+                 'Title': result['album'],
+                 'Type': result['primary_type'],
+                 'SecondaryTypes': result['secondary_types'],
+                 'ReleaseDate': datetime.datetime(result['year'] or 1,
+                                                  result['month'] or 1,
+                                                  result['day'] or 1),
+                 'Artist': {'Id': result['artist_id'], 'Name': result['artist_name']}}
                 for result in results]
 
     def get_album_media(self, album_id):
@@ -628,6 +659,7 @@ class MusicbrainzDbProvider(Provider,
         :return: List of dict with column: value results
         """
         filename = pkg_resources.resource_filename('lidarrmetadata.sql', sql_file)
+
         with open(filename, 'r') as sql:
             return self.map_query(sql.read(), *args, **kwargs)
 
@@ -638,6 +670,7 @@ class MusicbrainzDbProvider(Provider,
         :param kwargs: Keyword args to pass to cursor.execute
         :return: List of dict with column: value
         """
+
         connection = psycopg2.connect(host=self._db_host,
                                       port=self._db_port,
                                       dbname=self._db_name,

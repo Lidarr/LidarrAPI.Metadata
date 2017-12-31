@@ -145,6 +145,7 @@ def get_artist_info(mbid):
 
 
 @app.route('/search/album/')
+@cache.cached(key_prefix=lambda: request.full_path)
 def search_album():
     """Search for a human-readable album
     ---
@@ -165,8 +166,21 @@ def search_album():
                 "title": "Dark Side of the Moon"
               }
     """
-    query = request.args.get('query', '')
-    albums = provider.search_album(query)
+    query = request.args.get('query')
+    search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
+    album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)
+
+    if search_providers:
+        albums = search_providers[0].search_album_name(query)
+    else:
+        response = jsonify(error="No album search providers")
+        response.status_code = 500
+        return response
+
+    if album_art_providers:
+        for album in albums:
+            album['Images'] = album_art_providers[0].get_album_images(album['Id'])
+
     return jsonify(albums)
 
 
@@ -257,6 +271,8 @@ def search_route():
 
     if type == 'artist':
         return search_artist()
+    elif type == 'album':
+        return search_album()
     else:
         error = jsonify(error='Type not provided') if type is None else jsonify(
             error='Unsupported search type {}'.format(type))
