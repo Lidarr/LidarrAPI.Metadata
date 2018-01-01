@@ -493,6 +493,13 @@ class MusicbrainzDbProvider(Provider,
     Provider for directly querying musicbrainz database
     """
 
+    TRANSLATION_TABLE = util.BidirectionalDictionary({
+        u'\u2026': '...',  # HORIZONTAL ELLIPSIS (U+2026)
+        u'\u0027': "'",  # APOSTROPHE (U+0027)
+        u'\u2010': '-',  # HYPHEN (U+2010)
+        u'\u8243': u'\u2033',  # DOUBLE PRIME (U+8243)
+    })
+
     def __init__(self,
                  db_host='localhost',
                  db_port=5432,
@@ -533,6 +540,7 @@ class MusicbrainzDbProvider(Provider,
                 'Disambiguation': results['comment']}
 
     def search_artist_name(self, name):
+        name = self.mb_encode(name)
         results = self.query_from_file('artist_search_name.sql', [name])
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
@@ -640,9 +648,32 @@ class MusicbrainzDbProvider(Provider,
         columns = collections.OrderedDict(
             (column.name, None) for column in cursor.description)
         results = cursor.fetchall()
-        return [{column: result[i] for i, column in enumerate(columns.keys())}
-                for
-                result in results]
+        results = [{column: result[i] for i, column in enumerate(columns.keys())}
+                   for
+                   result in results]
+
+        # Decode strings
+        results = util.map_iterable_values(results, self.mb_decode, str)
+
+        return results
+
+    @classmethod
+    def mb_decode(cls, s):
+        """
+        Decodes a string from musicbrainz
+        :param s: String to decode
+        :return: Decoded string
+        """
+        return util.translate_string(s, cls.TRANSLATION_TABLE)
+
+    @classmethod
+    def mb_encode(cls, s):
+        """
+        Encodes a string for musicbrainz
+        :param s: String to encode
+        :return: Musicbrainz encoded string
+        """
+        return util.translate_string(s, cls.TRANSLATION_TABLE.inverse)
 
     @staticmethod
     def parse_url_source(url):

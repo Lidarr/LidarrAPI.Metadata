@@ -44,6 +44,10 @@ setup(
                       'requests',
                       'wikipedia'],
 
+    extras_require={
+        'test': ['pytest', 'tox']
+    },
+
     package_data={
       'lidarrmetadata.sql': ['*.sql']
     },
