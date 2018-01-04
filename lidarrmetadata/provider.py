@@ -79,6 +79,22 @@ class AlbumByArtistMixin(MixinBase):
         pass
 
 
+class AlbumByIdMixin(MixinBase):
+    """
+    Gets album by ID
+    """
+
+    @abc.abstractmethod
+    def get_album_by_id(self, rgid, rid=None):
+        """
+        Gets album by ID
+        :param rgid: Release group ID
+        :param rid: Release ID of individual release. Defaults to None, in which case the first result is chosen
+        :return: Album corresponding to rgid or rid
+        """
+        pass
+
+
 class MediaByAlbumMixin(MixinBase):
     """
     Gets medium for album
@@ -501,6 +517,7 @@ class MusicbrainzDbProvider(Provider,
                             ArtistLinkMixin,
                             ArtistNameSearchMixin,
                             AlbumByArtistMixin,
+                            AlbumByIdMixin,
                             AlbumNameSearchMixin,
                             MediaByAlbumMixin,
                             TracksByAlbumMixin):
@@ -593,6 +610,27 @@ class MusicbrainzDbProvider(Provider,
                                                   result['day'] or 1),
                  'Artist': {'Id': result['artist_id'], 'Name': result['artist_name']}}
                 for result in results]
+
+    def get_album_by_id(self, rgid, rid=None):
+        release_group = self.query_from_file('release_group_by_id.sql', [rgid])[0]
+
+        # TODO Have releases return as a list
+        release_group['releases'] = release_group.get('releases', '').strip('{}').split(',')
+        rid = rid or release_group['releases'][0]
+
+        release = self.query_from_file('release_by_mbid.sql', [rid])[0]
+
+        return {'Id': release_group['gid'],
+                'Disambiguation': release_group['comment'],
+                'Title': release_group['album'],
+                'Type': release_group['primary_type'],
+                'SecondaryTypes': release_group['secondary_types'],
+                'ReleaseDate': datetime.datetime(release['year'] or 1,
+                                                 release['month'] or 1,
+                                                 release['day'] or 1),
+                'Releases': release_group['releases'],
+                'Label': release['label'],
+                'Artist': {'Id': release_group['artist_id'], 'Name': release_group['artist_name']}}
 
     def get_album_media(self, album_id):
         results = self.query_from_file('media_album_mbid.sql',
