@@ -60,7 +60,7 @@ def validate_mbid(mbid):
         return jsonify(error='Blacklisted artist'), 403
 
 
-@app.route('/artists/<mbid>/', methods=['GET'])
+@app.route('/artist/<mbid>/', methods=['GET'])
 @cache.cached(key_prefix=lambda: request.full_path)
 def get_artist_info(mbid):
     uuid_validation_response = validate_mbid(mbid)
