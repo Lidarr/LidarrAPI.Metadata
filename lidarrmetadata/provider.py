@@ -619,22 +619,33 @@ class MusicbrainzDbProvider(Provider,
 
         rid = rid or release_groups[0]['release_id']
 
-        release = self.query_from_file('release_by_mbid.sql', [rid])[0]
+        releases = filter(lambda rg: rg['release_id'] == rid, release_groups)
+        release = releases[0] if releases else None
+
+        if not release:
+            return {}
 
         album = {'Id': release_groups[0]['gid'],
                  'Disambiguation': release_groups[0]['comment'],
                  'Title': release_groups[0]['album'],
                  'Type': release_groups[0]['primary_type'],
-                 'Country': release['country'],
                  'SecondaryTypes': release_groups[0]['secondary_types'],
-                 'ReleaseDate': datetime.datetime(release['year'] or 1,
-                                                  release['month'] or 1,
-                                                  release['day'] or 1),
+                 'ReleaseDate': datetime.datetime(release_groups[0]['year'] or 1,
+                                                  release_groups[0]['month'] or 1,
+                                                  release_groups[0]['day'] or 1),
                  'Label': release['label'],
                  'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']}}
 
         album['Releases'] = [{'Id': release_group['release_id'],
-                              'Disambiguation': release_group['release_comment']}
+                              'Disambiguation': release_group['release_comment'],
+                              'Country': release_group['country'],
+                              'Label': release_group['label'],
+                              'ReleaseDate': datetime.datetime(release_group['release_year'] or 1,
+                                                               release_group['release_month'] or 1,
+                                                               release_group['release_day'] or 1),
+                              'MediaCount': release_group['media_count'],
+                              'TrackCount': release_group['track_count'],
+                              'Format': release_group['format']}
                              for release_group in release_groups]
 
         return album
