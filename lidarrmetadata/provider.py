@@ -612,25 +612,32 @@ class MusicbrainzDbProvider(Provider,
                 for result in results]
 
     def get_album_by_id(self, rgid, rid=None):
-        release_group = self.query_from_file('release_group_by_id.sql', [rgid])[0]
+        release_groups = self.query_from_file('release_group_by_id.sql', [rgid])
 
-        # TODO Have releases return as a list
-        release_group['releases'] = release_group.get('releases', '').strip('{}').split(',')
-        rid = rid or release_group['releases'][0]
+        if not release_groups:
+            return {}
+
+        rid = rid or release_groups[0]['release_id']
 
         release = self.query_from_file('release_by_mbid.sql', [rid])[0]
 
-        return {'Id': release_group['gid'],
-                'Disambiguation': release_group['comment'],
-                'Title': release_group['album'],
-                'Type': release_group['primary_type'],
-                'SecondaryTypes': release_group['secondary_types'],
-                'ReleaseDate': datetime.datetime(release['year'] or 1,
-                                                 release['month'] or 1,
-                                                 release['day'] or 1),
-                'Releases': release_group['releases'],
-                'Label': release['label'],
-                'Artist': {'Id': release_group['artist_id'], 'Name': release_group['artist_name']}}
+        album = {'Id': release_groups[0]['gid'],
+                 'Disambiguation': release_groups[0]['comment'],
+                 'Title': release_groups[0]['album'],
+                 'Type': release_groups[0]['primary_type'],
+                 'Country': release['country'],
+                 'SecondaryTypes': release_groups[0]['secondary_types'],
+                 'ReleaseDate': datetime.datetime(release['year'] or 1,
+                                                  release['month'] or 1,
+                                                  release['day'] or 1),
+                 'Label': release['label'],
+                 'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']}}
+
+        album['Releases'] = [{'Id': release_group['release_id'],
+                              'Disambiguation': release_group['release_comment']}
+                             for release_group in release_groups]
+
+        return album
 
     def get_album_media(self, album_id):
         results = self.query_from_file('media_album_mbid.sql',
