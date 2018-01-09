@@ -674,45 +674,15 @@ class MusicbrainzDbProvider(Provider,
         results = self.query_from_file('album_search_artist_mbid.sql',
                                        [artist_id])
 
-        albums = []
-        for result in results:
-            album = {'Id': result['gid'],
-                     'Disambiguation': result['comment'],
-                     'Title': result['album'],
-                     'Type': result['primary_type'],
-                     'SecondaryTypes': result['secondary_types'],
-                     'ReleaseDate': datetime.datetime(result['year'] or 1,
-                                                      result['month'] or 1,
-                                                      result['day'] or 1)}
-
-            release_ids = result['releases'].strip('{}').split(',')
-            release_ids = [x for x in release_ids if x]
-
-            releases = {}
-            for rid in release_ids:
-                release_results = self.query_from_file('release_by_mbid.sql', [rid])
-                for release in release_results:
-                    # Just append label if we already have this release
-                    id_ = release['gid']
-                    if id_ in releases:
-                        if release['label'] not in releases[id_]['Labels']:
-                            releases[id_]['Labels'].append(release['label'])
-
-                        if release['country'] not in releases[id_]['Countries']:
-                            releases[id_]['Countries'].append(release['country'])
-
-                        continue
-
-                    releases[id_] = {'Id': id_,
-                                     'Countries': [release['country']] if release['country'] else [],
-                                     'Labels': [release['label']] if release['label'] else [],
-                                     'ReleaseDate': datetime.datetime(release['year'] or 1,
-                                                                      release['month'] or 1,
-                                                                      release['day'] or 1)}
-            album['Releases'] = releases.values()
-            albums.append(album)
-
-        return albums
+        return [{'Id': result['gid'],
+                 'Disambiguation': result['comment'],
+                 'Title': result['album'],
+                 'Type': result['primary_type'],
+                 'SecondaryTypes': result['secondary_types'],
+                 'ReleaseDate': datetime.datetime(result['year'] or 1,
+                                                  result['month'] or 1,
+                                                  result['day'] or 1)}
+                for result in results]
 
     def get_artist_links(self, artist_id):
         results = self.query_from_file('links_artist_mbid.sql',
