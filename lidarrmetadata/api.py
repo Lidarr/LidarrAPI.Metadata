@@ -109,6 +109,8 @@ def get_artist_info(mbid):
 
     if artist_art_providers:
         artist['Images'] = artist_art_providers[0].get_artist_images(mbid)
+    else:
+        artist['Images'] = []
 
     # Filter album types
     # TODO Should types be part of album query?
