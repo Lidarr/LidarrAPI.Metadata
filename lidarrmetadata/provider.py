@@ -637,17 +637,38 @@ class MusicbrainzDbProvider(Provider,
                  'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']},
                  'SelectedRelease': rid}
 
-        album['Releases'] = [{'Id': release_group['release_id'],
-                              'Disambiguation': release_group['release_comment'],
-                              'Country': release_group['country'],
-                              'Label': release_group['label'],
-                              'ReleaseDate': datetime.datetime(release_group['release_year'] or 1,
-                                                               release_group['release_month'] or 1,
-                                                               release_group['release_day'] or 1),
-                              'MediaCount': release_group['media_count'],
-                              'TrackCount': release_group['track_count'],
-                              'Format': release_group['format']}
-                             for release_group in release_groups]
+        releases = [{'Id': release_group['release_id'],
+                     'Disambiguation': release_group['release_comment'],
+                     'Country': release_group['country'],
+                     'Label': release_group['label'],
+                     'ReleaseDate': datetime.datetime(release_group['release_year'] or 1,
+                                                      release_group['release_month'] or 1,
+                                                      release_group['release_day'] or 1),
+                     'MediaCount': release_group['media_count'],
+                     'TrackCount': release_group['track_count'],
+                     'Format': [release_group['format']]}
+                    for release_group in release_groups]
+
+        # Combine formats
+        # TODO Rework data code and find a better solution for this
+        combined_releases = {}
+        for release in releases:
+            id_ = release['Id']
+            if id_ in combined_releases:
+                combined_releases[id_]['Format'].extend(release['Format'])
+            else:
+                combined_releases[id_] = release
+
+        for release in combined_releases.values():
+            format_counter = collections.Counter(release['Format'])
+            formats = []
+            for medium, count in format_counter.items():
+                format = '' if count == 1 else '{}x'.format(count)
+                formats.append(format + medium)
+
+            release['Format'] = ' + '.join(formats)
+
+        album['Releases'] = combined_releases.values()
 
         return album
 
