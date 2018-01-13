@@ -634,7 +634,8 @@ class MusicbrainzDbProvider(Provider,
                                                   release_groups[0]['month'] or 1,
                                                   release_groups[0]['day'] or 1),
                  'Label': release['label'],
-                 'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']}}
+                 'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']},
+                 'SelectedRelease': rid}
 
         album['Releases'] = [{'Id': release_group['release_id'],
                               'Disambiguation': release_group['release_comment'],
