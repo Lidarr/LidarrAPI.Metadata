@@ -155,8 +155,8 @@ def get_album_info(mbid):
 
     if track_providers:
         if 'Releases' in album and album['Releases'][0]:
-            album['Media'] = media_providers[0].get_album_media(album['Releases'][0]['Id'])
-            album['Tracks'] = track_providers[0].get_album_tracks(album['Releases'][0]['Id'])
+            album['Media'] = media_providers[0].get_album_media(album['SelectedRelease'])
+            album['Tracks'] = track_providers[0].get_album_tracks(album['SelectedRelease'])
     else:
         # 500 error if we don't have a track provider since it's essential
         return jsonify(error='No track provider available'), 500
