@@ -663,8 +663,9 @@ class MusicbrainzDbProvider(Provider,
             format_counter = collections.Counter(release['Format'])
             formats = []
             for medium, count in format_counter.items():
-                format = '' if count == 1 else '{}x'.format(count)
-                formats.append(format + medium)
+                if medium:
+                    format = '' if count == 1 else '{}x'.format(count)
+                    formats.append(format + medium)
 
             release['Format'] = ' + '.join(formats)
 
