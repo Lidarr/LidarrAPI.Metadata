@@ -170,7 +170,7 @@ def get_album_info(mbid):
     return jsonify(album)
 
 
-@app.route('/search/album/')
+@app.route('/search/album')
 @cache.cached(key_prefix=lambda: request.full_path)
 def search_album():
     """Search for a human-readable album
@@ -211,7 +211,7 @@ def search_album():
     return jsonify(albums)
 
 
-@app.route('/search/artist/', methods=['GET'])
+@app.route('/search/artist', methods=['GET'])
 @cache.cached(key_prefix=lambda: request.full_path)
 def search_artist():
     """Search for a human-readable artist
@@ -292,7 +292,7 @@ def search_artist():
     return jsonify(artists)
 
 
-@app.route('/search/')
+@app.route('/search')
 def search_route():
     type = request.args.get('type', None)
 
