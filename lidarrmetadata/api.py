@@ -29,7 +29,6 @@ if not app.config['PRODUCTION']:
 for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
     provider.PROVIDER_CLASSES[provider_name](*args, **kwargs)
 
-
 @app.errorhandler(404)
 @app.errorhandler(500)
 def handle_error(e):

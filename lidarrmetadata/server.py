@@ -4,7 +4,6 @@ from api import app
 from config import CONFIG
 
 
-
 def main():
     """
     Entry point for script
@@ -14,7 +13,6 @@ def main():
         'log.screen': True,
         'server.socket_port': CONFIG.HTTP_PORT,
         'server.socket_host': '0.0.0.0'})
-
     cherrypy.engine.start()
     cherrypy.engine.block()
 
