@@ -185,10 +185,11 @@ class AlbumNameSearchMixin(MixinBase):
     """
 
     @abc.abstractmethod
-    def search_album_name(self, name):
+    def search_album_name(self, name, artist_name=''):
         """
         Searches for album with name
         :param name: Name of album
+        :param artist_name: Artist name restriction
         :return: List of albums
         """
         pass
@@ -585,8 +586,8 @@ class MusicbrainzDbProvider(Provider,
         name = self.mb_encode(name)
 
         filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'album_search_name.sql')
-        with open(filename, 'r') as input:
-            query = input.read()
+        with open(filename, 'r') as infile:
+            query = infile.read()
 
         if artist_name:
             # TODO Clean this up with some connection/cursor method or allow building of sql
@@ -664,8 +665,8 @@ class MusicbrainzDbProvider(Provider,
             formats = []
             for medium, count in format_counter.items():
                 if medium:
-                    format = '' if count == 1 else '{}x'.format(count)
-                    formats.append(format + medium)
+                    format_ = '' if count == 1 else '{}x'.format(count)
+                    formats.append(format_ + medium)
 
             release['Format'] = ' + '.join(formats)
 
