@@ -6,7 +6,6 @@ import raven.contrib.flask
 from werkzeug.exceptions import HTTPException
 
 from lidarrmetadata import config
-from lidarrmetadata import models
 from lidarrmetadata import provider
 
 app = Flask(__name__)
@@ -17,23 +16,12 @@ sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
 cache = flask_cache.Cache(config=app.config['CACHE_CONFIG'])
 if app.config['USE_CACHE']:
     cache.init_app(app)
-    
+
 if not app.config['PRODUCTION']:
     # Run api doc server if not running in production
     from flasgger import Swagger
 
     swagger = Swagger(app)
-
-
-@app.before_request
-def before_request():
-    models.database.connect()
-
-
-@app.teardown_request
-def teardown_request(response):
-    if not models.database.is_closed():
-        models.database.close()
 
 
 @app.errorhandler(404)

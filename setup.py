@@ -36,7 +36,6 @@ setup(
                       'flask',
                       'flask-cache',
                       'musicbrainzngs',
-                      'peewee',
                       'psycopg2',
                       'pylast',
                       'python-dateutil',
