@@ -45,17 +45,27 @@ def handle_error(e):
     return jsonify(error=str(e)), code
 
 
-@app.route('/artists/<mbid>/', methods=['GET'])
-@cache.cached(key_prefix=lambda: request.full_path)
-def get_artist_info(mbid):
+def validate_mbid(mbid):
+    """
+    Validates Musicbrainz ID and returns flask response in case of error
+    :param mbid: Musicbrainz ID to verify
+    :return: Flask response if error, None if valid
+    """
     try:
         uuid.UUID(mbid, version=4)
-        print('Valid UUID')
     except ValueError:
         return jsonify(error='Invalid UUID'), 400
-      
+
     if mbid in config.CONFIG.BLACKLISTED_ARTISTS:
         return jsonify(error='Blacklisted artist'), 403
+
+
+@app.route('/artist/<mbid>', methods=['GET'])
+@cache.cached(key_prefix=lambda: request.full_path)
+def get_artist_info(mbid):
+    uuid_validation_response = validate_mbid(mbid)
+    if uuid_validation_response:
+        return uuid_validation_response
 
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(
@@ -68,11 +78,6 @@ def get_artist_info(mbid):
         provider.ArtistArtworkMixin)
     album_providers = provider.get_providers_implementing(
         provider.AlbumByArtistMixin)
-    album_art_providers = provider.get_providers_implementing(
-        provider.AlbumArtworkMixin)
-    media_providers = provider.get_providers_implementing(provider.MediaByAlbumMixin)
-    track_providers = provider.get_providers_implementing(
-        provider.TracksByAlbumMixin)
 
     # TODO Figure out preferred providers
     if artist_providers:
@@ -87,21 +92,6 @@ def get_artist_info(mbid):
     else:
         # 500 error if we don't have an album provider since it's essential
         return jsonify(error='No album provider available'), 500
-
-    if track_providers:
-        no_releases = []
-        for album in artist['Albums']:
-            if album['Releases'] and album['Releases'][0]:
-                album['Media'] = media_providers[0].get_album_media(album['Releases'][0]['Id'])
-                album['Tracks'] = track_providers[0].get_album_tracks(album['Releases'][0]['Id'])
-                album['Labels'] = album['Releases'][0]['Labels']
-            else:
-                no_releases.append(album)
-
-        artist['Albums'] = [album for album in artist['Albums'] if album not in no_releases]
-    else:
-        # 500 error if we don't have a track provider since it's essential
-        return jsonify(error='No track provider available'), 500
 
     if link_providers and not artist.get('Links', None):
         artist['Links'] = link_providers[0].get_artist_links(mbid)
@@ -119,14 +109,8 @@ def get_artist_info(mbid):
 
     if artist_art_providers:
         artist['Images'] = artist_art_providers[0].get_artist_images(mbid)
-
-    if album_art_providers:
-        for album in artist['Albums']:
-            album['Images'] = album_art_providers[0].get_album_images(
-                album['Id'], cache_only=True)
     else:
-        for album in artist['Albums']:
-            album['Images'] = []
+        artist['Images'] = []
 
     # Filter album types
     # TODO Should types be part of album query?
@@ -144,7 +128,50 @@ def get_artist_info(mbid):
     return jsonify(artist)
 
 
-@app.route('/search/album/')
+@app.route('/album/<mbid>', methods=['GET'])
+@cache.cached(key_prefix=lambda: request.full_path)
+def get_album_info(mbid):
+    uuid_validation_response = validate_mbid(mbid)
+    if uuid_validation_response:
+        return uuid_validation_response
+
+    # Determine which release we want
+    release = request.args.get('release', None)
+
+    album_providers = provider.get_providers_implementing(provider.AlbumByIdMixin)
+    album_art_providers = provider.get_providers_implementing(
+        provider.AlbumArtworkMixin)
+    media_providers = provider.get_providers_implementing(provider.MediaByAlbumMixin)
+    track_providers = provider.get_providers_implementing(
+        provider.TracksByAlbumMixin)
+
+    if album_providers:
+        album = album_providers[0].get_album_by_id(mbid, release)
+    else:
+        return jsonify(error='No album provider available'), 500
+
+    if not album:
+        return jsonify(error='Album not found'), 404
+
+    if track_providers:
+        if 'Releases' in album and album['Releases'][0]:
+            album['Media'] = media_providers[0].get_album_media(album['SelectedRelease'])
+            album['Tracks'] = track_providers[0].get_album_tracks(album['SelectedRelease'])
+    else:
+        # 500 error if we don't have a track provider since it's essential
+        return jsonify(error='No track provider available'), 500
+
+    if album_art_providers:
+        album['Images'] = album_art_providers[0].get_album_images(
+            album['Id'], cache_only=True)
+    else:
+        album['Images'] = []
+
+    return jsonify(album)
+
+
+@app.route('/search/album')
+@cache.cached(key_prefix=lambda: request.full_path)
 def search_album():
     """Search for a human-readable album
     ---
@@ -165,12 +192,26 @@ def search_album():
                 "title": "Dark Side of the Moon"
               }
     """
-    query = request.args.get('query', '')
-    albums = provider.search_album(query)
+    query = request.args.get('query')
+    artist_name = request.args.get('artist', '')
+    search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
+    album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)
+
+    if search_providers:
+        albums = search_providers[0].search_album_name(query, artist_name)
+    else:
+        response = jsonify(error="No album search providers")
+        response.status_code = 500
+        return response
+
+    if album_art_providers:
+        for album in albums:
+            album['Images'] = album_art_providers[0].get_album_images(album['Id'])
+
     return jsonify(albums)
 
 
-@app.route('/search/artist/', methods=['GET'])
+@app.route('/search/artist', methods=['GET'])
 @cache.cached(key_prefix=lambda: request.full_path)
 def search_artist():
     """Search for a human-readable artist
@@ -251,12 +292,14 @@ def search_artist():
     return jsonify(artists)
 
 
-@app.route('/search/')
+@app.route('/search')
 def search_route():
     type = request.args.get('type', None)
 
     if type == 'artist':
         return search_artist()
+    elif type == 'album':
+        return search_album()
     else:
         error = jsonify(error='Type not provided') if type is None else jsonify(
             error='Unsupported search type {}'.format(type))

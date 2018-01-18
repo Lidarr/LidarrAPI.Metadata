@@ -79,6 +79,22 @@ class AlbumByArtistMixin(MixinBase):
         pass
 
 
+class AlbumByIdMixin(MixinBase):
+    """
+    Gets album by ID
+    """
+
+    @abc.abstractmethod
+    def get_album_by_id(self, rgid, rid=None):
+        """
+        Gets album by ID
+        :param rgid: Release group ID
+        :param rid: Release ID of individual release. Defaults to None, in which case the first result is chosen
+        :return: Album corresponding to rgid or rid
+        """
+        pass
+
+
 class MediaByAlbumMixin(MixinBase):
     """
     Gets medium for album
@@ -163,6 +179,22 @@ class ArtistLinkMixin(MixinBase):
         pass
 
 
+class AlbumNameSearchMixin(MixinBase):
+    """
+    Searches for album by name
+    """
+
+    @abc.abstractmethod
+    def search_album_name(self, name, artist_name=''):
+        """
+        Searches for album with name
+        :param name: Name of album
+        :param artist_name: Artist name restriction
+        :return: List of albums
+        """
+        pass
+
+
 class Provider(object):
     """
     Provider base class
@@ -211,9 +243,10 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
 
         if not results and not cache_only:
             results = self.get_by_mbid(album_id)
+            results = results.get('albums', results).get(album_id, results)
             self.cache.put(album_id, results)
 
-        return self.parse_album_images(results, album_id)
+        return self.parse_album_images(results)
 
     def get_by_mbid(self, mbid):
         # TODO Cache results
@@ -240,14 +273,12 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         return url
 
     @staticmethod
-    def parse_album_images(response, album_id):
+    def parse_album_images(response):
         """
         Parses album images to our expected format
         :param response: API response
         :return: List of images in our expected format
         """
-        if 'albums' in response:
-            response = response.get('albums')
         images = {'Cover': util.first_key_item(response, 'albumcover'),
                   'Disc': util.first_key_item(response, 'cdart')}
         return [{'CoverType': key, 'Url': value['url'].replace('https', 'http')}
@@ -487,6 +518,8 @@ class MusicbrainzDbProvider(Provider,
                             ArtistLinkMixin,
                             ArtistNameSearchMixin,
                             AlbumByArtistMixin,
+                            AlbumByIdMixin,
+                            AlbumNameSearchMixin,
                             MediaByAlbumMixin,
                             TracksByAlbumMixin):
     """
@@ -542,11 +575,104 @@ class MusicbrainzDbProvider(Provider,
     def search_artist_name(self, name):
         name = self.mb_encode(name)
         results = self.query_from_file('artist_search_name.sql', [name])
+
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
                  'Type': result['type'] or 'Artist',
                  'Disambiguation': result['comment']}
                 for result in results]
+
+    def search_album_name(self, name, artist_name=''):
+        name = self.mb_encode(name)
+
+        filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'album_search_name.sql')
+        with open(filename, 'r') as infile:
+            query = infile.read()
+
+        if artist_name:
+            # TODO Clean this up with some connection/cursor method or allow building of sql
+            connection = psycopg2.connect(host=self._db_host,
+                                          port=self._db_port,
+                                          dbname=self._db_name,
+                                          user=self._db_user,
+                                          password=self._db_password)
+            cursor = connection.cursor()
+            query += cursor.mogrify(' AND UPPER(artist.name) LIKE UPPER(%s)', [artist_name])
+
+        results = self.map_query(query, [name])
+
+        return [{'Id': result['gid'],
+                 'Disambiguation': result['comment'],
+                 'Title': result['album'],
+                 'Type': result['primary_type'],
+                 'SecondaryTypes': result['secondary_types'],
+                 'ReleaseDate': datetime.datetime(result['year'] or 1,
+                                                  result['month'] or 1,
+                                                  result['day'] or 1),
+                 'Artist': {'Id': result['artist_id'], 'Name': result['artist_name']}}
+                for result in results]
+
+    def get_album_by_id(self, rgid, rid=None):
+        release_groups = self.query_from_file('release_group_by_id.sql', [rgid])
+
+        if not release_groups:
+            return {}
+
+        rid = rid or release_groups[0]['release_id']
+
+        releases = filter(lambda rg: rg['release_id'] == rid, release_groups)
+        release = releases[0] if releases else None
+
+        if not release:
+            return {}
+
+        album = {'Id': release_groups[0]['gid'],
+                 'Disambiguation': release_groups[0]['comment'],
+                 'Title': release_groups[0]['album'],
+                 'Type': release_groups[0]['primary_type'],
+                 'SecondaryTypes': release_groups[0]['secondary_types'],
+                 'ReleaseDate': datetime.datetime(release_groups[0]['year'] or 1,
+                                                  release_groups[0]['month'] or 1,
+                                                  release_groups[0]['day'] or 1),
+                 'Label': release['label'],
+                 'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']},
+                 'SelectedRelease': rid}
+
+        releases = [{'Id': release_group['release_id'],
+                     'Disambiguation': release_group['release_comment'],
+                     'Country': release_group['country'],
+                     'Label': release_group['label'],
+                     'ReleaseDate': datetime.datetime(release_group['release_year'] or 1,
+                                                      release_group['release_month'] or 1,
+                                                      release_group['release_day'] or 1),
+                     'MediaCount': release_group['media_count'],
+                     'TrackCount': release_group['track_count'],
+                     'Format': [release_group['format']]}
+                    for release_group in release_groups]
+
+        # Combine formats
+        # TODO Rework data code and find a better solution for this
+        combined_releases = {}
+        for release in releases:
+            id_ = release['Id']
+            if id_ in combined_releases:
+                combined_releases[id_]['Format'].extend(release['Format'])
+            else:
+                combined_releases[id_] = release
+
+        for release in combined_releases.values():
+            format_counter = collections.Counter(release['Format'])
+            formats = []
+            for medium, count in format_counter.items():
+                if medium:
+                    format_ = '' if count == 1 else '{}x'.format(count)
+                    formats.append(format_ + medium)
+
+            release['Format'] = ' + '.join(formats)
+
+        album['Releases'] = combined_releases.values()
+
+        return album
 
     def get_album_media(self, album_id):
         results = self.query_from_file('media_album_mbid.sql',
@@ -572,45 +698,15 @@ class MusicbrainzDbProvider(Provider,
         results = self.query_from_file('album_search_artist_mbid.sql',
                                        [artist_id])
 
-        albums = []
-        for result in results:
-            album = {'Id': result['gid'],
-                     'Disambiguation': result['comment'],
-                     'Title': result['album'],
-                     'Type': result['primary_type'],
-                     'SecondaryTypes': result['secondary_types'],
-                     'ReleaseDate': datetime.datetime(result['year'] or 1,
-                                                      result['month'] or 1,
-                                                      result['day'] or 1)}
-
-            release_ids = result['releases'].strip('{}').split(',')
-            release_ids = [x for x in release_ids if x]
-
-            releases = {}
-            for rid in release_ids:
-                release_results = self.query_from_file('release_by_mbid.sql', [rid])
-                for release in release_results:
-                    # Just append label if we already have this release
-                    id_ = release['gid']
-                    if id_ in releases:
-                        if release['label'] not in releases[id_]['Labels']:
-                            releases[id_]['Labels'].append(release['label'])
-
-                        if release['country'] not in releases[id_]['Countries']:
-                            releases[id_]['Countries'].append(release['country'])
-
-                        continue
-
-                    releases[id_] = {'Id': id_,
-                                     'Countries': [release['country']] if release['country'] else [],
-                                     'Labels': [release['label']] if release['label'] else [],
-                                     'ReleaseDate': datetime.datetime(release['year'] or 1,
-                                                                      release['month'] or 1,
-                                                                      release['day'] or 1)}
-            album['Releases'] = releases.values()
-            albums.append(album)
-
-        return albums
+        return [{'Id': result['gid'],
+                 'Disambiguation': result['comment'],
+                 'Title': result['album'],
+                 'Type': result['primary_type'],
+                 'SecondaryTypes': result['secondary_types'],
+                 'ReleaseDate': datetime.datetime(result['year'] or 1,
+                                                  result['month'] or 1,
+                                                  result['day'] or 1)}
+                for result in results]
 
     def get_artist_links(self, artist_id):
         results = self.query_from_file('links_artist_mbid.sql',
@@ -628,6 +724,7 @@ class MusicbrainzDbProvider(Provider,
         :return: List of dict with column: value results
         """
         filename = pkg_resources.resource_filename('lidarrmetadata.sql', sql_file)
+
         with open(filename, 'r') as sql:
             return self.map_query(sql.read(), *args, **kwargs)
 
@@ -638,6 +735,7 @@ class MusicbrainzDbProvider(Provider,
         :param kwargs: Keyword args to pass to cursor.execute
         :return: List of dict with column: value
         """
+
         connection = psycopg2.connect(host=self._db_host,
                                       port=self._db_port,
                                       dbname=self._db_name,
