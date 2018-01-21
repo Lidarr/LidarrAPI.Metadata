@@ -182,12 +182,17 @@ def chart_route(name):
     count = request.args.get('count', 10)
 
     # Function to get each chart. Use lower case for keys
-    charts = {'itunes': chart.get_itunes_chart}
+    charts = {
+        'apple-music': chart.get_apple_music_chart,
+        'billboard-200': chart.get_billboard_200_albums_chart,
+        'itunes': chart.get_itunes_chart
+    }
 
     if name not in charts.keys():
         return jsonify(error='Chart {} not found'.format(name)), 404
     else:
         return jsonify(charts[name](count))
+
 
 @app.route('/search/album')
 @cache.cached(key_prefix=lambda: request.full_path)

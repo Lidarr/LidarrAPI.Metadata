@@ -31,18 +31,21 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['cherrypy',
-                      'flasgger',
-                      'flask',
-                      'flask-cache',
-                      'musicbrainzngs',
-                      'peewee',
-                      'psycopg2',
-                      'pylast',
-                      'python-dateutil',
-                      'raven[flask]',
-                      'requests',
-                      'wikipedia'],
+    install_requires=[
+        'billboard.py',
+        'cherrypy',
+        'flasgger',
+        'flask',
+        'flask-cache',
+        'musicbrainzngs',
+        'peewee',
+        'psycopg2',
+        'pylast',
+        'python-dateutil',
+        'raven[flask]',
+        'requests',
+        'wikipedia'
+    ],
 
     extras_require={
         'test': ['pytest', 'tox']
