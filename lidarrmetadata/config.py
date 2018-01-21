@@ -90,7 +90,10 @@ class DefaultConfig(object):
 
     # Cache options
     USE_CACHE = True
-    CACHE_CONFIG = {'CACHE_TYPE': 'simple'}
+    CACHE_CONFIG = {
+        'CACHE_TYPE': 'simple',
+        'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24
+    }
 
     # File to use for DB
     DB_FILE = os.path.abspath('./music-metadata.db')
