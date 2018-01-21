@@ -18,7 +18,7 @@ sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
 cache = flask_cache.Cache(config=app.config['CACHE_CONFIG'])
 if app.config['USE_CACHE']:
     cache.init_app(app)
-    
+
 if not app.config['PRODUCTION']:
     # Run api doc server if not running in production
     from flasgger import Swagger

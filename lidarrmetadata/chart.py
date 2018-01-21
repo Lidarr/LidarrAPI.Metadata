@@ -22,11 +22,9 @@ def get_itunes_chart(count=10):
 
     search_results = []
     for result in results:
-        print('searching')
         search_result = search_provider.search_album_name(result['name'], result['artistName'])
         if search_result:
             search_result = search_result[0]
-            print(search_result)
             search_results.append({
                 'AlbumId': search_result['Id'],
                 'AlbumTitle': search_result['Title'],
@@ -36,6 +34,3 @@ def get_itunes_chart(count=10):
             })
 
     return search_results
-
-if __name__ == '__main__':
-    print(get_itunes_chart())

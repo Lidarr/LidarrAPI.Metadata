@@ -49,7 +49,7 @@ setup(
     },
 
     package_data={
-      'lidarrmetadata.sql': ['*.sql']
+        'lidarrmetadata.sql': ['*.sql']
     },
 
     # To provide executable scripts, use entry points in preference to the
