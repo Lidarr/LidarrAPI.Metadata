@@ -5,6 +5,7 @@ import flask_cache
 import raven.contrib.flask
 from werkzeug.exceptions import HTTPException
 
+from lidarrmetadata import chart
 from lidarrmetadata import config
 from lidarrmetadata import models
 from lidarrmetadata import provider
@@ -169,6 +170,24 @@ def get_album_info(mbid):
 
     return jsonify(album)
 
+
+@app.route('/chart/<name>')
+@cache.cached(key_prefix=lambda: request.full_path)
+def chart_route(name):
+    """
+    Gets chart
+    :param name: Name of chart. 404 if name invalid
+    """
+    name = name.lower()
+    count = request.args.get('count', 10)
+
+    # Function to get each chart. Use lower case for keys
+    charts = {'itunes': chart.get_itunes_chart}
+
+    if name not in charts.keys():
+        return jsonify(error='Chart {} not found'.format(name)), 404
+    else:
+        return jsonify(charts[name](count))
 
 @app.route('/search/album')
 @cache.cached(key_prefix=lambda: request.full_path)
