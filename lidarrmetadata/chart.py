@@ -27,7 +27,7 @@ def get_apple_music_chart(count=10):
         search_result = search_provider.search_album_name(result['name'], result['artistName'])
         if search_result:
             search_result = search_result[0]
-            search_results.append(_parse_result(search_result))
+            search_results.append(_parse_album_search_result(search_result))
 
             if len(search_results) == count:
                 break
@@ -50,7 +50,7 @@ def get_billboard_200_albums_chart(count=10):
         search_result = search_provider.search_album_name(result.title, result.artist)
         if search_result:
             search_result = search_result[0]
-            search_results.append(_parse_result(search_result))
+            search_results.append(_parse_album_search_result(search_result))
 
             if len(search_results) == count:
                 break
@@ -75,7 +75,7 @@ def get_itunes_chart(count=10):
         search_result = search_provider.search_album_name(result['name'], result['artistName'])
         if search_result:
             search_result = search_result[0]
-            search_results.append(_parse_result(search_result))
+            search_results.append(_parse_album_search_result(search_result))
 
             if len(search_results) == count:
                 break
@@ -98,18 +98,24 @@ def get_lastfm_album_chart(count=10, user=None):
         tag = client.get_tag('all')
         lastfm_albums = tag.get_top_albums()
 
-    print(lastfm_albums[0].item)
+    album_provider = provider.get_providers_implementing(provider.AlbumByIdMixin)[0]
+    albums = []
+    for result in pylast.extract_items(lastfm_albums):
+        # TODO Figure out a cleaner way to do this
+        rgid = album_provider.map_query(
+            ('SELECT release_group.gid '
+             'FROM release '
+             'JOIN release_group ON release_group.id = release.release_group '
+             'WHERE release.gid = %s'),
+            [result.get_mbid()])
 
-    albums = [
-        {
-            'AlbumId': album.get_mbid(),
-            'AlbumTitle': album.title,
-            'ArtistName': album.artist.name,
-            'ArtistId': album.artist.get_mbid(),
-            'ReleaseDate': album.get_release_date()
-        }
-        for album in pylast.extract_items(lastfm_albums)
-    ]
+        if rgid:
+            search_result = album_provider.get_album_by_id(rgid[0]['gid'])
+            if search_result:
+                albums.append(_parse_album_search_result(search_result))
+
+                if len(albums) == count:
+                    break
 
     if len(albums) > count:
         albums = albums[:count]
@@ -141,7 +147,7 @@ def get_lastfm_artist_chart(count=10, user=None):
     return artists
 
 
-def _parse_result(search_result):
+def _parse_album_search_result(search_result):
     return {
         'AlbumId': search_result['Id'],
         'AlbumTitle': search_result['Title'],
