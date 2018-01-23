@@ -181,6 +181,11 @@ def chart_route(name, type_, selection):
     name = name.lower()
     count = request.args.get('count', 10, type=int)
 
+    # Get remaining chart-dependent args
+    chart_kwargs = request.args.to_dict()
+    if 'count' in chart_kwargs:
+        del chart_kwargs['count']
+
     key = (name, type_, selection)
 
     # Function to get each chart. Use lower case for keys
@@ -195,7 +200,7 @@ def chart_route(name, type_, selection):
     if key not in charts.keys():
         return jsonify(error='Chart {}/{}/{} not found'.format(*key)), 404
     else:
-        return jsonify(charts[key](count, **request.args))
+        return jsonify(charts[key](count, **chart_kwargs))
 
 
 @app.route('/search/album')
