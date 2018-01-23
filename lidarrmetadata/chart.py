@@ -34,6 +34,7 @@ def get_apple_music_chart(count=10):
 
     return search_results
 
+
 def get_billboard_200_albums_chart(count=10):
     """
     Gets billboard top 200 albums
@@ -81,6 +82,7 @@ def get_itunes_chart(count=10):
 
     return search_results
 
+
 def get_lastfm_chart(count=10):
     """
     Gets and parses lastfm chart
@@ -90,13 +92,15 @@ def get_lastfm_chart(count=10):
     client = pylast.LastFMNetwork(api_key=config.CONFIG.LASTFM_KEY, api_secret=config.CONFIG.LASTFM_SECRET)
     lastfm_artists = client.get_top_artists()
 
-
     artists = [{'Name': artist.name,
                 'Id': artist.get_mbid()}
                for artist in pylast.extract_items(lastfm_artists)]
 
+    if len(artists) > count:
+        artists = artists[:count]
 
     return artists
+
 
 def _parse_result(search_result):
     return {
