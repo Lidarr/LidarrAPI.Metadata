@@ -185,7 +185,8 @@ def chart_route(name):
     charts = {
         'apple-music': chart.get_apple_music_chart,
         'billboard-200': chart.get_billboard_200_albums_chart,
-        'itunes': chart.get_itunes_chart
+        'itunes': chart.get_itunes_chart,
+        'lastfm': chart.get_lastfm_chart
     }
 
     if name not in charts.keys():

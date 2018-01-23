@@ -3,8 +3,10 @@ Code for getting and parsing music charts (Billboard, itunes, etc)
 """
 
 import billboard
+import pylast
 import requests
 
+from lidarrmetadata import config
 from lidarrmetadata import provider
 
 
@@ -79,6 +81,22 @@ def get_itunes_chart(count=10):
 
     return search_results
 
+def get_lastfm_chart(count=10):
+    """
+    Gets and parses lastfm chart
+    :param count: Number of results to return. Defaults to 10
+    :return: Parsed chart
+    """
+    client = pylast.LastFMNetwork(api_key=config.CONFIG.LASTFM_KEY, api_secret=config.CONFIG.LASTFM_SECRET)
+    lastfm_artists = client.get_top_artists()
+
+
+    artists = [{'Name': artist.name,
+                'Id': artist.get_mbid()}
+               for artist in pylast.extract_items(lastfm_artists)]
+
+
+    return artists
 
 def _parse_result(search_result):
     return {
