@@ -188,13 +188,13 @@ def chart_route(name, type_, selection):
         ('apple-music', 'album', 'top'): chart.get_apple_music_chart,
         ('billboard', 'album', 'top'): chart.get_billboard_200_albums_chart,
         ('itunes', 'album', 'top'): chart.get_itunes_chart,
-        ('lastfm', 'artist', 'top'): chart.get_lastfm_chart
+        ('lastfm', 'artist', 'top'): chart.get_lastfm_artist_chart
     }
 
     if key not in charts.keys():
         return jsonify(error='Chart {}/{}/{} not found'.format(*key)), 404
     else:
-        return jsonify(charts[key](count))
+        return jsonify(charts[key](count, **request.args))
 
 
 @app.route('/search/album')
