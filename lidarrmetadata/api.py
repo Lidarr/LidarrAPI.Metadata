@@ -179,7 +179,7 @@ def chart_route(name):
     :param name: Name of chart. 404 if name invalid
     """
     name = name.lower()
-    count = request.args.get('count', 10)
+    count = request.args.get('count', 10, type=int)
 
     # Function to get each chart. Use lower case for keys
     charts = {
