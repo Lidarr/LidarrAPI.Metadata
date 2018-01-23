@@ -171,9 +171,9 @@ def get_album_info(mbid):
     return jsonify(album)
 
 
-@app.route('/chart/<name>')
+@app.route('/chart/<name>/<type_>/<selection>')
 @cache.cached(key_prefix=lambda: request.full_path)
-def chart_route(name):
+def chart_route(name, type_, selection):
     """
     Gets chart
     :param name: Name of chart. 404 if name invalid
@@ -181,18 +181,20 @@ def chart_route(name):
     name = name.lower()
     count = request.args.get('count', 10, type=int)
 
+    key = (name, type_, selection)
+
     # Function to get each chart. Use lower case for keys
     charts = {
-        'apple-music': chart.get_apple_music_chart,
-        'billboard-200': chart.get_billboard_200_albums_chart,
-        'itunes': chart.get_itunes_chart,
-        'lastfm': chart.get_lastfm_chart
+        ('apple-music', 'album', 'top'): chart.get_apple_music_chart,
+        ('billboard', 'album', 'top'): chart.get_billboard_200_albums_chart,
+        ('itunes', 'album', 'top'): chart.get_itunes_chart,
+        ('lastfm', 'artist', 'top'): chart.get_lastfm_chart
     }
 
-    if name not in charts.keys():
-        return jsonify(error='Chart {} not found'.format(name)), 404
+    if key not in charts.keys():
+        return jsonify(error='Chart {}/{}/{} not found'.format(*key)), 404
     else:
-        return jsonify(charts[name](count))
+        return jsonify(charts[key](count))
 
 
 @app.route('/search/album')
