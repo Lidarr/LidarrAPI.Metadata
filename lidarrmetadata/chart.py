@@ -83,6 +83,40 @@ def get_itunes_chart(count=10):
     return search_results
 
 
+def get_lastfm_album_chart(count=10, user=None):
+    """
+    Gets and parses lastfm chart
+    :param count: Number of results to return. Defaults to 10
+    :return: Parsed chart
+    """
+    client = pylast.LastFMNetwork(api_key=config.CONFIG.LASTFM_KEY, api_secret=config.CONFIG.LASTFM_SECRET)
+
+    if user:
+        user = client.get_user(user[0])
+        lastfm_albums = user.get_top_albums()
+    else:
+        tag = client.get_tag('all')
+        lastfm_albums = tag.get_top_albums()
+
+    print(lastfm_albums[0].item)
+
+    albums = [
+        {
+            'AlbumId': album.get_mbid(),
+            'AlbumTitle': album.title,
+            'ArtistName': album.artist.name,
+            'ArtistId': album.artist.get_mbid(),
+            'ReleaseDate': album.get_release_date()
+        }
+        for album in pylast.extract_items(lastfm_albums)
+    ]
+
+    if len(albums) > count:
+        albums = albums[:count]
+
+    return albums
+
+
 def get_lastfm_artist_chart(count=10, user=None):
     """
     Gets and parses lastfm chart
