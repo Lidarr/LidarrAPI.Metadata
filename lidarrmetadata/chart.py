@@ -24,7 +24,7 @@ def get_apple_music_chart(count=10):
 
     search_results = []
     for result in results:
-        search_result = search_provider.search_album_name(result['name'], result['artistName'])
+        search_result = search_provider.search_album_name(result['name'], artist_name=result['artistName'], limit=1)
         if search_result:
             search_result = search_result[0]
             search_results.append(_parse_album_search_result(search_result))
@@ -47,7 +47,7 @@ def get_billboard_200_albums_chart(count=10):
 
     search_results = []
     for result in results:
-        search_result = search_provider.search_album_name(result.title, result.artist)
+        search_result = search_provider.search_album_name(result.title, artist_name=result.artist)
         if search_result:
             search_result = search_result[0]
             search_results.append(_parse_album_search_result(search_result))
@@ -72,7 +72,7 @@ def get_itunes_chart(count=10):
 
     search_results = []
     for result in results:
-        search_result = search_provider.search_album_name(result['name'], result['artistName'])
+        search_result = search_provider.search_album_name(result['name'], artist_name=result['artistName'], limit=1)
         if search_result:
             search_result = search_result[0]
             search_results.append(_parse_album_search_result(search_result))
@@ -106,7 +106,8 @@ def get_lastfm_album_chart(count=10, user=None):
             ('SELECT release_group.gid '
              'FROM release '
              'JOIN release_group ON release_group.id = release.release_group '
-             'WHERE release.gid = %s'),
+             'WHERE release.gid = %s '
+             'LIMIT 1'),
             [result.get_mbid()])
 
         if rgid:
@@ -145,7 +146,7 @@ def get_lastfm_artist_chart(count=10, user=None):
 
         if not all(artist.values()):
             print(artist)
-            results = search_provider.search_artist_name(artist['Name'])
+            results = search_provider.search_artist_name(artist['Name'], limit=1)
             print(results)
             if results:
                 results = results[0]
