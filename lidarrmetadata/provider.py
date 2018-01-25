@@ -1,5 +1,6 @@
 import abc
 import collections
+import contextlib
 import datetime
 import imp
 import logging
@@ -574,7 +575,13 @@ class MusicbrainzDbProvider(Provider,
 
     def search_artist_name(self, name):
         name = self.mb_encode(name)
-        results = self.query_from_file('artist_search_name.sql', [name])
+
+        filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'artist_search_name.sql')
+        with open(filename, 'r') as infile:
+            query = infile.read()
+
+
+        results = self.map_query(query, [name])
 
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
@@ -589,15 +596,11 @@ class MusicbrainzDbProvider(Provider,
         with open(filename, 'r') as infile:
             query = infile.read()
 
-        if artist_name:
-            # TODO Clean this up with some connection/cursor method or allow building of sql
-            connection = psycopg2.connect(host=self._db_host,
-                                          port=self._db_port,
-                                          dbname=self._db_name,
-                                          user=self._db_user,
-                                          password=self._db_password)
-            cursor = connection.cursor()
-            query += cursor.mogrify(' AND UPPER(artist.name) LIKE UPPER(%s)', [artist_name])
+        if artist_name or limit:
+            with self._cursor() as cursor:
+
+                if artist_name:
+                    query += cursor.mogrify(' AND UPPER(artist.name) LIKE UPPER(%s)', [artist_name])
 
         results = self.map_query(query, [name])
 
@@ -736,16 +739,12 @@ class MusicbrainzDbProvider(Provider,
         :return: List of dict with column: value
         """
 
-        connection = psycopg2.connect(host=self._db_host,
-                                      port=self._db_port,
-                                      dbname=self._db_name,
-                                      user=self._db_user,
-                                      password=self._db_password)
-        cursor = connection.cursor()
-        cursor.execute(*args, **kwargs)
-        columns = collections.OrderedDict(
-            (column.name, None) for column in cursor.description)
-        results = cursor.fetchall()
+        with self._cursor() as cursor:
+            cursor.execute(*args, **kwargs)
+            columns = collections.OrderedDict(
+                (column.name, None) for column in cursor.description)
+            results = cursor.fetchall()
+
         results = [{column: result[i] for i, column in enumerate(columns.keys())}
                    for
                    result in results]
@@ -754,6 +753,20 @@ class MusicbrainzDbProvider(Provider,
         results = util.map_iterable_values(results, self.mb_decode, str)
 
         return results
+
+    @contextlib.contextmanager
+    def _cursor(self):
+        try:
+            connection = psycopg2.connect(host=self._db_host,
+                                          port=self._db_port,
+                                          dbname=self._db_name,
+                                          user=self._db_user,
+                                          password=self._db_password)
+            cursor = connection.cursor()
+            yield cursor
+        finally:
+            cursor.close()
+            connection.close()
 
     @classmethod
     def mb_decode(cls, s):
