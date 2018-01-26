@@ -1,5 +1,6 @@
 import abc
 import collections
+import contextlib
 import datetime
 import imp
 import logging
@@ -55,10 +56,11 @@ class ArtistNameSearchMixin(MixinBase):
     """
 
     @abc.abstractmethod
-    def search_artist_name(self, name):
+    def search_artist_name(self, name, limit=None):
         """
         Searches for artist with name
         :param name: Name to search for
+        :param limit: Limit of number of results to return. Defaults to None, indicating no limit
         :return: List of possible matches
         """
         pass
@@ -185,10 +187,11 @@ class AlbumNameSearchMixin(MixinBase):
     """
 
     @abc.abstractmethod
-    def search_album_name(self, name, artist_name=''):
+    def search_album_name(self, name, limit=None, artist_name=''):
         """
         Searches for album with name
         :param name: Name of album
+        :param limit: Limit of number of results to return. Defaults to None, indicating no limit
         :param artist_name: Artist name restriction
         :return: List of albums
         """
@@ -360,7 +363,7 @@ class MusicbrainzApiProvider(Provider,
     def get_albums_by_artist(self, artist_id):
         return self.search_album('', arid=artist_id)
 
-    def search_artist_name(self, name):
+    def search_artist_name(self, name, limit=None):
         return self.search_artist(name)
 
     def _search_artist(self, query, **kwargs):
@@ -572,9 +575,19 @@ class MusicbrainzDbProvider(Provider,
                 'Type': results['type'] or 'Artist',
                 'Disambiguation': results['comment']}
 
-    def search_artist_name(self, name):
+    def search_artist_name(self, name, limit=None):
         name = self.mb_encode(name)
-        results = self.query_from_file('artist_search_name.sql', [name])
+
+        filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'artist_search_name.sql')
+        with open(filename, 'r') as infile:
+            query = infile.read()
+
+        if limit:
+            with self._cursor() as cursor:
+                if limit:
+                    query += cursor.mogrify(' LIMIT %s', [limit])
+
+        results = self.map_query(query, [name])
 
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
@@ -582,22 +595,21 @@ class MusicbrainzDbProvider(Provider,
                  'Disambiguation': result['comment']}
                 for result in results]
 
-    def search_album_name(self, name, artist_name=''):
+    def search_album_name(self, name, limit=None, artist_name=''):
         name = self.mb_encode(name)
 
         filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'album_search_name.sql')
         with open(filename, 'r') as infile:
             query = infile.read()
 
-        if artist_name:
-            # TODO Clean this up with some connection/cursor method or allow building of sql
-            connection = psycopg2.connect(host=self._db_host,
-                                          port=self._db_port,
-                                          dbname=self._db_name,
-                                          user=self._db_user,
-                                          password=self._db_password)
-            cursor = connection.cursor()
-            query += cursor.mogrify(' AND UPPER(artist.name) LIKE UPPER(%s)', [artist_name])
+        if artist_name or limit:
+            with self._cursor() as cursor:
+
+                if artist_name:
+                    query += cursor.mogrify(' AND UPPER(artist.name) LIKE UPPER(%s)', [artist_name])
+
+                if limit:
+                    query += cursor.mogrify(' LIMIT %s', [limit])
 
         results = self.map_query(query, [name])
 
@@ -736,16 +748,12 @@ class MusicbrainzDbProvider(Provider,
         :return: List of dict with column: value
         """
 
-        connection = psycopg2.connect(host=self._db_host,
-                                      port=self._db_port,
-                                      dbname=self._db_name,
-                                      user=self._db_user,
-                                      password=self._db_password)
-        cursor = connection.cursor()
-        cursor.execute(*args, **kwargs)
-        columns = collections.OrderedDict(
-            (column.name, None) for column in cursor.description)
-        results = cursor.fetchall()
+        with self._cursor() as cursor:
+            cursor.execute(*args, **kwargs)
+            columns = collections.OrderedDict(
+                (column.name, None) for column in cursor.description)
+            results = cursor.fetchall()
+
         results = [{column: result[i] for i, column in enumerate(columns.keys())}
                    for
                    result in results]
@@ -754,6 +762,20 @@ class MusicbrainzDbProvider(Provider,
         results = util.map_iterable_values(results, self.mb_decode, str)
 
         return results
+
+    @contextlib.contextmanager
+    def _cursor(self):
+        try:
+            connection = psycopg2.connect(host=self._db_host,
+                                          port=self._db_port,
+                                          dbname=self._db_name,
+                                          user=self._db_user,
+                                          password=self._db_password)
+            cursor = connection.cursor()
+            yield cursor
+        finally:
+            cursor.close()
+            connection.close()
 
     @classmethod
     def mb_decode(cls, s):

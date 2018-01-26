@@ -5,6 +5,7 @@ import flask_cache
 import raven.contrib.flask
 from werkzeug.exceptions import HTTPException
 
+from lidarrmetadata import chart
 from lidarrmetadata import config
 from lidarrmetadata import models
 from lidarrmetadata import provider
@@ -17,7 +18,7 @@ sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
 cache = flask_cache.Cache(config=app.config['CACHE_CONFIG'])
 if app.config['USE_CACHE']:
     cache.init_app(app)
-    
+
 if not app.config['PRODUCTION']:
     # Run api doc server if not running in production
     from flasgger import Swagger
@@ -170,6 +171,38 @@ def get_album_info(mbid):
     return jsonify(album)
 
 
+@app.route('/chart/<name>/<type_>/<selection>')
+@cache.cached(key_prefix=lambda: request.full_path)
+def chart_route(name, type_, selection):
+    """
+    Gets chart
+    :param name: Name of chart. 404 if name invalid
+    """
+    name = name.lower()
+    count = request.args.get('count', 10, type=int)
+
+    # Get remaining chart-dependent args
+    chart_kwargs = request.args.to_dict()
+    if 'count' in chart_kwargs:
+        del chart_kwargs['count']
+
+    key = (name, type_, selection)
+
+    # Function to get each chart. Use lower case for keys
+    charts = {
+        ('apple-music', 'album', 'top'): chart.get_apple_music_chart,
+        ('billboard', 'album', 'top'): chart.get_billboard_200_albums_chart,
+        ('itunes', 'album', 'top'): chart.get_itunes_chart,
+        ('lastfm', 'album', 'top'): chart.get_lastfm_album_chart,
+        ('lastfm', 'artist', 'top'): chart.get_lastfm_artist_chart
+    }
+
+    if key not in charts.keys():
+        return jsonify(error='Chart {}/{}/{} not found'.format(*key)), 404
+    else:
+        return jsonify(charts[key](count, **chart_kwargs))
+
+
 @app.route('/search/album')
 @cache.cached(key_prefix=lambda: request.full_path)
 def search_album():
@@ -198,7 +231,7 @@ def search_album():
     album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)
 
     if search_providers:
-        albums = search_providers[0].search_album_name(query, artist_name)
+        albums = search_providers[0].search_album_name(query, artist_name=artist_name)
     else:
         response = jsonify(error="No album search providers")
         response.status_code = 500
