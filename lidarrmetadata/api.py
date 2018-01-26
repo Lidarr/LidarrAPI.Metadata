@@ -5,6 +5,7 @@ import flask_cache
 import raven.contrib.flask
 from werkzeug.exceptions import HTTPException
 
+import lidarrmetadata
 from lidarrmetadata import chart
 from lidarrmetadata import config
 from lidarrmetadata import models
@@ -59,6 +60,16 @@ def validate_mbid(mbid):
 
     if mbid in config.CONFIG.BLACKLISTED_ARTISTS:
         return jsonify(error='Blacklisted artist'), 403
+
+
+@app.route('/')
+def default_route():
+    """
+    Default route with API information
+    :return:
+    """
+    info = {'version': lidarrmetadata.__version__}
+    return jsonify(info)
 
 
 @app.route('/artist/<mbid>', methods=['GET'])
