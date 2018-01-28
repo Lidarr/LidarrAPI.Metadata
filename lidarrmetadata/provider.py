@@ -841,6 +841,9 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         except wikipedia.DisambiguationError as error:
             logger.error('Wikipedia DisambiguationError from {url}: {e}'.format(e=error, url=url))
             return ''
+        except ValueError as error:
+            logger.error('Page parse error: {e}'.format(e=error))
+            return ''
 
     @classmethod
     def title_from_url(cls, url):
@@ -850,5 +853,10 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         :param url: URL of wikipedia page
         :return: Title of page at URL
         """
-        title = cls.URL_REGEX.match(url).group('title')
+        match = cls.URL_REGEX.match(url)
+
+        if not match:
+            raise ValueError('URL {} does not match regex `{}`'.format(url, cls.URL_REGEX.pattern))
+
+        title = match.group('title')
         return urllib.unquote(title)

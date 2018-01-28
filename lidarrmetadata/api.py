@@ -237,9 +237,15 @@ def search_album():
               }
     """
     query = request.args.get('query')
+    if not query:
+        return jsonify(error="No query provided"), 400
+    query = query.strip()
+
     artist_name = request.args.get('artist', '')
+
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
+
     search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
     album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)
 
@@ -290,6 +296,10 @@ def search_artist():
                 }
     """
     query = request.args.get('query')
+    if not query:
+        return jsonify(error='No query provided'), 400
+    query = query.strip()
+
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
 
