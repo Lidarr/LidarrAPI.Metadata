@@ -791,6 +791,7 @@ class MusicbrainzDbProvider(Provider,
         :param s: String to encode
         :return: Musicbrainz encoded string
         """
+        s = re.sub(' +', ' ', s)
         return util.translate_string(s, cls.TRANSLATION_TABLE.inverse)
 
     @staticmethod
