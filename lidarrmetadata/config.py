@@ -104,6 +104,9 @@ class DefaultConfig(object):
     # Fanart.tv API credentials
     FANART_KEY = ''
 
+    # Port to use
+    HTTP_PORT = 5001
+
     # LastFM API connection details
     LASTFM_KEY = ''
     LASTFM_SECRET = ''

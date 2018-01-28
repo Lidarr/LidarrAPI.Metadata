@@ -1,6 +1,7 @@
 import cherrypy
 
 from api import app
+from config import CONFIG
 import models
 
 
@@ -12,7 +13,7 @@ def main():
     cherrypy.tree.graft(app, '/')
     cherrypy.config.update({
         'log.screen': True,
-        'server.socket_port': 5000
+        'server.socket_port': CONFIG.HTTP_PORT
     })
 
     models.database.connect()
