@@ -57,6 +57,27 @@ def get_billboard_200_albums_chart(count=10):
 
     return search_results
 
+def get_billboard_100_artists_chart(count=10):
+    """
+    Gets billboard top 100 albums
+    :param count: Number of results to return. Defaults to 10
+    :return: Chart response for artist-100
+    """
+    results = billboard.ChartData('artist-100')
+
+    search_provider = provider.get_providers_implementing(provider.ArtistNameSearchMixin)[0]
+
+    search_results = []
+    for result in results:
+        artist_search = search_provider.search_artist_name(result.artist, limit=1)
+        if artist_search:
+            search_results.append({'ArtistName': result.artist, 'ArtistId': artist_search[0]['Id']})
+
+        if len(search_results) == count:
+            break
+
+    return search_results
+
 
 def get_itunes_chart(count=10):
     """
