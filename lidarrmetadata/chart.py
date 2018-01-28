@@ -146,7 +146,7 @@ def get_lastfm_artist_chart(count=10, user=None):
 
         if not all(artist.values()):
             print(artist)
-            results = search_provider.search_artist_name(artist['Name'], limit=1)
+            results = search_provider.search_artist_name(artist['ArtistName'], limit=1)
             print(results)
             if results:
                 results = results[0]
