@@ -6,7 +6,6 @@ import imp
 import logging
 import pkg_resources
 import re
-import urllib
 
 import dateutil.parser
 import six
@@ -18,6 +17,12 @@ import wikipedia
 
 import lidarrmetadata
 from lidarrmetadata import util
+
+if six.PY2:
+    from urllib import unquote as url_unquote
+else:
+    from urllib.parse import unquote as url_unquote
+
 
 logger = logging.getLogger(__name__)
 
@@ -860,4 +865,4 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             raise ValueError('URL {} does not match regex `{}`'.format(url, cls.URL_REGEX.pattern))
 
         title = match.group('title')
-        return urllib.unquote(title)
+        return url_unquote(title)
