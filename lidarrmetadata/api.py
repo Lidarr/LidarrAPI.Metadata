@@ -238,11 +238,13 @@ def search_album():
     """
     query = request.args.get('query')
     artist_name = request.args.get('artist', '')
+    limit = request.args.get('limit', default=10, type=int)
+    limit = None if limit < 1 else limit
     search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
     album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)
 
     if search_providers:
-        albums = search_providers[0].search_album_name(query, artist_name=artist_name)
+        albums = search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
     else:
         response = jsonify(error="No album search providers")
         response.status_code = 500
@@ -288,6 +290,8 @@ def search_artist():
                 }
     """
     query = request.args.get('query')
+    limit = request.args.get('limit', default=10, type=int)
+    limit = None if limit < 1 else limit
 
     search_providers = provider.get_providers_implementing(
         provider.ArtistNameSearchMixin)
@@ -306,7 +310,7 @@ def search_artist():
         return response
 
     # TODO Prefer certain providers?
-    artists = search_providers[0].search_artist_name(query)
+    artists = search_providers[0].search_artist_name(query, limit=limit)
 
     for artist in artists:
         artist.update(artist_providers[0].get_artist_by_id(artist['Id']))
