@@ -142,7 +142,7 @@ def get_lastfm_artist_chart(count=10, user=None):
     artists = []
     search_provider = provider.get_providers_implementing(provider.ArtistNameSearchMixin)[0]
     for lastfm_artist in pylast.extract_items(lastfm_artists):
-        artist = {'Name': lastfm_artist.name, 'Id': lastfm_artist.get_mbid()}
+        artist = {'ArtistName': lastfm_artist.name, 'ArtistId': lastfm_artist.get_mbid()}
 
         if not all(artist.values()):
             print(artist)
@@ -150,7 +150,7 @@ def get_lastfm_artist_chart(count=10, user=None):
             print(results)
             if results:
                 results = results[0]
-                artist = {'Name': results['ArtistName'], 'Id': results['Id']}
+                artist = {'ArtistName': results['ArtistName'], 'ArtistId': results['Id']}
 
 
         if all(artist.values()):
