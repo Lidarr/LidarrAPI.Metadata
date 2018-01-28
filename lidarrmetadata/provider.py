@@ -765,17 +765,15 @@ class MusicbrainzDbProvider(Provider,
 
     @contextlib.contextmanager
     def _cursor(self):
-        try:
-            connection = psycopg2.connect(host=self._db_host,
-                                          port=self._db_port,
-                                          dbname=self._db_name,
-                                          user=self._db_user,
-                                          password=self._db_password)
-            cursor = connection.cursor()
-            yield cursor
-        finally:
-            cursor.close()
-            connection.close()
+        connection = psycopg2.connect(host=self._db_host,
+                                      port=self._db_port,
+                                      dbname=self._db_name,
+                                      user=self._db_user,
+                                      password=self._db_password)
+        cursor = connection.cursor()
+        yield cursor
+        cursor.close()
+        connection.close()
 
     @classmethod
     def mb_decode(cls, s):
