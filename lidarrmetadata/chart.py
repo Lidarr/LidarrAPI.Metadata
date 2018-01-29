@@ -57,6 +57,27 @@ def get_billboard_200_albums_chart(count=10):
 
     return search_results
 
+def get_billboard_100_artists_chart(count=10):
+    """
+    Gets billboard top 100 albums
+    :param count: Number of results to return. Defaults to 10
+    :return: Chart response for artist-100
+    """
+    results = billboard.ChartData('artist-100')
+
+    search_provider = provider.get_providers_implementing(provider.ArtistNameSearchMixin)[0]
+
+    search_results = []
+    for result in results:
+        artist_search = search_provider.search_artist_name(result.artist, limit=1)
+        if artist_search:
+            search_results.append({'ArtistName': result.artist, 'ArtistId': artist_search[0]['Id']})
+
+        if len(search_results) == count:
+            break
+
+    return search_results
+
 
 def get_itunes_chart(count=10):
     """
@@ -142,15 +163,15 @@ def get_lastfm_artist_chart(count=10, user=None):
     artists = []
     search_provider = provider.get_providers_implementing(provider.ArtistNameSearchMixin)[0]
     for lastfm_artist in pylast.extract_items(lastfm_artists):
-        artist = {'Name': lastfm_artist.name, 'Id': lastfm_artist.get_mbid()}
+        artist = {'ArtistName': lastfm_artist.name, 'ArtistId': lastfm_artist.get_mbid()}
 
         if not all(artist.values()):
             print(artist)
-            results = search_provider.search_artist_name(artist['Name'], limit=1)
+            results = search_provider.search_artist_name(artist['ArtistName'], limit=1)
             print(results)
             if results:
                 results = results[0]
-                artist = {'Name': results['ArtistName'], 'Id': results['Id']}
+                artist = {'ArtistName': results['ArtistName'], 'ArtistId': results['Id']}
 
 
         if all(artist.values()):
