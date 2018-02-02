@@ -26,6 +26,8 @@ else:
 
 logger = logging.getLogger(__name__)
 
+# Provider class dictionary
+PROVIDER_CLASSES = {}
 
 def get_providers_implementing(cls):
     """
@@ -202,8 +204,20 @@ class AlbumNameSearchMixin(MixinBase):
         """
         pass
 
+class ProviderMeta(abc.ABCMeta):
+    def __new__(meta, name, bases, class_dict):
+        """
+        Creates class and registers it to PROVIDER_CLASSES
+        :param name: Name of class
+        :param bases: Base classes
+        :param class_dict: Class dictionary
+        :return: Newly created class
+        """
+        cls = type.__new__(meta, name, bases, class_dict)
+        PROVIDER_CLASSES[name] = cls
+        return cls
 
-class Provider(object):
+class Provider(six.with_metaclass(ProviderMeta, object)):
     """
     Provider base class
     """

@@ -26,6 +26,10 @@ if not app.config['PRODUCTION']:
 
     swagger = Swagger(app)
 
+# Set up providers
+for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
+    provider.PROVIDER_CLASSES[provider_name](*args, **kwargs)
+
 
 @app.before_request
 def before_request():
