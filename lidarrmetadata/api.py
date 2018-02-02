@@ -1,7 +1,7 @@
 import uuid
 
 from flask import Flask, request, jsonify, send_file
-import flask_cache
+import flask.ext.cache
 import raven.contrib.flask
 from werkzeug.exceptions import HTTPException
 
@@ -14,9 +14,9 @@ from lidarrmetadata import provider
 app = Flask(__name__)
 app.config.from_object(config.CONFIG)
 
-sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
+# sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
 
-cache = flask_cache.Cache(config=app.config['CACHE_CONFIG'])
+cache = flask.ext.cache.Cache(config=app.config['CACHE_CONFIG'])
 if app.config['USE_CACHE']:
     cache.init_app(app)
 

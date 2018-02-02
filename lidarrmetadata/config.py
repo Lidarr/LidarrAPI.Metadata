@@ -91,8 +91,10 @@ class DefaultConfig(object):
     # Cache options
     USE_CACHE = True
     CACHE_CONFIG = {
-        'CACHE_TYPE': 'simple',
-        'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24
+        'CACHE_TYPE': 'redis',
+        'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24,
+        'CACHE_KEY_PREFIX': 'lidarrmetadata',
+        'CACHE_REDIS_HOST': 'localhost'
     }
 
     # File to use for DB
