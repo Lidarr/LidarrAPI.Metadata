@@ -36,7 +36,7 @@ setup(
         'cherrypy',
         'flasgger',
         'flask',
-        'flask-cache',
+        'flask-caching',
         'musicbrainzngs',
         'peewee',
         'psycopg2',
