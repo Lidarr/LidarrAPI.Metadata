@@ -270,8 +270,8 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
 
         return self.parse_album_images(results)
 
+    @util.CACHE.memoize()
     def get_by_mbid(self, mbid):
-        # TODO Cache results
         """
         Gets the fanart.tv response for resource with Musicbrainz id mbid
         :param mbid: Musicbrainz ID
@@ -757,7 +757,7 @@ class MusicbrainzDbProvider(Provider,
         filename = pkg_resources.resource_filename('lidarrmetadata.sql', sql_file)
 
         with open(filename, 'r') as sql:
-            return self.map_query(sql.read(), *args, **kwargs)
+            return util.cache_or_call(self.map_query, sql.read(), *args, **kwargs)
 
     def map_query(self, *args, **kwargs):
         """
@@ -845,6 +845,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         return self.get_summary(url)
 
     @classmethod
+    @util.CACHE.memoize()
     def get_summary(cls, url):
         """
         Gets summary of a wikipedia page
