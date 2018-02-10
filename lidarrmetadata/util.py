@@ -19,7 +19,7 @@ def cache_or_call(func, *args, **kwargs):
     :return: Result of func(*args, **kwargs)
     """
     # This may not work well if args or kwargs contain objects, but we don't need to handle that at the moment
-    key = (function_hash(func), repr(args), repr(kwargs))
+    key = str((function_hash(func), repr(args), repr(kwargs)))
     ret = CACHE.get(key)
     if not ret:
         ret = func(*args, **kwargs)
