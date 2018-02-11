@@ -205,15 +205,16 @@ class AlbumNameSearchMixin(MixinBase):
         pass
 
 class ProviderMeta(abc.ABCMeta):
-    def __new__(meta, name, bases, class_dict):
+    def __new__(meta, name, bases, attr):
         """
         Creates class and registers it to PROVIDER_CLASSES
+        :param meta: Metaclass
         :param name: Name of class
         :param bases: Base classes
-        :param class_dict: Class dictionary
+        :param attr: Class dictionary
         :return: Newly created class
         """
-        cls = type.__new__(meta, name, bases, class_dict)
+        cls = super(ProviderMeta, meta).__new__(meta, name, bases, attr)
         PROVIDER_CLASSES[name] = cls
         return cls
 
