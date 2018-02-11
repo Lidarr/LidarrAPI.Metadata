@@ -127,5 +127,7 @@ class DefaultConfig(object):
     # Testing mode
     TESTING = False
 
+class TestConfig(DefaultConfig):
+    CACHE_CONFIG = {'CACHE_TYPE': 'null'}
 
 CONFIG = CONFIGS.get(os.getenv(ENV_KEY), DefaultConfig)

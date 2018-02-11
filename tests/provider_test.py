@@ -1,6 +1,8 @@
 # coding=utf-8
 import pytest
 
+
+from lidarrmetadata import api # This is imported so the flask app initializes and cache doesn't fail
 from lidarrmetadata import provider
 
 
