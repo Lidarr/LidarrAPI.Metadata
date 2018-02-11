@@ -3,6 +3,7 @@ Lidarr metadata config
 """
 
 import os
+import six
 import re
 
 # Environment key to use for configuration setting. This environment variable
@@ -63,7 +64,7 @@ class ConfigMeta(EnvironmentOverride):
         CONFIGS[key] = cls
 
 
-class DefaultConfig(object):
+class DefaultConfig(six.with_metaclass(ConfigMeta, object)):
     """
     Base configuration class to define default values. All possible config
     values should be defined in this class to avoid KeyErrors or unexpected
@@ -71,7 +72,6 @@ class DefaultConfig(object):
     value should be provided above the variable and options should be listed
     in alphabetical order.
     """
-    __metaclass__ = ConfigMeta
 
     APPLICATION_ROOT = None
 
