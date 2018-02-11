@@ -1,7 +1,6 @@
 import uuid
 
-from flask import Flask, request, jsonify, send_file
-import flask_caching
+from flask import Flask, request, jsonify
 import raven.contrib.flask
 from werkzeug.exceptions import HTTPException
 
