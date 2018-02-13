@@ -1,7 +1,6 @@
 import uuid
 
-from flask import Flask, request, jsonify, send_file
-import flask_cache
+from flask import Flask, request, jsonify
 import raven.contrib.flask
 from werkzeug.exceptions import HTTPException
 
@@ -10,21 +9,26 @@ from lidarrmetadata import chart
 from lidarrmetadata import config
 from lidarrmetadata import models
 from lidarrmetadata import provider
+from lidarrmetadata import util
 
 app = Flask(__name__)
 app.config.from_object(config.CONFIG)
 
 sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
 
-cache = flask_cache.Cache(config=app.config['CACHE_CONFIG'])
 if app.config['USE_CACHE']:
-    cache.init_app(app)
+    util.CACHE.config = config.CONFIG.CACHE_CONFIG
+    util.CACHE.init_app(app)
 
 if not app.config['PRODUCTION']:
     # Run api doc server if not running in production
     from flasgger import Swagger
 
     swagger = Swagger(app)
+
+# Set up providers
+for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
+    provider.PROVIDER_CLASSES[provider_name](*args, **kwargs)
 
 
 @app.before_request
@@ -73,7 +77,7 @@ def default_route():
 
 
 @app.route('/artist/<mbid>', methods=['GET'])
-@cache.cached(key_prefix=lambda: request.full_path)
+@util.CACHE.cached(key_prefix=lambda: request.full_path)
 def get_artist_info(mbid):
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
@@ -141,7 +145,7 @@ def get_artist_info(mbid):
 
 
 @app.route('/album/<mbid>', methods=['GET'])
-@cache.cached(key_prefix=lambda: request.full_path)
+@util.CACHE.cached(key_prefix=lambda: request.full_path)
 def get_album_info(mbid):
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
@@ -183,7 +187,7 @@ def get_album_info(mbid):
 
 
 @app.route('/chart/<name>/<type_>/<selection>')
-@cache.cached(key_prefix=lambda: request.full_path)
+@util.CACHE.cached(key_prefix=lambda: request.full_path)
 def chart_route(name, type_, selection):
     """
     Gets chart
@@ -216,7 +220,7 @@ def chart_route(name, type_, selection):
 
 
 @app.route('/search/album')
-@cache.cached(key_prefix=lambda: request.full_path)
+@util.CACHE.cached(key_prefix=lambda: request.full_path)
 def search_album():
     """Search for a human-readable album
     ---
@@ -265,7 +269,7 @@ def search_album():
 
 
 @app.route('/search/artist', methods=['GET'])
-@cache.cached(key_prefix=lambda: request.full_path)
+@util.CACHE.cached(key_prefix=lambda: request.full_path)
 def search_artist():
     """Search for a human-readable artist
     ---

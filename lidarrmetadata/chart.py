@@ -8,8 +8,10 @@ import requests
 
 from lidarrmetadata import config
 from lidarrmetadata import provider
+from lidarrmetadata import util
 
 
+@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
 def get_apple_music_chart(count=10):
     """
     Gets and parses itunes chart
@@ -57,6 +59,7 @@ def get_billboard_200_albums_chart(count=10):
 
     return search_results
 
+
 def get_billboard_100_artists_chart(count=10):
     """
     Gets billboard top 100 albums
@@ -79,6 +82,7 @@ def get_billboard_100_artists_chart(count=10):
     return search_results
 
 
+@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
 def get_itunes_chart(count=10):
     """
     Gets and parses itunes chart
@@ -113,11 +117,11 @@ def get_lastfm_album_chart(count=10, user=None):
     client = pylast.LastFMNetwork(api_key=config.CONFIG.LASTFM_KEY, api_secret=config.CONFIG.LASTFM_SECRET)
 
     if user:
-        user = client.get_user(user[0])
-        lastfm_albums = user.get_top_albums()
+        user = util.cache_or_call(client.get_user, user[0])
+        lastfm_albums = util.cache_or_call(user.get_top_albums)
     else:
-        tag = client.get_tag('all')
-        lastfm_albums = tag.get_top_albums()
+        tag = util.cache_or_call(client.get_tag, 'all')
+        lastfm_albums = util.cache_or_call(tag.get_top_albums)
 
     album_provider = provider.get_providers_implementing(provider.AlbumByIdMixin)[0]
     albums = []
@@ -154,11 +158,10 @@ def get_lastfm_artist_chart(count=10, user=None):
     client = pylast.LastFMNetwork(api_key=config.CONFIG.LASTFM_KEY, api_secret=config.CONFIG.LASTFM_SECRET)
 
     if user:
-        user = client.get_user(user[0])
-        lastfm_artists = user.get_top_artists()
+        user = util.cache_or_call(client.get_user, user[0])
+        lastfm_artists = util.cache_or_call(user.get_top_artists)
     else:
-        lastfm_artists = client.get_top_artists()
-
+        lastfm_artists = util.cache_or_call(client.get_top_artists)
 
     artists = []
     search_provider = provider.get_providers_implementing(provider.ArtistNameSearchMixin)[0]
@@ -172,7 +175,6 @@ def get_lastfm_artist_chart(count=10, user=None):
             if results:
                 results = results[0]
                 artist = {'ArtistName': results['ArtistName'], 'ArtistId': results['Id']}
-
 
         if all(artist.values()):
             artists.append(artist)

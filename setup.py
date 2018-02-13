@@ -32,18 +32,20 @@ setup(
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
-        'billboard.py',
+        'billboard.py>=4.1.0',
         'cherrypy',
         'flasgger',
         'flask',
-        'flask-cache',
+        'flask-caching',
         'musicbrainzngs',
         'peewee',
         'psycopg2',
         'pylast',
         'python-dateutil',
         'raven[flask]',
+        'redis',
         'requests',
+        'werkzeug>=0.7.0',
         'wikipedia'
     ],
 

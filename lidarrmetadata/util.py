@@ -2,8 +2,30 @@
 Utility functionality that isn't specific to a given module
 """
 
+import flask_caching
 import functools
 
+from lidarrmetadata import config
+
+# Cache for application
+CACHE = flask_caching.Cache(config=config.CONFIG.CACHE_CONFIG)
+
+def cache_or_call(func, *args, **kwargs):
+    """
+    Gets cache result or calls function with args and kwargs
+    :param func: Function to call
+    :param args: Args to call func with
+    :param kwargs: Kwargs to call func with
+    :return: Result of func(*args, **kwargs)
+    """
+    # This may not work well if args or kwargs contain objects, but we don't need to handle that at the moment
+    key = str((function_hash(func), repr(args), repr(kwargs)))
+    ret = CACHE.get(key)
+    if not ret:
+        ret = func(*args, **kwargs)
+        CACHE.set(key, ret)
+
+    return ret
 
 def first_key_item(dictionary, key, default=None):
     """
@@ -20,6 +42,13 @@ def first_key_item(dictionary, key, default=None):
 
     return value
 
+def function_hash(func):
+    """
+    Hashes function to determine uniqueness of function. Used for versioning functions in caches
+    :param func: Function to hash
+    :return: Hash representing function. Unique for bytecode of function
+    """
+    return hash(func.__code__)
 
 def map_iterable_values(iterable, func, types=object):
     """

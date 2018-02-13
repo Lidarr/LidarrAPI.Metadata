@@ -9,7 +9,6 @@ def main():
     """
     Entry point for script
     """
-
     cherrypy.tree.graft(app, '/')
     cherrypy.config.update({
         'log.screen': True,

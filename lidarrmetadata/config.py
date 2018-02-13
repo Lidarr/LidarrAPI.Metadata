@@ -3,10 +3,8 @@ Lidarr metadata config
 """
 
 import os
+import six
 import re
-import sys
-
-from lidarrmetadata import provider
 
 # Environment key to use for configuration setting. This environment variable
 # may be set to override the default config if no CLI argument is given
@@ -66,7 +64,7 @@ class ConfigMeta(EnvironmentOverride):
         CONFIGS[key] = cls
 
 
-class DefaultConfig(object):
+class DefaultConfig(six.with_metaclass(ConfigMeta, object)):
     """
     Base configuration class to define default values. All possible config
     values should be defined in this class to avoid KeyErrors or unexpected
@@ -74,7 +72,6 @@ class DefaultConfig(object):
     value should be provided above the variable and options should be listed
     in alphabetical order.
     """
-    __metaclass__ = ConfigMeta
 
     APPLICATION_ROOT = None
 
@@ -91,8 +88,10 @@ class DefaultConfig(object):
     # Cache options
     USE_CACHE = True
     CACHE_CONFIG = {
-        'CACHE_TYPE': 'simple',
-        'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24
+        'CACHE_TYPE': 'redis',
+        'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24,
+        'CACHE_KEY_PREFIX': 'lidarrmetadata',
+        'CACHE_REDIS_HOST': 'localhost'
     }
 
     # File to use for DB
@@ -114,11 +113,12 @@ class DefaultConfig(object):
     # Whether or not running in production
     PRODUCTION = False
 
-    # List of providers
-    PROVIDERS = [provider.FanArtTvProvider(FANART_KEY),
-                 provider.MusicbrainzDbProvider(),
-                 provider.MusicbrainzApiProvider(),
-                 provider.WikipediaProvider()],
+    # Provider -> (args, kwargs) dictionaries
+    PROVIDERS = {
+        'FanArtTvProvider': ([FANART_KEY], {}),
+        'MusicbrainzDbProvider': ([], {}),
+        'WikipediaProvider': ([], {})
+    }
 
     # Connection info for sentry
     SENTRY_DSN = ('https://c94975eddcf84d91901ebc1fdba99327:'
@@ -127,5 +127,7 @@ class DefaultConfig(object):
     # Testing mode
     TESTING = False
 
+class TestConfig(DefaultConfig):
+    CACHE_CONFIG = {'CACHE_TYPE': 'null'}
 
 CONFIG = CONFIGS.get(os.getenv(ENV_KEY), DefaultConfig)
