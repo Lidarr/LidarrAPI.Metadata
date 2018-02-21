@@ -1,7 +1,10 @@
 import cherrypy
 
 from api import app
+<<<<<<< HEAD
 from config import CONFIG
+=======
+>>>>>>> 864ffcad010b0a118eb3b676051c00507a1ea3dc
 
 
 def main():
