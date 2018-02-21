@@ -10,11 +10,6 @@ services:
     networks:
       - lidarrmetadata
 
-    environment:
-      - FANART_KEY
-      - LASTFM_KEY
-      - LASTFM_SECRET
-
     ports:
       - 5001:5001
 
