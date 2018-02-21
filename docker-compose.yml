@@ -1,0 +1,67 @@
+version: '3'
+services:
+  lidarrmetadata:
+    build: .
+
+    depends_on:
+      - redis
+      - musicbrainz
+
+    networks:
+      - lidarrmetadata
+
+    environment:
+      - FANART_KEY
+      - LASTFM_KEY
+      - LASTFM_SECRET
+
+    ports:
+      - 5001:5001
+
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 10s
+        max_attempts: 5
+
+  redis:
+    image: redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+
+    networks:
+      - lidarrmetadata
+
+    volumes:
+      - /opt/redis:/data
+      - $PWD/redis.conf:/usr/local/etc/redis/redis.conf
+
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 10s
+        max_attempts: 5
+
+  musicbrainz:
+    image: linuxserver/musicbrainz
+
+    networks:
+      - lidarrmetadata
+
+    environment:
+      - BRAINZCODE=
+      - NPROC=3
+      - PUID=
+      - PGID=
+
+    volumes:
+      - /opt/musicbrainz/config:/config
+      - /opt/musicbrainz/data:/data
+
+    deploy:
+      restart_policy:
+        condition: any
+        delay: 10s
+        max_attempts: 5
+
+networks:
+  lidarrmetadata:
