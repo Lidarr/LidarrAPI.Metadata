@@ -91,7 +91,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, object)):
         'CACHE_TYPE': 'redis',
         'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24,
         'CACHE_KEY_PREFIX': 'lidarrmetadata',
-        'CACHE_REDIS_HOST': 'localhost'
+        'CACHE_REDIS_HOST': 'redis'
     }
 
     # File to use for DB
@@ -116,7 +116,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, object)):
     # Provider -> (args, kwargs) dictionaries
     PROVIDERS = {
         'FanArtTvProvider': ([FANART_KEY], {}),
-        'MusicbrainzDbProvider': ([], {}),
+        'MusicbrainzDbProvider': ([], {'db_host': 'musicbrainz'}),
         'WikipediaProvider': ([], {})
     }
 
