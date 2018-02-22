@@ -666,6 +666,7 @@ class MusicbrainzDbProvider(Provider,
                  'ReleaseDate': datetime.datetime(release_groups[0]['year'] or 1,
                                                   release_groups[0]['month'] or 1,
                                                   release_groups[0]['day'] or 1),
+                 'ReleaseStatus': release['release_status'],
                  'Label': release['label'],
                  'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']},
                  'SelectedRelease': rid}
