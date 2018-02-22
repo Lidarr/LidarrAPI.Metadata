@@ -128,7 +128,7 @@ def get_artist_info(mbid):
     else:
         artist['Images'] = []
 
-    # Filter album types
+    # Filter album types and statuses
     # TODO Should types be part of album query?
     primary_types = request.args.get('primTypes', None)
     if primary_types:
@@ -140,6 +140,10 @@ def get_artist_info(mbid):
         artist['Albums'] = filter(lambda album: (album['SecondaryTypes'] == [] and 'Studio' in secondary_types)
                                                 or secondary_types.intersection(album.get('SecondaryTypes')),
                                   artist['Albums'])
+    release_statuses = request.args.get('releaseStatuses', None)
+    if release_statuses:
+        release_statuses = set(release_statuses.split('|'))
+        artist['Albums'] = filter(lambda album: album.get('ReleaseStatus') in release_statuses, artist['Albums'])
 
     return jsonify(artist)
 
