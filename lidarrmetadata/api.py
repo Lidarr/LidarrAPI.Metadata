@@ -143,7 +143,8 @@ def get_artist_info(mbid):
     release_statuses = request.args.get('releaseStatuses', None)
     if release_statuses:
         release_statuses = set(release_statuses.split('|'))
-        artist['Albums'] = filter(lambda album: album.get('ReleaseStatus') in release_statuses, artist['Albums'])
+        artist['Albums'] = filter(lambda album: release_statuses.intersection(album.get('ReleaseStatuses')),
+                                  artist['Albums'])
 
     return jsonify(artist)
 

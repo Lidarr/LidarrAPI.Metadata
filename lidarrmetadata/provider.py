@@ -736,7 +736,7 @@ class MusicbrainzDbProvider(Provider,
                  'Title': result['album'],
                  'Type': result['primary_type'],
                  'SecondaryTypes': result['secondary_types'],
-                 'ReleaseStatus': result['release_status'],
+                 'ReleaseStatuses': result['release_statuses'],
                  'ReleaseDate': datetime.datetime(result['year'] or 1,
                                                   result['month'] or 1,
                                                   result['day'] or 1)}
