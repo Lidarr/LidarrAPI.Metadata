@@ -7,7 +7,6 @@ from werkzeug.exceptions import HTTPException
 import lidarrmetadata
 from lidarrmetadata import chart
 from lidarrmetadata import config
-from lidarrmetadata import models
 from lidarrmetadata import provider
 from lidarrmetadata import util
 
@@ -29,18 +28,6 @@ if not app.config['PRODUCTION']:
 # Set up providers
 for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
     provider.PROVIDER_CLASSES[provider_name](*args, **kwargs)
-
-
-@app.before_request
-def before_request():
-    models.database.connect()
-
-
-@app.teardown_request
-def teardown_request(response):
-    if not models.database.is_closed():
-        models.database.close()
-
 
 @app.errorhandler(404)
 @app.errorhandler(500)

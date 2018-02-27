@@ -1,0 +1,49 @@
+version: '3'
+services:
+  metadata:
+    build: .
+    restart: unless-stopped
+
+
+    depends_on:
+      - redis
+      - musicbrainz
+
+    networks:
+      - lidarrmetadata
+
+    ports:
+      - 5001:5001
+
+  redis:
+    image: redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    restart: unless-stopped
+
+    networks:
+      - lidarrmetadata
+
+    volumes:
+      - /opt/redis:/data
+      - $PWD/redis.conf:/usr/local/etc/redis/redis.conf
+
+  musicbrainz:
+    image: linuxserver/musicbrainz
+    restart: unless-stopped
+
+
+    networks:
+      - lidarrmetadata
+
+    environment:
+      - BRAINZCODE=
+      - NPROC=3
+      - PUID=
+      - PGID=
+
+    volumes:
+      - /opt/musicbrainz/config:/config
+      - /opt/musicbrainz/data:/data
+
+networks:
+  lidarrmetadata:

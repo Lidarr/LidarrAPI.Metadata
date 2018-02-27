@@ -2,7 +2,6 @@ import cherrypy
 
 from api import app
 from config import CONFIG
-import models
 
 
 def main():
@@ -12,17 +11,8 @@ def main():
     cherrypy.tree.graft(app, '/')
     cherrypy.config.update({
         'log.screen': True,
-        'server.socket_port': CONFIG.HTTP_PORT
-    })
-
-    models.database.connect()
-    models.database.create_tables([models.Artist,
-                                   models.Album,
-                                   models.Track,
-                                   models.Image],
-                                  safe=True)
-    models.database.close()
-
+        'server.socket_port': CONFIG.HTTP_PORT,
+        'server.socket_host': '0.0.0.0'})
     cherrypy.engine.start()
     cherrypy.engine.block()
 
