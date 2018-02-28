@@ -20,6 +20,7 @@ SELECT DISTINCT
   release_country.date_year                                  AS release_year,
   release_country.date_month                                 AS release_month,
   release_country.date_day                                   AS release_day,
+  release_status.name                                        AS release_status,
   medium.name                                                AS medium_name,
   medium.position                                            AS medium_position,
   medium_format.name                                         AS format,
@@ -41,6 +42,7 @@ SELECT DISTINCT
 
 FROM release_group
   LEFT JOIN release ON release.release_group = release_group.id
+  LEFT JOIN release_status ON release_status.id = release.status
   LEFT JOIN release_group_meta ON release_group_meta.id = release_group.id
   LEFT JOIN artist_credit_name ON artist_credit_name.artist_credit = release_group.artist_credit
   LEFT JOIN artist ON artist_credit_name.artist = artist.id
