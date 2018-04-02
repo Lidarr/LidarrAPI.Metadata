@@ -607,7 +607,7 @@ class MusicbrainzDbProvider(Provider,
                 if limit:
                     query += cursor.mogrify(' LIMIT %s', [limit])
 
-        results = self.map_query(query, [name])
+        results = self.map_query(query, [name + '%'])
 
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
