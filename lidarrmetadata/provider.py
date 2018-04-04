@@ -630,7 +630,15 @@ class MusicbrainzDbProvider(Provider,
             with self._cursor() as cursor:
 
                 if artist_name:
-                    query += cursor.mogrify(' AND UPPER(artist.name) LIKE UPPER(%s)', [artist_name])
+                    query_parts = query.split()
+
+                    # Add artist name clause to where
+                    for part in query_parts[::-1]:
+                        if part.startswith('WHERE'):
+                            part += cursor.mogrify(' AND UPPER(artist.name) LIKE UPPER(%s)', [artist_name])
+                            break
+
+                    query = '\n'.join(query_parts)
 
                 if limit:
                     query += cursor.mogrify(' LIMIT %s', [limit])
