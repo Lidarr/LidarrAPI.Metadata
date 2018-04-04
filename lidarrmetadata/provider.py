@@ -1,3 +1,5 @@
+from __future__ import division
+
 import abc
 import collections
 import contextlib
@@ -593,7 +595,8 @@ class MusicbrainzDbProvider(Provider,
                 'SortName': results['sort_name'],
                 'Status': 'ended' if results['ended'] else 'active',
                 'Type': results['type'] or 'Artist',
-                'Disambiguation': results['comment']}
+                'Disambiguation': results['comment'],
+                'Rating': {'Count': results['rating_count'] or 0, 'Value': (results['rating'] or 0) / 10 or None}}
 
     def search_artist_name(self, name, limit=None):
         name = self.mb_encode(name)
@@ -607,12 +610,13 @@ class MusicbrainzDbProvider(Provider,
                 if limit:
                     query += cursor.mogrify(' LIMIT %s', [limit])
 
-        results = self.map_query(query, [name])
+        results = self.map_query(query, [name + '%', name])
 
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
                  'Type': result['type'] or 'Artist',
-                 'Disambiguation': result['comment']}
+                 'Disambiguation': result['comment'],
+                 'Rating': {'Count': result['rating_count'] or 0, 'Value': (result['rating'] or 0) / 10 or None}}
                 for result in results]
 
     def search_album_name(self, name, limit=None, artist_name=''):
@@ -631,7 +635,7 @@ class MusicbrainzDbProvider(Provider,
                 if limit:
                     query += cursor.mogrify(' LIMIT %s', [limit])
 
-        results = self.map_query(query, [name])
+        results = self.map_query(query, [name + '%', name])
 
         return [{'Id': result['gid'],
                  'Disambiguation': result['comment'],
@@ -641,7 +645,8 @@ class MusicbrainzDbProvider(Provider,
                  'ReleaseDate': datetime.datetime(result['year'] or 1,
                                                   result['month'] or 1,
                                                   result['day'] or 1),
-                 'Artist': {'Id': result['artist_id'], 'Name': result['artist_name']}}
+                 'Artist': {'Id': result['artist_id'], 'Name': result['artist_name']},
+                 'Rating': {'Count': result['rating_count'] or 0, 'Value': (result['rating'] or 0) / 10 or None}}
                 for result in results]
 
     def get_album_by_id(self, rgid, rid=None):
@@ -658,17 +663,20 @@ class MusicbrainzDbProvider(Provider,
         if not release:
             return {}
 
-        album = {'Id': release_groups[0]['gid'],
-                 'Disambiguation': release_groups[0]['comment'],
-                 'Title': release_groups[0]['album'],
-                 'Type': release_groups[0]['primary_type'],
-                 'SecondaryTypes': release_groups[0]['secondary_types'],
-                 'ReleaseDate': datetime.datetime(release_groups[0]['year'] or 1,
-                                                  release_groups[0]['month'] or 1,
-                                                  release_groups[0]['day'] or 1),
-                 'Label': release['label'],
-                 'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']},
-                 'SelectedRelease': rid}
+        album = {
+            'Id': release_groups[0]['gid'],
+            'Disambiguation': release_groups[0]['comment'],
+            'Title': release_groups[0]['album'],
+            'Type': release_groups[0]['primary_type'],
+            'SecondaryTypes': release_groups[0]['secondary_types'],
+            'ReleaseDate': datetime.datetime(release_groups[0]['year'] or 1,
+                                             release_groups[0]['month'] or 1,
+                                             release_groups[0]['day'] or 1),
+            'Label': release['label'],
+            'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']},
+            'SelectedRelease': rid,
+            'Rating': {'Count': release_groups[0]['rating_count'], 'Value': (release_groups[0]['rating'] or 0) / 10 or None}
+        }
 
         releases = [{'Id': release_group['release_id'],
                      'Disambiguation': release_group['release_comment'],

@@ -6,6 +6,8 @@ SELECT DISTINCT
   release_group_meta.first_release_date_year                 AS year,
   release_group_meta.first_release_date_month                AS month,
   release_group_meta.first_release_date_day                  AS day,
+  release_group_meta.rating,
+  release_group_meta.rating_count,
   array(
       SELECT name
       FROM release_group_secondary_type rgst
