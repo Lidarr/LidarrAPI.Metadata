@@ -633,7 +633,7 @@ class MusicbrainzDbProvider(Provider,
                 if limit:
                     query += cursor.mogrify(' LIMIT %s', [limit])
 
-        results = self.map_query(query, [name])
+        results = self.map_query(query, [name + '%', name])
 
         return [{'Id': result['gid'],
                  'Disambiguation': result['comment'],
@@ -643,7 +643,8 @@ class MusicbrainzDbProvider(Provider,
                  'ReleaseDate': datetime.datetime(result['year'] or 1,
                                                   result['month'] or 1,
                                                   result['day'] or 1),
-                 'Artist': {'Id': result['artist_id'], 'Name': result['artist_name']}}
+                 'Artist': {'Id': result['artist_id'], 'Name': result['artist_name']},
+                 'Rating': {'Count': result['rating_count'] or 0, 'Rating': result['rating']}}
                 for result in results]
 
     def get_album_by_id(self, rgid, rid=None):
@@ -660,17 +661,20 @@ class MusicbrainzDbProvider(Provider,
         if not release:
             return {}
 
-        album = {'Id': release_groups[0]['gid'],
-                 'Disambiguation': release_groups[0]['comment'],
-                 'Title': release_groups[0]['album'],
-                 'Type': release_groups[0]['primary_type'],
-                 'SecondaryTypes': release_groups[0]['secondary_types'],
-                 'ReleaseDate': datetime.datetime(release_groups[0]['year'] or 1,
-                                                  release_groups[0]['month'] or 1,
-                                                  release_groups[0]['day'] or 1),
-                 'Label': release['label'],
-                 'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']},
-                 'SelectedRelease': rid}
+        album = {
+            'Id': release_groups[0]['gid'],
+            'Disambiguation': release_groups[0]['comment'],
+            'Title': release_groups[0]['album'],
+            'Type': release_groups[0]['primary_type'],
+            'SecondaryTypes': release_groups[0]['secondary_types'],
+            'ReleaseDate': datetime.datetime(release_groups[0]['year'] or 1,
+                                             release_groups[0]['month'] or 1,
+                                             release_groups[0]['day'] or 1),
+            'Label': release['label'],
+            'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']},
+            'SelectedRelease': rid,
+            'Rating': {'Count': release_groups[0]['rating_count'], 'Rating': release_groups[0]['rating']}
+        }
 
         releases = [{'Id': release_group['release_id'],
                      'Disambiguation': release_group['release_comment'],

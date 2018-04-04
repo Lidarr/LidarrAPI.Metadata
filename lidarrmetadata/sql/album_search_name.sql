@@ -6,6 +6,8 @@ SELECT
   release_group_meta.first_release_date_year AS year,
   release_group_meta.first_release_date_month AS month,
   release_group_meta.first_release_date_day AS day,
+  release_group_meta.rating,
+  release_group_meta.rating_count,
     array(
     SELECT name FROM release_group_secondary_type rgst
     JOIN release_group_secondary_type_join rgstj ON rgstj.secondary_type = rgst.id
@@ -29,3 +31,6 @@ FROM release_group
   JOIN release_group_primary_type ON release_group.type = release_group_primary_type.id
 
 WHERE UPPER(release_group.name) LIKE UPPER(%s)
+ORDER BY
+  CASE WHEN UPPER(release_group.name) = UPPER(%s) THEN 0 ELSE 1 END,
+  CASE WHEN (release_group_meta.rating_count * release_group_meta.rating) IS NULL THEN 0 ELSE (release_group_meta.rating_count * release_group_meta.rating) END DESC
