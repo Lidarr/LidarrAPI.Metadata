@@ -11,6 +11,4 @@ FROM artist
 WHERE UPPER(artist.name) LIKE UPPER(%s)
 ORDER BY
   CASE WHEN UPPER(artist.name) = UPPER(%s) THEN 0 ELSE 1 END,
-  CASE WHEN artist_meta.rating_count IS NULL THEN 1 ELSE 0 END,
-  artist_meta.rating_count DESC,
-  artist_meta.rating DESC
+  CASE WHEN (artist_meta.rating_count * artist_meta.rating) IS NULL THEN 0 ELSE (artist_meta.rating_count * artist_meta.rating) END DESC
