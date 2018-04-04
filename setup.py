@@ -27,6 +27,9 @@ setup(
     url='https://github.com/lidarr/lidarrapi.metadata',
     packages=find_packages(),
 
+    # Dependencies for running install
+    setup_requires=['requests'],
+
     # List run-time dependencies here.  These will be installed by pip when
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
@@ -37,15 +40,14 @@ setup(
         'flasgger',
         'flask',
         'flask-caching',
+        'mediawikiapi',
         'musicbrainzngs',
         'psycopg2-binary',
         'pylast<=1.9.0',
         'python-dateutil',
         'raven[flask]',
         'redis',
-        'requests',
         'werkzeug>=0.7.0',
-        'mediawikiapi',
     ],
 
     extras_require={
