@@ -47,6 +47,7 @@ setup(
         'python-dateutil',
         'raven[flask]',
         'redis',
+        'requests',
         'werkzeug>=0.7.0',
     ],
 
