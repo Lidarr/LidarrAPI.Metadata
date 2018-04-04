@@ -594,7 +594,7 @@ class MusicbrainzDbProvider(Provider,
                 'Status': 'ended' if results['ended'] else 'active',
                 'Type': results['type'] or 'Artist',
                 'Disambiguation': results['comment'],
-                'Rating': {'Count': results['rating_count'] or 0, 'Rating': results['rating']}}
+                'Rating': {'Count': results['rating_count'] or 0, 'Value': results['rating']}}
 
     def search_artist_name(self, name, limit=None):
         name = self.mb_encode(name)
@@ -614,7 +614,7 @@ class MusicbrainzDbProvider(Provider,
                  'ArtistName': result['name'],
                  'Type': result['type'] or 'Artist',
                  'Disambiguation': result['comment'],
-                 'Rating': {'Count': result['rating_count'] or 0, 'Rating': result['rating']}}
+                 'Rating': {'Count': result['rating_count'] or 0, 'Value': result['rating']}}
                 for result in results]
 
     def search_album_name(self, name, limit=None, artist_name=''):
@@ -644,7 +644,7 @@ class MusicbrainzDbProvider(Provider,
                                                   result['month'] or 1,
                                                   result['day'] or 1),
                  'Artist': {'Id': result['artist_id'], 'Name': result['artist_name']},
-                 'Rating': {'Count': result['rating_count'] or 0, 'Rating': result['rating']}}
+                 'Rating': {'Count': result['rating_count'] or 0, 'Value': result['rating']}}
                 for result in results]
 
     def get_album_by_id(self, rgid, rid=None):
@@ -673,7 +673,7 @@ class MusicbrainzDbProvider(Provider,
             'Label': release['label'],
             'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']},
             'SelectedRelease': rid,
-            'Rating': {'Count': release_groups[0]['rating_count'], 'Rating': release_groups[0]['rating']}
+            'Rating': {'Count': release_groups[0]['rating_count'], 'Value': release_groups[0]['rating']}
         }
 
         releases = [{'Id': release_group['release_id'],
