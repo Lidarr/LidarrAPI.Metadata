@@ -7,7 +7,7 @@ COPY . /metadata
 
 EXPOSE 5000
 
-RUN pip install .
+RUN pip install --process-dependency-links .
 
 RUN useradd -u $UID metadata
 
