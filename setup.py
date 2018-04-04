@@ -37,7 +37,6 @@ setup(
         'flasgger',
         'flask',
         'flask-caching',
-        'mediawikiapi',
         'musicbrainzngs',
         'psycopg2-binary',
         'pylast<=1.9.0',
@@ -46,6 +45,7 @@ setup(
         'redis',
         'requests',
         'werkzeug>=0.7.0',
+        'mediawikiapi',
     ],
 
     extras_require={
