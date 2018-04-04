@@ -593,7 +593,8 @@ class MusicbrainzDbProvider(Provider,
                 'SortName': results['sort_name'],
                 'Status': 'ended' if results['ended'] else 'active',
                 'Type': results['type'] or 'Artist',
-                'Disambiguation': results['comment']}
+                'Disambiguation': results['comment'],
+                'Rating': {'Count': results['rating_count'] or 0, 'Rating': results['rating']}}
 
     def search_artist_name(self, name, limit=None):
         name = self.mb_encode(name)
@@ -612,7 +613,8 @@ class MusicbrainzDbProvider(Provider,
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
                  'Type': result['type'] or 'Artist',
-                 'Disambiguation': result['comment']}
+                 'Disambiguation': result['comment'],
+                 'Rating': {'Count': result['rating_count'] or 0, 'Rating': result['rating']}}
                 for result in results]
 
     def search_album_name(self, name, limit=None, artist_name=''):
