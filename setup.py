@@ -32,6 +32,7 @@ setup(
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
+        'beautifulsoup4==4.5.3',
         'billboard.py>=4.1.0',
         'cherrypy',
         'flasgger',
