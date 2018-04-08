@@ -882,7 +882,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             logger.error('Wikipedia DisambiguationError from {url}: {e}'.format(e=error.message, url=url))
             return ''
         except ValueError as error:
-            logger.error('Page parse error: {e}'.format(e=error.message))
+            logger.error('Page parse error: {e}'.format(e=error)
             return ''
 
     @classmethod
