@@ -876,13 +876,13 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             return self._client.summary(title, auto_suggest=False)
         # FIXME Both of these may be recoverable
         except mediawikiapi.PageError as error:
-            logger.error('Wikipedia PageError from {url}: {e}'.format(e=error, url=url))
+            logger.error('Wikipedia PageError from {url}: {e}'.format(e=error.message, url=url))
             return ''
         except mediawikiapi.DisambiguationError as error:
-            logger.error('Wikipedia DisambiguationError from {url}: {e}'.format(e=error, url=url))
+            logger.error('Wikipedia DisambiguationError from {url}: {e}'.format(e=error.message, url=url))
             return ''
         except ValueError as error:
-            logger.error('Page parse error: {e}'.format(e=error))
+            logger.error('Page parse error: {e}'.format(e=error.message))
             return ''
 
     @classmethod
