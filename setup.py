@@ -32,11 +32,13 @@ setup(
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
+        'beautifulsoup4==4.5.3',
         'billboard.py>=4.1.0',
         'cherrypy',
         'flasgger',
         'flask',
         'flask-caching',
+        'mediawikiapi>=1.1.2',
         'musicbrainzngs',
         'psycopg2-binary',
         'pylast<=1.9.0',
@@ -45,8 +47,9 @@ setup(
         'redis',
         'requests',
         'werkzeug>=0.7.0',
-        'wikipedia'
     ],
+
+    dependency_links = ['https://github.com/danielunderwood/MediaWikiAPI/archive/fix/setup-dependencies.zip#egg=mediawikiapi-1.1.2'],
 
     extras_require={
         'test': ['pytest', 'tox']
