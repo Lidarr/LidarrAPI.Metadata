@@ -17,6 +17,7 @@ SELECT DISTINCT
   )                                                             secondary_types,
   release.gid                                                AS release_id,
   release.comment                                            AS release_comment,
+  release.name                                               AS release_name,
   artist.gid                                                 AS artist_id,
   artist.name                                                AS artist_name,
   release_country.date_year                                  AS release_year,

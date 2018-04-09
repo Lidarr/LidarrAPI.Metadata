@@ -696,6 +696,7 @@ class MusicbrainzDbProvider(Provider,
                      'ReleaseStatus': release_group['release_status'],
                      'MediaCount': release_group['media_count'],
                      'TrackCount': release_group['track_count'],
+                     'Title': release_group['release_name'],
                      'Format': [release_group['format']]}
                     for release_group in release_groups]
 
