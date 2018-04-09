@@ -884,6 +884,9 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         except ValueError as error:
             logger.error('Page parse error: {e}'.format(e=error))
             return ''
+        except KeyError as error:
+            logger.error('KeyError {e}'.format(e=error))
+            return ''
 
     @classmethod
     def title_from_url(cls, url):
