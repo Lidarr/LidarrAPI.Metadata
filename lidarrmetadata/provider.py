@@ -12,10 +12,10 @@ import re
 import dateutil.parser
 import six
 
+import mediawikiapi
 import psycopg2
 import pylast
 import requests
-import wikipedia
 
 import lidarrmetadata
 from lidarrmetadata import util
@@ -859,27 +859,27 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         Class initialization
         """
         super(WikipediaProvider, self).__init__()
+        self._client = mediawikiapi.MediaWikiAPI()
 
     def get_artist_overview(self, url):
         return self.get_summary(url)
 
-    @classmethod
     @util.CACHE.memoize()
-    def get_summary(cls, url):
+    def get_summary(self, url):
         """
         Gets summary of a wikipedia page
         :param url: URL of wikipedia page
         :return: Summary String
         """
         try:
-            title = cls.title_from_url(url)
-            return wikipedia.summary(title, auto_suggest=False)
+            title = self.title_from_url(url)
+            return self._client.summary(title, auto_suggest=False)
         # FIXME Both of these may be recoverable
-        except wikipedia.PageError as error:
-            logger.error('Wikipedia PageError from {url}: {e}'.format(e=error, url=url))
+        except mediawikiapi.PageError as error:
+            logger.error('Wikipedia PageError from {url}: {e}'.format(e=error.message, url=url))
             return ''
-        except wikipedia.DisambiguationError as error:
-            logger.error('Wikipedia DisambiguationError from {url}: {e}'.format(e=error, url=url))
+        except mediawikiapi.DisambiguationError as error:
+            logger.error('Wikipedia DisambiguationError from {url}: {e}'.format(e=error.message, url=url))
             return ''
         except ValueError as error:
             logger.error('Page parse error: {e}'.format(e=error))
