@@ -11,6 +11,7 @@ from lidarrmetadata import config
 CACHE = flask_caching.Cache(config=config.get_config().CACHE_CONFIG)
 
 
+
 def cache_or_call(func, *args, **kwargs):
     """
     Gets cache result or calls function with args and kwargs
@@ -89,6 +90,38 @@ def map_iterable_values(iterable, func, types=object):
         mapped = original_type(mapped)
 
     return mapped
+
+
+def split_escaped(string, split_char=' ', escape_char='\\'):
+    """
+    Splits escaped string
+
+    :param string: String to split
+    :param split_char: Character to split on. Defaults to single space
+    :param escape_char: Character to escape with. Defaults to \
+    """
+    ret = []
+    current = ''
+    skip = False
+    for i, char in enumerate(string):
+        if skip:
+            skip = False
+            continue
+        elif char == escape_char:
+            current += split_char
+            skip = True
+        elif char == split_char:
+            if current:
+                ret.append(current)
+
+            current = ''
+        else:
+            current += char
+
+    if current:
+        ret.append(current)
+
+    return ret
 
 
 def translate_string(s, table):
