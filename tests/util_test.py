@@ -31,24 +31,6 @@ def test_map_iterable_values(iterable, func, types, expected):
     assert expected == result
 
 
-@pytest.mark.parametrize('name,string,split_char,expected', [
-    ('No escape', 'a:b', ':', ['a', 'b']),
-    ('No escape multiple chars', 'ab:cd', ':', ['ab', 'cd']),
-    ('Multiple no escape', 'a:b:c', ':', ['a', 'b', 'c']),
-    ('Single escape', 'a\:b', ':', ['a:b']),
-    ('Single escape multiple chars', 'ab\:cd', ':', ['ab:cd']),
-    ('Multiple escape', 'a\:b\:c', ':', ['a:b:c']),
-    ('Mixed escaped', 'a\\:b:c', ':', ['a:b', 'c']),
-    ('Beginning no escape', ':a', ':', ['a']),
-    ('Beginning escape', '\:a', ':', [':a']),
-    ('Ending no escape', 'a:', ':', ['a']),
-    ('Ending escape', 'a\:', ':', ['a:'])
-])
-def test_split_escaped(name, string, split_char, expected):
-    result = util.split_escaped(string, split_char=split_char)
-    assert expected == result
-
-
 @pytest.mark.parametrize('string,table,expected', [
     ('abc', {'a': 'q'}, 'qbc'),
     ('abc', {'a': 'qw'}, 'qwbc'),
