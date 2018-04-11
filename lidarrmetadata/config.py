@@ -247,7 +247,7 @@ def get_config():
         for key in dir(__config):
             if key == key.upper():
                 value = getattr(__config, key)
-                print('\t{:24s}{:30s}{}'.format(key, type(value), value))
+                print('\t{:24s}{:30s}{}'.format(key, str(type(value)), value))
     return __config
 
 
