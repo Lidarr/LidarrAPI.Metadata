@@ -11,12 +11,12 @@ from lidarrmetadata import provider
 from lidarrmetadata import util
 
 app = Flask(__name__)
-app.config.from_object(config.CONFIG)
+app.config.from_object(config.get_config())
 
 sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
 
 if app.config['USE_CACHE']:
-    util.CACHE.config = config.CONFIG.CACHE_CONFIG
+    util.CACHE.config = config.get_config().CACHE_CONFIG
     util.CACHE.init_app(app)
 
 if not app.config['PRODUCTION']:
@@ -49,7 +49,7 @@ def validate_mbid(mbid):
     except ValueError:
         return jsonify(error='Invalid UUID'), 400
 
-    if mbid in config.CONFIG.BLACKLISTED_ARTISTS:
+    if mbid in config.get_config().BLACKLISTED_ARTISTS:
         return jsonify(error='Blacklisted artist'), 403
 
 
@@ -362,4 +362,4 @@ def search_route():
 
 
 if __name__ == '__main__':
-    app.run(port=config.CONFIG.HTTP_PORT)
+    app.run(port=config.get_config().HTTP_PORT)

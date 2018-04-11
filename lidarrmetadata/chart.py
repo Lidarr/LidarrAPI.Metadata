@@ -114,7 +114,7 @@ def get_lastfm_album_chart(count=10, user=None):
     :param count: Number of results to return. Defaults to 10
     :return: Parsed chart
     """
-    client = pylast.LastFMNetwork(api_key=config.CONFIG.LASTFM_KEY, api_secret=config.CONFIG.LASTFM_SECRET)
+    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY, api_secret=config.get_config().LASTFM_SECRET)
 
     if user:
         user = util.cache_or_call(client.get_user, user[0])
@@ -155,7 +155,7 @@ def get_lastfm_artist_chart(count=10, user=None):
     :param count: Number of results to return. Defaults to 10
     :return: Parsed chart
     """
-    client = pylast.LastFMNetwork(api_key=config.CONFIG.LASTFM_KEY, api_secret=config.CONFIG.LASTFM_SECRET)
+    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY, api_secret=config.get_config().LASTFM_SECRET)
 
     if user:
         user = util.cache_or_call(client.get_user, user[0])
