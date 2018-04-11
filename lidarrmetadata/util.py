@@ -10,6 +10,7 @@ from lidarrmetadata import config
 # Cache for application
 CACHE = flask_caching.Cache(config=config.CONFIG.CACHE_CONFIG)
 
+
 def cache_or_call(func, *args, **kwargs):
     """
     Gets cache result or calls function with args and kwargs
@@ -27,6 +28,7 @@ def cache_or_call(func, *args, **kwargs):
 
     return ret
 
+
 def first_key_item(dictionary, key, default=None):
     """
     Gets the first item from a dictionary key that returns a list
@@ -42,6 +44,7 @@ def first_key_item(dictionary, key, default=None):
 
     return value
 
+
 def function_hash(func):
     """
     Hashes function to determine uniqueness of function. Used for versioning functions in caches
@@ -49,6 +52,7 @@ def function_hash(func):
     :return: Hash representing function. Unique for bytecode of function
     """
     return hash(func.__code__)
+
 
 def map_iterable_values(iterable, func, types=object):
     """
@@ -85,6 +89,38 @@ def map_iterable_values(iterable, func, types=object):
         mapped = original_type(mapped)
 
     return mapped
+
+
+def split_escaped(string, split_char=' ', escape_char='\\'):
+    """
+    Splits escaped string
+
+    :param string: String to split
+    :param split_char: Character to split on. Defaults to single space
+    :param escape_char: Character to escape with. Defaults to \
+    """
+    ret = []
+    current = ''
+    skip = False
+    for i, char in enumerate(string):
+        if skip:
+            skip = False
+            continue
+        elif char == escape_char:
+            current += split_char
+            skip = True
+        elif char == split_char:
+            if current:
+                ret.append(current)
+
+            current = ''
+        else:
+            current += char
+
+    if current:
+        ret.append(current)
+
+    return ret
 
 
 def translate_string(s, table):
