@@ -6,8 +6,6 @@ import os
 import six
 import re
 
-from lidarrmetadata import util
-
 # Environment key to use for configuration setting. This environment variable
 # may be set to override the default config if no CLI argument is given
 ENV_KEY = 'LIDARR_METADATA_CONFIG'
