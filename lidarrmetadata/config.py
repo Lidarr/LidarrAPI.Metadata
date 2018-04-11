@@ -148,7 +148,7 @@ class ConfigBase(object):
         if isinstance(original_value, list):
             # Lists are separated with colons such as a:b:c -> ['a', 'b', 'c']
             list_item_type = type(original_value[0]) if original_value else str
-            items = util.split_escaped(env_setting, split_char=':')
+            items = split_escaped(env_setting, split_char=':')
             override = map(list_item_type, items)
         elif isinstance(original_value, dict):
             # Dicts have each object split into a different variable being the original name plus '__'. For
