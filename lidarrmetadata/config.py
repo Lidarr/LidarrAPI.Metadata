@@ -6,8 +6,6 @@ import os
 import six
 import re
 
-from lidarrmetadata import util
-
 # Environment key to use for configuration setting. This environment variable
 # may be set to override the default config if no CLI argument is given
 ENV_KEY = 'LIDARR_METADATA_CONFIG'
@@ -25,6 +23,38 @@ def split_camel_case(string):
     :returns: List of substrings in CamelCase
     """
     return re.sub('([a-z])([A-Z])', r'\1 \2', string).split()
+
+
+def split_escaped(string, split_char=' ', escape_char='\\'):
+    """
+    Splits escaped string
+
+    :param string: String to split
+    :param split_char: Character to split on. Defaults to single space
+    :param escape_char: Character to escape with. Defaults to \
+    """
+    ret = []
+    current = ''
+    skip = False
+    for i, char in enumerate(string):
+        if skip:
+            skip = False
+            continue
+        elif char == escape_char:
+            current += split_char
+            skip = True
+        elif char == split_char:
+            if current:
+                ret.append(current)
+
+            current = ''
+        else:
+            current += char
+
+    if current:
+        ret.append(current)
+
+    return ret
 
 
 class ConfigMeta(type):
