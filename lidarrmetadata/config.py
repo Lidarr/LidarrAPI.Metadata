@@ -36,7 +36,7 @@ def split_escaped(string, split_char=' ', escape_char='\\'):
     ret = []
     current = ''
     skip = False
-    for i, char in enumerate(string):
+    for char in string:
         if skip:
             skip = False
             continue
