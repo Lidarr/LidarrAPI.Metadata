@@ -35,6 +35,7 @@ def test_config_override():
         STR_LIST = ['a']
         INT_LIST = [0]
         DICT = {'A': 'b'}
+        TUPLE = ('a', 'b')
 
     os.environ.setdefault('INT', '1')
     os.environ.setdefault('STR', 'B')
@@ -43,6 +44,7 @@ def test_config_override():
     os.environ.setdefault('INT_LIST', '0:1')
     os.environ.setdefault('DICT__A', 'c')
     os.environ.setdefault('DICT__B', 'd')
+    os.environ.setdefault('TUPLE', 'c:d')
 
     config = TestConfig()
 
@@ -52,6 +54,7 @@ def test_config_override():
     assert ['a', 'b'] == config.STR_LIST
     assert [0, 1] == config.INT_LIST
     assert {'A': 'c', 'B': 'd'} == config.DICT
+    assert ('c', 'd') == config.TUPLE
 
 
 @pytest.mark.parametrize('name,env_setting,original_type,original_value,variable_name,expected', [
@@ -67,7 +70,9 @@ def test_config_override():
     ('List with colon', r'a\:b', list, ['a'], 'var', ['a:b']),
     ('Integer list', '1:2', list, [0], 'var', [1, 2]),
     ('Dictionary', 'c', dict, {'A': 'b'}, 'var__A', {'A': 'c'}),
-    ('Dictionary integer', '1', dict, {'A': 0}, 'var__A', {'A': 1})
+    ('Dictionary integer', '1', dict, {'A': 0}, 'var__A', {'A': 1}),
+    ('Tuple', '1:2', tuple, (0, 1), 'var', (1, 2)),
+    ('Empty tuple', 'a', tuple, (), 'var', ('a',)),
 ])
 def test_parse_env_value(name, env_setting, original_type, original_value, variable_name, expected):
     """

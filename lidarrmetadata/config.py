@@ -145,11 +145,11 @@ class ConfigBase(object):
         if not env_setting:
             return original_value
 
-        if isinstance(original_value, list):
+        if isinstance(original_value, (list, tuple)):
             # Lists are separated with colons such as a:b:c -> ['a', 'b', 'c']
             list_item_type = type(original_value[0]) if original_value else str
             items = split_escaped(env_setting, split_char=':')
-            override = list(map(list_item_type, items))
+            override = original_type(map(list_item_type, items))
         elif isinstance(original_value, dict):
             # Dicts have each object split into a different variable being the original name plus '__'. For
             # example, DictVar = {'a': 1, 'b': [2,3]} is set in the env as DictVar__a=1 and DictVar__b=2:3.
