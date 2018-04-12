@@ -674,7 +674,7 @@ class MusicbrainzDbProvider(Provider,
         album = {
             'Id': release_groups[0]['gid'],
             'Disambiguation': release_groups[0]['comment'],
-            'Title': release_groups[0]['album'],
+            'Title': release['release_name'],
             'Type': release_groups[0]['primary_type'],
             'SecondaryTypes': release_groups[0]['secondary_types'],
             'ReleaseDate': datetime.datetime(release_groups[0]['year'] or 1,
