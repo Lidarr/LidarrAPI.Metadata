@@ -34,15 +34,15 @@ def test_config_override():
         EMPTY_LIST = []
         STR_LIST = ['a']
         INT_LIST = [0]
-        DICT = {'a': 'b'}
+        DICT = {'A': 'b'}
 
     os.environ.setdefault('INT', '1')
     os.environ.setdefault('STR', 'B')
     os.environ.setdefault('EMPTY_LIST', 'a')
     os.environ.setdefault('STR_LIST', 'a:b')
     os.environ.setdefault('INT_LIST', '0:1')
-    os.environ.setdefault('DICT__a', 'c')
-    os.environ.setdefault('DICT__b', 'd')
+    os.environ.setdefault('DICT__A', 'c')
+    os.environ.setdefault('DICT__B', 'd')
 
     config = TestConfig()
 
@@ -51,7 +51,7 @@ def test_config_override():
     assert ['a'] == config.EMPTY_LIST
     assert ['a', 'b'] == config.STR_LIST
     assert [0, 1] == config.INT_LIST
-    assert {'a': 'c', 'b': 'd'} == config.DICT
+    assert {'A': 'c', 'B': 'd'} == config.DICT
 
 
 @pytest.mark.parametrize('name,env_setting,original_type,original_value,variable_name,expected', [
@@ -66,8 +66,8 @@ def test_config_override():
     ('List single', 'a', list, ['b'], 'var', ['a']),
     ('List with colon', r'a\:b', list, ['a'], 'var', ['a:b']),
     ('Integer list', '1:2', list, [0], 'var', [1, 2]),
-    ('Dictionary', 'c', dict, {'a': 'b'}, 'var__a', {'a': 'c'}),
-    ('Dictionary integer', '1', dict, {'a': 0}, 'var__a', {'a': 1})
+    ('Dictionary', 'c', dict, {'A': 'b'}, 'var__A', {'A': 'c'}),
+    ('Dictionary integer', '1', dict, {'A': 0}, 'var__A', {'A': 1})
 ])
 def test_parse_env_value(name, env_setting, original_type, original_value, variable_name, expected):
     """

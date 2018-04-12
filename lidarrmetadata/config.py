@@ -153,7 +153,7 @@ class ConfigBase(object):
         elif isinstance(original_value, dict):
             # Dicts have each object split into a different variable being the original name plus '__'. For
             # example, DictVar = {'a': 1, 'b': [2,3]} is set in the env as DictVar__a=1 and DictVar__b=2:3.
-            override = {k: cls._parse_env_value(env_setting,
+            override = {k.upper(): cls._parse_env_value(env_setting,
                                                 type(v),
                                                 v,
                                                 k)
@@ -172,6 +172,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     missing values. Explanation for the functionality of each configuration
     value should be provided above the variable and options should be listed
     in alphabetical order.
+
+    Note that for the environmental override system to work correctly, keys
+    in dictionary config variables should be capitalized.
     """
 
     APPLICATION_ROOT = None
@@ -216,9 +219,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
     # Provider -> (args, kwargs) dictionaries
     PROVIDERS = {
-        'FanArtTvProvider': ([FANART_KEY], {}),
-        'MusicbrainzDbProvider': ([], {'db_host': 'musicbrainz'}),
-        'WikipediaProvider': ([], {})
+        'FANARTTVPROVIDER': ([FANART_KEY], {}),
+        'MUSICBRAINZDBPROVIDER': ([], {'db_host': 'musicbrainz'}),
+        'WIKIPEDIAPROVIDER': ([], {})
     }
 
     # Connection info for sentry

@@ -27,7 +27,9 @@ if not app.config['PRODUCTION']:
 
 # Set up providers
 for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
-    provider.PROVIDER_CLASSES[provider_name](*args, **kwargs)
+    provider_key = list(filter(lambda k: k.upper() == provider_name,
+                          provider.PROVIDER_CLASSES.keys()))[0]
+    provider.PROVIDER_CLASSES[provider_key](*args, **kwargs)
 
 @app.errorhandler(404)
 @app.errorhandler(500)
