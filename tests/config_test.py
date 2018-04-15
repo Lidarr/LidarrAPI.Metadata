@@ -9,6 +9,51 @@ import pytest
 import lidarrmetadata.config
 
 
+@pytest.mark.parametrize('iterable,expected', [
+    ([], int),
+    (tuple(), int),
+    ({'A': 0}, str),
+    ({'A': 'A'}, str)
+])
+def test_get_index_type(iterable, expected):
+    result = lidarrmetadata.config.get_index_type(iterable)
+    assert expected == result
+
+
+@pytest.mark.parametrize('iterable,expected', [
+    ([0], int),
+    ((0,), int),
+    ({'A': 0}, int),
+    ({'A': 'A'}, str)
+])
+def test_get_value_type(iterable, expected):
+    result = lidarrmetadata.config.get_value_type(iterable)
+    assert expected == result
+
+
+@pytest.mark.parametrize('iterable,indices,expected', [
+    ([0], ['0'], 0),
+    ([[0]], ['0', '0'], 0),
+    ({'A': [1, 2]}, ['A', '1'], 2),
+    (({'A': 0}, [1, 2]), [1, 1], 2)
+])
+def test_get_nested(iterable, indices, expected):
+    result = lidarrmetadata.config.get_nested(iterable, indices)
+    assert expected == result
+
+
+@pytest.mark.parametrize('iterable,indices,value,expected', [
+    ([0], ['0'], 1, [1]),
+    ([[0]], ['0', '0'], 1, [[1]]),
+    ({'A': [1, 2]}, ['A', '1'], 3, {'A': [1, 3]}),
+    (({'A': 0}, [1, 2]), [1, 1], 3, ({'A': 0}, [1, 3])),
+    ({'A': 0}, ['B'], 1, {'A': 0, 'B': 1})
+])
+def test_set_nested(iterable, indices, value, expected):
+    lidarrmetadata.config.set_nested(iterable, indices, value)
+    assert expected == iterable
+
+
 @pytest.mark.parametrize('name,string,split_char,expected', [
     ('No escape', 'a:b', ':', ['a', 'b']),
     ('No escape multiple chars', 'ab:cd', ':', ['ab', 'cd']),
@@ -48,24 +93,6 @@ def test_search_env(vars, values, expected):
     os.environ = old_environ
 
     assert sorted(expected) == sorted(result)
-
-
-@pytest.mark.parametrize('var,original,environment,expected', [
-    ('A', 'b', {'A': 'c'}, 'c'),
-    ('A', 0, {'A': '1'}, 1),
-    ('A', ['a'], {'A': 'a:b'}, ['a', 'b']),
-    ('A', ['a'], {'A__0': 'b'}, ['b']),
-    ('A', ['a', 'b'], {'A__1': 'c'}, ['a', 'c']),
-    ('A', ['ab'], {'A': 'd'}, ['d']),
-    ('A', {'B': 0}, {'A__B': '1'}, {'B': 1}),
-    ('A', {'B': [1, 2]}, {'A__C': '3'}, {'B': [1, 2], 'C': [3]})
-])
-def test_get_env_override(var, original, environment, expected):
-    old_env = os.environ
-    os.environ = environment
-    result = lidarrmetadata.config.ConfigBase._get_env_override(var, original)
-    os.environ = old_env
-    assert expected == result
 
 
 def test_config_override():

@@ -16,6 +16,92 @@ ENV_KEY = 'LIDARR_METADATA_CONFIG'
 CONFIGS = {}
 
 
+# TODO Move these functions to util once circular dependency is resolved
+def get_index_type(iterable):
+    """
+    Gets the index type of an iterable. Note that iterables with multiple
+    index types are not supported
+
+    :param iterable: Iterable to get index type of
+    :return: Type of index of iterable
+    """
+    if isinstance(iterable, (tuple, list)):
+        return int
+    elif isinstance(iterable, dict):
+        return type(iterable.keys()[0]) if iterable else None
+    else:
+        raise ValueError()
+
+
+def get_value_type(iterable):
+    """
+    Gets the value type of an iterable. Note that iterables with multiple
+    value types are not supported
+
+    :param iterable: Iterable to get value type of
+    :return: Value type of iterable
+    """
+    if isinstance(iterable, (tuple, list)):
+        return type(iterable[0])
+    elif isinstance(iterable, dict):
+        return type(iterable.get(iterable.keys()[0]))
+    else:
+        raise ValueError()
+
+
+def get_nested(iterable, indices, fail_return_first=False):
+    """
+    Gets a nested value of a series of indices
+
+    :param iterable: Iterable to get value from
+    :param indices: Sequence of indices to follow
+    :param fail_return_first: Returns first key if an index doesn't exist.
+            This is a somewhat dirty way of getting what we need for config.
+            Defaults to False
+    :return: Value at sequence of indices
+    """
+    index = get_index_type(iterable)(indices[0])
+    if len(indices) > 1:
+        return get_nested(iterable[index], indices[1:])
+    else:
+        if fail_return_first:
+            try:
+                return iterable[index]
+            except IndexError:
+                return iterable[0]
+            except KeyError:
+                return iterable[iterable.keys()[0]]
+        else:
+            return iterable[index]
+
+
+def set_nested(iterable, indices, value):
+    """
+    Sets a nested value of a series of indices. Note that this will
+    edit the iterable in-place since all iterables should be references
+
+    :param iterable: Iterable to set value in
+    :param indices: Indices to follow
+    :param value: Value to set
+    :return:
+    """
+    index = get_index_type(iterable)(indices[0])
+    if len(indices) > 1:
+        set_nested(iterable[index], indices[1:], value)
+    else:
+        if isinstance(iterable, dict):
+            iterable.update({index: value})
+        elif isinstance(iterable, list):
+            if index < len(iterable):
+                iterable[index] = value
+            else:
+                # Add Nones if we have a list. Note that we can't do
+                # this for tuples since they're immutable
+                set_nested(iterable.append(None), indices, value)
+        else:
+            iterable[index] = value
+
+
 def split_camel_case(string):
     """
     Splits camel case string into list of strings
@@ -95,10 +181,7 @@ class ConfigBase(object):
                 if var.upper() != var:
                     continue
 
-                override = self._get_env_override(var, getattr(self, var)) or getattr(self, var)
-                print(var, override)
-
-                setattr(self, var, override)
+                self._set_env_override(var, getattr(self, var))
 
             self.__instance = self
 
@@ -116,8 +199,7 @@ class ConfigBase(object):
                  'indices': var.split('__')[1:]}
                 for var in vars]
 
-    @classmethod
-    def _get_env_override(cls, var, original):
+    def _set_env_override(self, var, original):
         """
         Gets the environment variable override value for a variable if it exists or returns the original value
         :param var: Name of variable to check. It will check the environment variable of the same name
@@ -125,35 +207,16 @@ class ConfigBase(object):
         """
         original_type = type(original) if original is not None else str
 
-        envs = cls._search_env(var)
+        envs = self._search_env(var)
         override = None
         for env in envs:
             if env['indices']:
-                last_item = original
-                item = original
-                for i, index in enumerate(env['indices']):
-                    last_item = item
-                    try:
-                        item = item[index]
-                    except TypeError:
-                        item = item[int(index)]
-                    except KeyError:
-                        item = item.get(index, type(item.values()[0])())
-                    except IndexError:
-                        item = item[index - 1]
-
-                    if i == len(env['indices']) - 1:
-                        setting = cls._parse_env_value(env['env_setting'], type(item), item)
-                        try:
-                            last_item[index] = setting
-                        except TypeError:
-                            last_item[int(index)] = setting
-
-                override = original
-
+                original_value = get_nested(original, env['indices'], True)
+                set_nested(original, env['indices'],
+                           self._parse_env_value(env['env_setting'], type(original_value), original_value))
             else:
-                setting = cls._parse_env_value(env['env_setting'], original_type, original)
-                override = setting
+                setting = self._parse_env_value(env['env_setting'], original_type, original)
+                setattr(self, var, setting)
 
         return override
 
