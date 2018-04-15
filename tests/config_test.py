@@ -27,6 +27,47 @@ def test_split_escaped(name, string, split_char, expected):
     assert expected == result
 
 
+@pytest.mark.parametrize('vars,values,expected', [
+    (['A'], ['value'], [{'config_var': 'A', 'env_var': 'A', 'env_setting': 'value', 'indices': []}]),
+    (['A__B'], ['value'], [{'config_var': 'A', 'env_var': 'A__B', 'env_setting': 'value', 'indices': ['B']}]),
+    (
+            ['A__B__0'], ['value'],
+            [{'config_var': 'A', 'env_var': 'A__B__0', 'env_setting': 'value', 'indices': ['B', '0']}]),
+    (['A__B', 'A__C'], ['value1', 'value2'],
+     [{'config_var': 'A', 'env_var': 'A__B', 'env_setting': 'value1', 'indices': ['B']},
+      {'config_var': 'A', 'env_var': 'A__C', 'env_setting': 'value2', 'indices': ['C']}])
+])
+def test_search_env(vars, values, expected):
+    # Patch environment
+    old_environ = os.environ
+    os.environ = {var: value for var, value in zip(vars, values)}
+
+    result = lidarrmetadata.config.ConfigBase._search_env(vars[0].split('__')[0])
+
+    # Restore original env
+    os.environ = old_environ
+
+    assert sorted(expected) == sorted(result)
+
+
+@pytest.mark.parametrize('var,original,environment,expected', [
+    ('A', 'b', {'A': 'c'}, 'c'),
+    ('A', 0, {'A': '1'}, 1),
+    ('A', ['a'], {'A': 'a:b'}, ['a', 'b']),
+    ('A', ['a'], {'A__0': 'b'}, ['b']),
+    ('A', ['a', 'b'], {'A__1': 'c'}, ['a', 'c']),
+    ('A', ['ab'], {'A': 'd'}, ['d']),
+    ('A', {'B': 0}, {'A__B': '1'}, {'B': 1}),
+    ('A', {'B': [1, 2]}, {'A__C': '3'}, {'B': [1, 2], 'C': [3]})
+])
+def test_get_env_override(var, original, environment, expected):
+    old_env = os.environ
+    os.environ = environment
+    result = lidarrmetadata.config.ConfigBase._get_env_override(var, original)
+    os.environ = old_env
+    assert expected == result
+
+
 def test_config_override():
     class TestConfig(lidarrmetadata.config.ConfigBase):
         INT = 0
@@ -69,8 +110,6 @@ def test_config_override():
     ('List single', 'a', list, ['b'], 'var', ['a']),
     ('List with colon', r'a\:b', list, ['a'], 'var', ['a:b']),
     ('Integer list', '1:2', list, [0], 'var', [1, 2]),
-    ('Dictionary', 'c', dict, {'A': 'b'}, 'var__A', {'A': 'c'}),
-    ('Dictionary integer', '1', dict, {'A': 0}, 'var__A', {'A': 1}),
     ('Tuple', '1:2', tuple, (0, 1), 'var', (1, 2)),
     ('Empty tuple', 'a', tuple, (), 'var', ('a',)),
 ])
@@ -80,6 +119,5 @@ def test_parse_env_value(name, env_setting, original_type, original_value, varia
     """
     result = lidarrmetadata.config.ConfigBase._parse_env_value(env_setting,
                                                                original_type,
-                                                               original_value,
-                                                               variable_name)
+                                                               original_value)
     assert expected == result

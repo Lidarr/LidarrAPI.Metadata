@@ -95,50 +95,75 @@ class ConfigBase(object):
                 if var.upper() != var:
                     continue
 
-                override = self._get_env_override(var)
+                override = self._get_env_override(var, getattr(self, var)) or getattr(self, var)
                 print(var, override)
 
                 setattr(self, var, override)
 
             self.__instance = self
 
+    @staticmethod
+    def _search_env(name):
+        """
+        Searches env variables for variables matching name and returns a list of indices
+        :param name: Name to match
+        :return: List of (var, value, [indices]) tuples
+        """
+        vars = filter(lambda k: k.split('__')[0] == name, os.environ.keys())
+        return [{'config_var': var.split('__')[0],
+                 'env_var': var,
+                 'env_setting': os.getenv(var),
+                 'indices': var.split('__')[1:]}
+                for var in vars]
+
     @classmethod
-    def _get_env_override(cls, var):
+    def _get_env_override(cls, var, original):
         """
         Gets the environment variable override value for a variable if it exists or returns the original value
         :param var: Name of variable to check. It will check the environment variable of the same name
         :return: Environment variable of object or original value if environment variable does not exist
         """
-        print(var)
-        original_value = getattr(cls, var)
-        original_type = type(original_value) if original_value is not None else str
+        original_type = type(original) if original is not None else str
 
-        # Parse special types
-        env_setting = os.getenv(var, original_value)
-        if env_setting != original_value:
-            override = cls._parse_env_value(env_setting, original_type, original_value, var)
-        elif original_type == dict:
-            keys = [key for key in os.environ.keys() if key.startswith(var)]
-            override = original_value
-            override.update({k.split('__')[1]:
-                                 cls._parse_env_value(os.getenv(k),
-                                                      type(original_value.get(k, '')),
-                                                      original_value.get(k, None),
-                                                      k)
-                             for k in keys})
-        else:
-            override = original_value
+        envs = cls._search_env(var)
+        override = None
+        for env in envs:
+            if env['indices']:
+                last_item = original
+                item = original
+                for i, index in enumerate(env['indices']):
+                    last_item = item
+                    try:
+                        item = item[index]
+                    except TypeError:
+                        item = item[int(index)]
+                    except KeyError:
+                        item = item.get(index, type(item.values()[0])())
+                    except IndexError:
+                        item = item[index - 1]
+
+                    if i == len(env['indices']) - 1:
+                        setting = cls._parse_env_value(env['env_setting'], type(item), item)
+                        try:
+                            last_item[index] = setting
+                        except TypeError:
+                            last_item[int(index)] = setting
+
+                override = original
+
+            else:
+                setting = cls._parse_env_value(env['env_setting'], original_type, original)
+                override = setting
 
         return override
 
     @classmethod
-    def _parse_env_value(cls, env_setting, original_type, original_value, variable_name):
+    def _parse_env_value(cls, env_setting, original_type, original_value):
         """
         Parses the value of an environment variable according to the type of the original variable
         :param env_setting: Environment setting as string
         :param original_type: Type of original variable
         :param original_value: Value of original variable
-        :param variable_name: Name of variable being parsed
         :return:
         """
         # No override if there is no env setting
@@ -150,14 +175,6 @@ class ConfigBase(object):
             list_item_type = type(original_value[0]) if original_value else str
             items = split_escaped(env_setting, split_char=':')
             override = original_type(map(list_item_type, items))
-        elif isinstance(original_value, dict):
-            # Dicts have each object split into a different variable being the original name plus '__'. For
-            # example, DictVar = {'a': 1, 'b': [2,3]} is set in the env as DictVar__a=1 and DictVar__b=2:3.
-            override = {k.upper(): cls._parse_env_value(env_setting,
-                                                type(v),
-                                                v,
-                                                k)
-                        for k, v in original_value.items()}
         elif isinstance(original_value, bool):
             return env_setting.lower() == 'true'
         else:
@@ -192,7 +209,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Cache options
     USE_CACHE = True
     CACHE_CONFIG = {
-        'CACHE_TYPE': 'redis',
+        'CACHE_TYPE': 'null',
         'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24,
         'CACHE_KEY_PREFIX': 'lidarrmetadata',
         'CACHE_REDIS_HOST': 'redis'
