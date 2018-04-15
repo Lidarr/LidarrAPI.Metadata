@@ -282,7 +282,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Cache options
     USE_CACHE = True
     CACHE_CONFIG = {
-        'CACHE_TYPE': 'redis',
+        'CACHE_TYPE': 'null',
         'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24,
         'CACHE_KEY_PREFIX': 'lidarrmetadata',
         'CACHE_REDIS_HOST': 'redis'
