@@ -92,8 +92,7 @@ def test_search_env(vars, values, expected):
     # Restore original env
     os.environ = old_environ
 
-    assert sorted(expected) == sorted(result)
-
+    assert sorted(expected, key=lambda i: i['env_var']) == sorted(result, key=lambda i: i['env_var'])
 
 def test_config_override():
     class TestConfig(lidarrmetadata.config.ConfigBase):
