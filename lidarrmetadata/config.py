@@ -17,6 +17,16 @@ CONFIGS = {}
 
 
 # TODO Move these functions to util once circular dependency is resolved
+
+def first_key(d):
+    """
+    Gets the first key of a dictionary
+    :param d: Dictionary
+    :return: First key in dictionary
+    """
+    return list(d.keys())[0]
+
+
 def get_index_type(iterable):
     """
     Gets the index type of an iterable. Note that iterables with multiple
@@ -28,7 +38,7 @@ def get_index_type(iterable):
     if isinstance(iterable, (tuple, list)):
         return int
     elif isinstance(iterable, dict):
-        return type(iterable.keys()[0]) if iterable else None
+        return type(first_key(iterable)) if iterable else None
     else:
         raise ValueError()
 
@@ -44,7 +54,7 @@ def get_value_type(iterable):
     if isinstance(iterable, (tuple, list)):
         return type(iterable[0])
     elif isinstance(iterable, dict):
-        return type(iterable.get(iterable.keys()[0]))
+        return type(iterable.get(first_key(iterable)))
     else:
         raise ValueError()
 
@@ -70,7 +80,7 @@ def get_nested(iterable, indices, fail_return_first=False):
             except IndexError:
                 return iterable[0]
             except KeyError:
-                return iterable[iterable.keys()[0]]
+                return iterable[first_key(iterable)]
         else:
             return iterable[index]
 
