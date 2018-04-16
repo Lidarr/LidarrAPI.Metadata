@@ -103,6 +103,7 @@ def test_config_override():
         INT_LIST = [0]
         DICT = {'A': 'b'}
         TUPLE = ('a', 'b')
+        NESTED_TUPLE = ([0], {'A': 1})
 
     os.environ.setdefault('INT', '1')
     os.environ.setdefault('STR', 'B')
@@ -112,6 +113,7 @@ def test_config_override():
     os.environ.setdefault('DICT__A', 'c')
     os.environ.setdefault('DICT__B', 'd')
     os.environ.setdefault('TUPLE', 'c:d')
+    os.environ.setdefault('NESTED_TUPLE__1__A', '2')
 
     config = TestConfig()
 
@@ -122,6 +124,7 @@ def test_config_override():
     assert [0, 1] == config.INT_LIST
     assert {'A': 'c', 'B': 'd'} == config.DICT
     assert ('c', 'd') == config.TUPLE
+    assert ([0], {'A': 2}) == config.NESTED_TUPLE
 
 
 @pytest.mark.parametrize('name,env_setting,original_type,original_value,variable_name,expected', [
