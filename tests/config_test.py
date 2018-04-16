@@ -72,7 +72,7 @@ def test_split_escaped(name, string, split_char, expected):
     assert expected == result
 
 
-@pytest.mark.parametrize('vars,values,expected', [
+@pytest.mark.parametrize('envs,values,expected', [
     (['A'], ['value'], [{'config_var': 'A', 'env_var': 'A', 'env_setting': 'value', 'indices': []}]),
     (['A__B'], ['value'], [{'config_var': 'A', 'env_var': 'A__B', 'env_setting': 'value', 'indices': ['B']}]),
     (
@@ -82,12 +82,12 @@ def test_split_escaped(name, string, split_char, expected):
      [{'config_var': 'A', 'env_var': 'A__B', 'env_setting': 'value1', 'indices': ['B']},
       {'config_var': 'A', 'env_var': 'A__C', 'env_setting': 'value2', 'indices': ['C']}])
 ])
-def test_search_env(vars, values, expected):
+def test_search_env(envs, values, expected):
     # Patch environment
     old_environ = os.environ
-    os.environ = {var: value for var, value in zip(vars, values)}
+    os.environ = {var: value for var, value in zip(envs, values)}
 
-    result = lidarrmetadata.config.ConfigBase._search_env(vars[0].split('__')[0])
+    result = lidarrmetadata.config.ConfigBase._search_env(envs[0].split('__')[0])
 
     # Restore original env
     os.environ = old_environ

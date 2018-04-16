@@ -202,12 +202,12 @@ class ConfigBase(object):
         :param name: Name to match
         :return: List of (var, value, [indices]) tuples
         """
-        vars = filter(lambda k: k.split('__')[0] == name, os.environ.keys())
+        envs = filter(lambda k: k.split('__')[0] == name, os.environ.keys())
         return [{'config_var': var.split('__')[0],
                  'env_var': var,
                  'env_setting': os.getenv(var),
                  'indices': var.split('__')[1:]}
-                for var in vars]
+                for var in envs]
 
     def _set_env_override(self, var, original):
         """
