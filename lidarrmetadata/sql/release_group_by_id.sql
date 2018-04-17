@@ -1,4 +1,4 @@
-SELECT DISTINCT
+SELECT
   release_group.gid                                          AS gid,
   release_group.comment,
   release_group_primary_type.name                            AS primary_type,
@@ -55,3 +55,11 @@ FROM release_group
   LEFT JOIN medium_format ON medium.format = medium_format.id
 
 WHERE release_group.gid = %s
+ORDER BY
+  release.quality,
+  release_year,
+  release_month,
+  release_day,
+  CASE WHEN release_status.name = 'Official'
+    THEN 0
+  ELSE 1 END
