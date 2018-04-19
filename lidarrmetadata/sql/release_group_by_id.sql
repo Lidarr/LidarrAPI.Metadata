@@ -56,10 +56,10 @@ FROM release_group
 
 WHERE release_group.gid = %s
 ORDER BY
-  release_year,
-  release_month,
-  release_day,
-  release.quality,
   CASE WHEN release_status.name = 'Official'
     THEN 0
   ELSE 1 END
+  release_year,
+  release_month,
+  release_day,
+  release.quality
