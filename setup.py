@@ -49,7 +49,7 @@ setup(
         'werkzeug>=0.7.0',
     ],
 
-    dependency_links = ['https://github.com/danielunderwood/MediaWikiAPI/archive/fix/setup-dependencies.zip#egg=mediawikiapi-1.1.2'],
+    dependency_links = ['https://github.com/danielunderwood/MediaWikiAPI/archive/fix/link-list-access.zip#egg=mediawikiapi-1.1.2'],
 
     extras_require={
         'test': ['pytest', 'tox']
