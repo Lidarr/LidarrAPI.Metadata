@@ -11,7 +11,6 @@ from lidarrmetadata import config
 CACHE = flask_caching.Cache(config=config.get_config().CACHE_CONFIG)
 
 
-
 def cache_or_call(func, *args, **kwargs):
     """
     Gets cache result or calls function with args and kwargs
