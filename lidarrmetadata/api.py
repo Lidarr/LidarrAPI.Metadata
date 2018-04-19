@@ -29,7 +29,8 @@ if not app.config['PRODUCTION']:
 for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
     provider_key = list(filter(lambda k: k.upper() == provider_name,
                           provider.PROVIDER_CLASSES.keys()))[0]
-    provider.PROVIDER_CLASSES[provider_key](*args, **kwargs)
+    lower_kwargs = {k.lower(): v for k, v in kwargs.items()}
+    provider.PROVIDER_CLASSES[provider_key](*args, **lower_kwargs)
 
 @app.errorhandler(404)
 @app.errorhandler(500)

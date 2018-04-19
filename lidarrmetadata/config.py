@@ -310,7 +310,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Provider -> (args, kwargs) dictionaries
     PROVIDERS = {
         'FANARTTVPROVIDER': ([FANART_KEY], {}),
-        'MUSICBRAINZDBPROVIDER': ([], {'db_host': 'musicbrainz'}),
+        'MUSICBRAINZDBPROVIDER': ([], {'DB_HOST': 'musicbrainz'}),
         'WIKIPEDIAPROVIDER': ([], {})
     }
 
