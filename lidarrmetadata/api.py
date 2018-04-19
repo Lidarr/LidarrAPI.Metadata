@@ -62,12 +62,13 @@ def default_route():
     Default route with API information
     :return:
     """
+    print(request.url)
     info = {'version': lidarrmetadata.__version__}
     return jsonify(info)
 
 
 @app.route('/artist/<mbid>', methods=['GET'])
-@util.CACHE.cached(key_prefix=lambda: request.full_path)
+@util.CACHE.cached(key_prefix=lambda: request.url)
 def get_artist_info(mbid):
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
@@ -140,7 +141,7 @@ def get_artist_info(mbid):
 
 
 @app.route('/album/<mbid>', methods=['GET'])
-@util.CACHE.cached(key_prefix=lambda: request.full_path)
+@util.CACHE.cached(key_prefix=lambda: request.url)
 def get_album_info(mbid):
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
@@ -182,7 +183,7 @@ def get_album_info(mbid):
 
 
 @app.route('/chart/<name>/<type_>/<selection>')
-@util.CACHE.cached(key_prefix=lambda: request.full_path)
+@util.CACHE.cached(key_prefix=lambda: request.url)
 def chart_route(name, type_, selection):
     """
     Gets chart
@@ -215,7 +216,7 @@ def chart_route(name, type_, selection):
 
 
 @app.route('/search/album')
-@util.CACHE.cached(key_prefix=lambda: request.full_path)
+@util.CACHE.cached(key_prefix=lambda: request.url)
 def search_album():
     """Search for a human-readable album
     ---
@@ -264,7 +265,7 @@ def search_album():
 
 
 @app.route('/search/artist', methods=['GET'])
-@util.CACHE.cached(key_prefix=lambda: request.full_path)
+@util.CACHE.cached(key_prefix=lambda: request.url)
 def search_artist():
     """Search for a human-readable artist
     ---
