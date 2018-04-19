@@ -62,7 +62,6 @@ def default_route():
     Default route with API information
     :return:
     """
-    print(request.url)
     info = {'version': lidarrmetadata.__version__}
     return jsonify(info)
 
