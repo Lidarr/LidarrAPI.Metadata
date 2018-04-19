@@ -8,7 +8,8 @@ import functools
 from lidarrmetadata import config
 
 # Cache for application
-CACHE = flask_caching.Cache(config=config.CONFIG.CACHE_CONFIG)
+CACHE = flask_caching.Cache(config=config.get_config().CACHE_CONFIG)
+
 
 def cache_or_call(func, *args, **kwargs):
     """
@@ -27,6 +28,7 @@ def cache_or_call(func, *args, **kwargs):
 
     return ret
 
+
 def first_key_item(dictionary, key, default=None):
     """
     Gets the first item from a dictionary key that returns a list
@@ -42,6 +44,7 @@ def first_key_item(dictionary, key, default=None):
 
     return value
 
+
 def function_hash(func):
     """
     Hashes function to determine uniqueness of function. Used for versioning functions in caches
@@ -49,6 +52,7 @@ def function_hash(func):
     :return: Hash representing function. Unique for bytecode of function
     """
     return hash(func.__code__)
+
 
 def map_iterable_values(iterable, func, types=object):
     """
