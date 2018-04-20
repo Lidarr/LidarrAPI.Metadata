@@ -9,7 +9,12 @@ def main():
     Entry point for script
     """
     config = get_config()
-    cherrypy.tree.graft(app, '/')
+
+    mount_point = config.APPLICATION_ROOT or '/'
+    if not mount_point.startswith('/'):
+        mount_point = '/' + mount_point
+
+    cherrypy.tree.graft(app, mount_point)
     cherrypy.config.update({
         'log.screen': True,
         'server.socket_port': config.HTTP_PORT,
