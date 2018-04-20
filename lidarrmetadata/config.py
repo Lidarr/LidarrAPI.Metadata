@@ -294,6 +294,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Debug mode
     DEBUG = False
 
+    # Enable sending api query stats
+    ENABLE_STATS = True
+
     # Fanart.tv API credentials
     FANART_KEY = ''
 
@@ -319,14 +322,19 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
                   '605f0689da43434bae633d07c0357c46@sentry.io/215082')
     SENTRY_ENABLE = True
 
+    # Telegraf connection details
+    TELEGRAF_HOST = 'localhost'
+    TELEGRAF_PORT = 8092
+
     # Testing mode
     TESTING = False
 
 
 class TestConfig(DefaultConfig):
     CACHE_CONFIG = {'CACHE_TYPE': 'null'}
+    ENABLE_STATS =  False
     SENTRY_ENABLE = False
-    Testing = True
+    TESTING = True
 
 
 __config = None
