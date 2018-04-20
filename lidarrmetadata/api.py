@@ -1,7 +1,9 @@
+import time
 import uuid
 
 from flask import Flask, request, jsonify
 import raven.contrib.flask
+import telegraf.client
 from werkzeug.exceptions import HTTPException
 
 import lidarrmetadata
@@ -13,7 +15,11 @@ from lidarrmetadata import util
 app = Flask(__name__)
 app.config.from_object(config.get_config())
 
-sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
+# sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
+
+telegraf_client = None
+if app.config['ENABLE_STATS']:
+    telegraf_client = telegraf.client.TelegrafClient(host=app.config['TELEGRAF_HOST'], port=app.config['TELEGRAF_PORT'])
 
 if app.config['USE_CACHE']:
     util.CACHE.config = config.get_config().CACHE_CONFIG
@@ -39,6 +45,21 @@ def handle_error(e):
     if isinstance(e, HTTPException):
         code = e.code
     return jsonify(error=str(e)), code
+
+
+@app.before_request
+def before_request():
+    request.start_time = time.time()
+
+
+@app.teardown_request
+def teardown_request(response):
+    end_time = time.time()
+    if app.config['ENABLE_STATS']:
+        request_time = 1000 * (end_time - request.start_time)
+        print(request_time)
+        telegraf_client.metric('api', {'response_time': request_time, 'path': request.path},
+                               tags={'path': request.path})
 
 
 def validate_mbid(mbid):
