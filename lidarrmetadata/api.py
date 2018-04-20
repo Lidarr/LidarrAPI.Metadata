@@ -80,9 +80,10 @@ def teardown_request(response):
     end_time = time.time()
     if app.config['ENABLE_STATS']:
         request_time = 1000 * (end_time - request.start_time)
-        print(request_time)
-        telegraf_client.metric('api', {'response_time': request_time, 'path': request.path},
-                               tags={'path': request.path})
+        telegraf_client.metric('api', {'response_time': request_time},
+                               tags={'path': request.path,
+                                     'platform': request.user_agent.platform,
+                                     'version': request.user_agent.version})
 
 
 def validate_mbid(mbid):
