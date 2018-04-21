@@ -83,6 +83,20 @@ def before_request():
 def after_request(response):
     end_time = time.time()
     if app.config['ENABLE_STATS']:
+        # TODO Catch and async
+        # Parse the type of resource we have
+        resource_type = request.path.split('/')[1].lower()
+        data = json.loads(response.get_data())
+        print(data)
+        if resource_type == 'artist':
+            resource = u'Artist/{}/{}'.format(data.get(u'Id', None), data.get(u'ArtistName', None))
+        elif resource_type == 'album':
+            resource = u'Album/{}/{}'.format(data.get(u'Id', None), data.get(u'Title', None))
+        elif resource_type == 'chart':
+            resource = u'Chart/{}'.format(request.path)
+        else:
+            resource = u'Unknown/{}'.format(request.path)
+
         request_time = 1000 * (end_time - request.start_time)
 
         # User agent info
