@@ -1,3 +1,5 @@
+import json
+import re
 import time
 import uuid
 
@@ -13,6 +15,8 @@ from lidarrmetadata import chart
 from lidarrmetadata import config
 from lidarrmetadata import provider
 from lidarrmetadata import util
+
+UA_REGEX = re.compile(r'Lidarr\/(?P<version>\d+\.\d+\.\d+\.\d+)\s+\((?P<platform>\w+)')
 
 app = Flask(__name__)
 app.config.from_object(config.get_config())
@@ -75,15 +79,28 @@ def before_request():
     request.start_time = time.time()
 
 
-@app.teardown_request
-def teardown_request(response):
+@app.after_request
+def after_request(response):
     end_time = time.time()
     if app.config['ENABLE_STATS']:
         request_time = 1000 * (end_time - request.start_time)
+
+        # User agent info
+        ua_match = UA_REGEX.match(request.user_agent.string)
+        if ua_match:
+            ua_version = ua_match.group('version')
+            ua_platform = ua_match.group('platform')
+        else:
+            ua_version = request.user_agent.version
+            ua_platform = request.user_agent.platform
+
         telegraf_client.metric('api', {'response_time': request_time},
                                tags={'path': request.path,
-                                     'platform': request.user_agent.platform,
-                                     'version': request.user_agent.version})
+                                     'platform': ua_platform,
+                                     'version': ua_version,
+                                     'resource': resource})
+
+    return response
 
 
 def validate_mbid(mbid):
