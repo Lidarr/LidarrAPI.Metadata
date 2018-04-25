@@ -654,10 +654,13 @@ class MusicbrainzDbProvider(Provider,
                     query_parts = query.split()
 
                     # Add artist name clause to where
-                    for part in query_parts[::-1]:
+                    new_parts = []
+                    for part in query_parts:
                         if part.startswith('WHERE'):
-                            part += cursor.mogrify(' AND UPPER(artist.name) LIKE UPPER(%s)', [artist_name])
-                            break
+                            part += cursor.mogrify(' UPPER(artist.name) LIKE UPPER(%s) AND ', [artist_name])
+
+                        new_parts.append(part)
+                    query_parts = new_parts or query_parts
 
                     query = '\n'.join(query_parts)
 
