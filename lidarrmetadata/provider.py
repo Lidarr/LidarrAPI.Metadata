@@ -25,11 +25,11 @@ if six.PY2:
 else:
     from urllib.parse import unquote as url_unquote
 
-
 logger = logging.getLogger(__name__)
 
 # Provider class dictionary
 PROVIDER_CLASSES = {}
+
 
 def get_providers_implementing(cls):
     """
@@ -135,6 +135,24 @@ class TracksByAlbumMixin(MixinBase):
         pass
 
 
+class TrackSearchMixin(MixinBase):
+    """
+    Search for tracks by name
+    """
+
+    @abc.abstractmethod
+    def search_track(self, query, artist_name=None, album_name=None, limit=10):
+        """
+        Searches for tracks matching query
+        :param query: Search query
+        :param artist_name: Artist name. Defaults to None, in which case tracks from all artists are returned
+        :param album_name: Album name. Defaults to None, in which case tracks from all albums are returned
+        :param limit: Maximum number of results to return. Defaults to 10. Returns all results if negative
+        :return: List of track results
+        """
+        pass
+
+
 class ArtistOverviewMixin(MixinBase):
     """
     Gets overview for artist
@@ -206,6 +224,7 @@ class AlbumNameSearchMixin(MixinBase):
         """
         pass
 
+
 class ProviderMeta(abc.ABCMeta):
     def __new__(mcls, name, bases, namespace):
         """
@@ -219,6 +238,7 @@ class ProviderMeta(abc.ABCMeta):
         cls = super(ProviderMeta, mcls).__new__(mcls, name, bases, namespace)
         PROVIDER_CLASSES[name] = cls
         return cls
+
 
 class Provider(six.with_metaclass(ProviderMeta, object)):
     """
@@ -546,7 +566,8 @@ class MusicbrainzDbProvider(Provider,
                             AlbumByIdMixin,
                             AlbumNameSearchMixin,
                             MediaByAlbumMixin,
-                            TracksByAlbumMixin):
+                            TracksByAlbumMixin,
+                            TrackSearchMixin):
     """
     Provider for directly querying musicbrainz database
     """
@@ -764,6 +785,45 @@ class MusicbrainzDbProvider(Provider,
                                        [artist_id])
         return [{'target': result['url'],
                  'type': self.parse_url_source(result['url'])}
+                for result in results]
+
+    def search_track(self, query, artist_name=None, album_name=None, limit=10):
+        filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'track_search.sql')
+        with open(filename, 'r') as infile:
+            sql_query = infile.read()
+
+        with self._cursor() as cursor:
+
+            query_parts = sql_query.split()
+
+            # Add artist name clause to where
+            if artist_name or album_name:
+                new_query = []
+                for part in query_parts:
+                    if part.startswith('WHERE'):
+                        # This makes no sense, but extra queries are added after WHERE instead of at end of line
+                        if artist_name:
+                            part += cursor.mogrify(' UPPER(artist.name) LIKE UPPER(%s) AND ', [artist_name])
+                        if album_name:
+                            part += cursor.mogrify(' UPPER(release_group.name) LIKE UPPER(%s) AND ', [album_name])
+                            print(part)
+                    new_query.append(part)
+
+                query_parts = new_query
+
+            sql_query = '\n'.join(query_parts)
+
+            if limit:
+                sql_query += cursor.mogrify(' LIMIT %s', [limit])
+
+        results = self.map_query(sql_query, [query + '%', query])
+        print(results)
+
+        return [{'TrackName': result['track_name'],
+                 'ArtistName': result['artist_name'],
+                 'ArtistId': result['artist_gid'],
+                 'AlbumTitle': result['rg_title'],
+                 'AlbumId': result['rg_gid']}
                 for result in results]
 
     def query_from_file(self, sql_file, *args, **kwargs):

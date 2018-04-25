@@ -350,6 +350,33 @@ def search_artist():
     return jsonify(artists)
 
 
+@app.route('/search/track')
+@util.CACHE.cached(key_prefix=lambda: request.url)
+def search_track():
+    """
+    Search for a track
+    """
+    query = request.args.get('query')
+    if not query:
+        return jsonify(error='No query provided'), 400
+    query = query.strip()
+
+    artist_name = request.args.get('artist', None)
+    album_name = request.args.get('album', None)
+
+    limit = request.args.get('limit', default=10, type=int)
+    limit = None if limit < 1 else limit
+
+    search_providers = provider.get_providers_implementing(provider.TrackSearchMixin)
+    if not search_providers:
+        response = jsonify(error='No search providers available')
+        response.status_code = 500
+        return response
+
+    tracks = search_providers[0].search_track(query, artist_name, album_name, limit)
+
+    return jsonify(tracks)
+
 @app.route('/search')
 def search_route():
     type = request.args.get('type', None)
@@ -358,6 +385,8 @@ def search_route():
         return search_artist()
     elif type == 'album':
         return search_album()
+    elif type == 'track':
+        return search_track()
     else:
         error = jsonify(error='Type not provided') if type is None else jsonify(
             error='Unsupported search type {}'.format(type))
