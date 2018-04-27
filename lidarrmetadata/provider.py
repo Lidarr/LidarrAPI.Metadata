@@ -631,7 +631,7 @@ class MusicbrainzDbProvider(Provider,
                 if limit:
                     query += cursor.mogrify(' LIMIT %s', [limit])
 
-        results = self.map_query(query, [name + '%', name])
+        results = self.map_query(query, [name, name, name])
 
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
@@ -657,7 +657,7 @@ class MusicbrainzDbProvider(Provider,
                     new_parts = []
                     for part in query_parts:
                         if part.startswith('WHERE'):
-                            part += cursor.mogrify(' UPPER(artist.name) LIKE UPPER(%s) AND ', [artist_name])
+                            part += cursor.mogrify(' to_tsvector(\'mb_simple\', artist.name) @@ plainto_tsquery(\'mb_simple\', %s) AND ', [artist_name])
 
                         new_parts.append(part)
                     query_parts = new_parts or query_parts
@@ -667,7 +667,7 @@ class MusicbrainzDbProvider(Provider,
                 if limit:
                     query += cursor.mogrify(' LIMIT %s', [limit])
 
-        results = self.map_query(query, [name + '%', name])
+        results = self.map_query(query, [name, name, name])
 
         return [{'Id': result['gid'],
                  'Disambiguation': result['comment'],
@@ -806,9 +806,9 @@ class MusicbrainzDbProvider(Provider,
                     if part.startswith('WHERE'):
                         # This makes no sense, but extra queries are added after WHERE instead of at end of line
                         if artist_name:
-                            part += cursor.mogrify(' UPPER(artist.name) LIKE UPPER(%s) AND ', [artist_name])
+                            part += cursor.mogrify(' to_tsvector(\'mb_simple\', artist.name) @@ plainto_tsquery(\'mb_simple\', %s) AND ', [artist_name])
                         if album_name:
-                            part += cursor.mogrify(' UPPER(release_group.name) LIKE UPPER(%s) AND ', [album_name])
+                            part += cursor.mogrify(' to_tsvector(\'mb_simple\', release_group.name) @@ plainto_tsquery(\'mb_simple\', %s)) AND ', [album_name])
                             print(part)
                     new_query.append(part)
 
@@ -819,7 +819,7 @@ class MusicbrainzDbProvider(Provider,
             if limit:
                 sql_query += cursor.mogrify(' LIMIT %s', [limit])
 
-        results = self.map_query(sql_query, [query + '%', query])
+        results = self.map_query(sql_query, [query , query])
         print(results)
 
         return [{'TrackName': result['track_name'],
