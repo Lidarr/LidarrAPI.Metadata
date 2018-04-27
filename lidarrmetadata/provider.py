@@ -707,7 +707,8 @@ class MusicbrainzDbProvider(Provider,
             'Label': release['label'],
             'Artist': {'Id': release_groups[0]['artist_id'], 'Name': release_groups[0]['artist_name']},
             'SelectedRelease': rid,
-            'Rating': {'Count': release_groups[0]['rating_count'], 'Value': (release_groups[0]['rating'] or 0) / 10 or None}
+            'Rating': {'Count': release_groups[0]['rating_count'],
+                       'Value': (release_groups[0]['rating'] or 0) / 10 or None}
         }
 
         releases = [{'Id': release_group['release_id'],
@@ -819,14 +820,18 @@ class MusicbrainzDbProvider(Provider,
             if limit:
                 sql_query += cursor.mogrify(' LIMIT %s', [limit])
 
-        results = self.map_query(sql_query, [query , query])
+        results = self.map_query(sql_query, [query , query, query])
         print(results)
 
         return [{'TrackName': result['track_name'],
                  'ArtistName': result['artist_name'],
                  'ArtistId': result['artist_gid'],
                  'AlbumTitle': result['rg_title'],
-                 'AlbumId': result['rg_gid']}
+                 'AlbumId': result['rg_gid'],
+                 'Rating': {
+                     'Count': result['rating_count'],
+                     'Value': (result['rating'] / 10 or 0) or None
+                 }}
                 for result in results]
 
     def query_from_file(self, sql_file, *args, **kwargs):
