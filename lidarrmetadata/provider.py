@@ -830,7 +830,7 @@ class MusicbrainzDbProvider(Provider,
                  'AlbumId': result['rg_gid'],
                  'Rating': {
                      'Count': result['rating_count'],
-                     'Value': (result['rating'] / 10 or 0) or None
+                     'Value': (result['rating'] or 0) / 10 or None
                  }}
                 for result in results]
 
