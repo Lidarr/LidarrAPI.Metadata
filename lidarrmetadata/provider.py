@@ -657,7 +657,9 @@ class MusicbrainzDbProvider(Provider,
                     new_parts = []
                     for part in query_parts:
                         if part.startswith('WHERE'):
-                            part += cursor.mogrify(' to_tsvector(\'mb_simple\', artist.name) @@ plainto_tsquery(\'mb_simple\', %s) AND ', [artist_name])
+                            part += cursor.mogrify(
+                                ' to_tsvector(\'mb_simple\', artist.name) @@ plainto_tsquery(\'mb_simple\', %s) AND ',
+                                [artist_name])
 
                         new_parts.append(part)
                     query_parts = new_parts or query_parts
@@ -807,10 +809,13 @@ class MusicbrainzDbProvider(Provider,
                     if part.startswith('WHERE'):
                         # This makes no sense, but extra queries are added after WHERE instead of at end of line
                         if artist_name:
-                            part += cursor.mogrify(' to_tsvector(\'mb_simple\', artist.name) @@ plainto_tsquery(\'mb_simple\', %s) AND ', [artist_name])
+                            part += cursor.mogrify(
+                                ' to_tsvector(\'mb_simple\', artist.name) @@ plainto_tsquery(\'mb_simple\', %s) AND ',
+                                [artist_name])
                         if album_name:
-                            part += cursor.mogrify(' to_tsvector(\'mb_simple\', release_group.name) @@ plainto_tsquery(\'mb_simple\', %s)) AND ', [album_name])
-                            print(part)
+                            part += cursor.mogrify(
+                                ' to_tsvector(\'mb_simple\', release_group.name) @@ plainto_tsquery(\'mb_simple\', %s)) AND ',
+                                [album_name])
                     new_query.append(part)
 
                 query_parts = new_query
@@ -821,7 +826,6 @@ class MusicbrainzDbProvider(Provider,
                 sql_query += cursor.mogrify(' LIMIT %s', [limit])
 
         results = self.map_query(sql_query, [query, query, query])
-        print(results)
 
         return [{'TrackName': result['track_name'],
                  'DurationMs': result['track_duration'],
