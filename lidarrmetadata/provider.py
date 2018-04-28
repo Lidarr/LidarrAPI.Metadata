@@ -820,10 +820,11 @@ class MusicbrainzDbProvider(Provider,
             if limit:
                 sql_query += cursor.mogrify(' LIMIT %s', [limit])
 
-        results = self.map_query(sql_query, [query , query, query])
+        results = self.map_query(sql_query, [query, query, query])
         print(results)
 
         return [{'TrackName': result['track_name'],
+                 'DurationMs': result['track_duration'],
                  'ArtistName': result['artist_name'],
                  'ArtistId': result['artist_gid'],
                  'AlbumTitle': result['rg_title'],
