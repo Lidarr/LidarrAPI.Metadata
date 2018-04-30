@@ -52,9 +52,6 @@ def validate_mbid(mbid):
     except ValueError:
         return jsonify(error='Invalid UUID'), 400
 
-    if mbid in config.get_config().BLACKLISTED_ARTISTS:
-        return jsonify(error='Blacklisted artist'), 403
-
 
 @app.route('/')
 def default_route():
@@ -93,9 +90,9 @@ def get_artist_info(mbid):
     else:
         # 500 error if we don't have an artist provider since it's essential
         return jsonify(error='No artist provider available'), 500
-    if album_providers:
+    if album_providers and mbid not in config.get_config().BLACKLISTED_ARTISTS:
         artist['Albums'] = album_providers[0].get_albums_by_artist(mbid)
-    else:
+    elif not artist_art_providers:
         # 500 error if we don't have an album provider since it's essential
         return jsonify(error='No album provider available'), 500
 
