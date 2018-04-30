@@ -30,7 +30,7 @@ FROM release_group
   JOIN artist ON artist_credit_name.artist = artist.id
   JOIN release_group_primary_type ON release_group.type = release_group_primary_type.id
 
-WHERE UPPER(release_group.name) LIKE UPPER(%s)
+WHERE (to_tsvector('mb_simple', release_group.name) @@ plainto_tsquery('mb_simple', %s) OR release_group.name = %s)
 ORDER BY
-  CASE WHEN UPPER(release_group.name) = UPPER(%s) THEN 0 ELSE 1 END,
+  CASE WHEN to_tsvector('mb_simple', release_group.name) = to_tsvector('mb_simple', %s) THEN 0 ELSE 1 END,
   CASE WHEN (release_group_meta.rating_count * release_group_meta.rating) IS NULL THEN 0 ELSE (release_group_meta.rating_count * release_group_meta.rating) END DESC
