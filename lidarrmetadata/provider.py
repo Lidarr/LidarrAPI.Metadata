@@ -126,7 +126,7 @@ class TracksByAlbumMixin(MixinBase):
     """
 
     @abc.abstractmethod
-    def get_album_tracks(self, album_id):
+    def get_album_recordings(self, album_id):
         """
         Gets tracks in album
         :param album_id: ID of album
@@ -399,7 +399,7 @@ class MusicbrainzApiProvider(Provider,
     def get_artist_links(self, artist_id):
         return self.get_artist_by_id(artist_id)['Links']
 
-    def get_album_tracks(self, album_id):
+    def get_album_recordings(self, album_id):
         return self.search_album('', rgid=album_id)[0]['Tracks']
 
     def get_albums_by_artist(self, artist_id):
@@ -759,17 +759,21 @@ class MusicbrainzDbProvider(Provider,
                  'Position': result['medium_position']}
                 for result in results]
 
-    def get_album_tracks(self, album_id):
-        results = self.query_from_file('track_album_mbid.sql',
+    def get_album_recordings(self, album_id):
+        results = self.query_from_file('recordings_album_mbid.sql',
                                        [album_id])
 
-        return [{'Id': result['gid'],
-                 'TrackName': result['name'],
-                 'DurationMs': result['length'],
-                 'MediumNumber': result['medium_position'],
-                 'TrackNumber': result['number'],
-                 'TrackPosition': result['position']}
-                for result in results]
+        return [{
+            'Id': result['recording_id'],
+            'Name': result['name'],
+            'DurationMs': result['length'],
+            'Releases': [{
+                'ReleaseId': release['release_id'],
+                'MediumNumber': release['medium_position'],
+                'TrackNumber': release['track_number'],
+                'TrackPosition': release['track_position']
+            } for release in result['releases']]
+        } for result in results]
 
     def get_albums_by_artist(self, artist_id):
         results = self.query_from_file('album_search_artist_mbid.sql',
