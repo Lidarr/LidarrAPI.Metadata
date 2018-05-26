@@ -11,9 +11,9 @@ from lidarrmetadata import provider
 from lidarrmetadata import util
 
 
-def _parse_apple_music_results(URL, count):
+def _parse_itunes_chart(URL, count):
     response = requests.get(URL)
-    results = filter(lambda r: r.get('kind', None) == 'album', response.json()['feed']['results'])
+    results = filter(lambda r: r.get('kind', '') == 'album', response.json()['feed']['results'])
     search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
     search_results = []
     for result in results:
@@ -36,14 +36,14 @@ def get_apple_music_top_albums_chart(count=10):
     """
     URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/top-albums/all/{count}/explicit.json'.format(
         count=4 * count)
-    return _parse_apple_music_results(URL, count)
+    return _parse_itunes_chart(URL, count)
 
 
 @util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
 def get_apple_music_new_albums_chart(count=10):
     URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/new-releases/all/{count}/explicit.json'.format(
         count=4 * count)
-    return _parse_apple_music_results(URL, count)
+    return _parse_itunes_chart(URL, count)
 
 
 def get_billboard_200_albums_chart(count=10):
@@ -88,22 +88,6 @@ def get_billboard_100_artists_chart(count=10):
         if len(search_results) == count:
             break
 
-    return search_results
-
-
-def _parse_itunes_chart(URL, count):
-    response = requests.get(URL)
-    results = filter(lambda r: r.get('kind', '') == 'album', response.json()['feed']['results'])
-    search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
-    search_results = []
-    for result in results:
-        search_result = search_provider.search_album_name(result['name'], artist_name=result['artistName'], limit=1)
-        if search_result:
-            search_result = search_result[0]
-            search_results.append(_parse_album_search_result(search_result))
-
-            if len(search_results) == count:
-                break
     return search_results
 
 
