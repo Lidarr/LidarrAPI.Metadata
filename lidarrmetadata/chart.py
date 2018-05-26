@@ -11,20 +11,10 @@ from lidarrmetadata import provider
 from lidarrmetadata import util
 
 
-@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
-def get_apple_music_chart(count=10):
-    """
-    Gets and parses itunes chart
-    :param count: Number of results to return. Defaults to 10
-    :return: Chart response for itunes
-    """
-    URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/top-albums/all/{count}/explicit.json'.format(
-        count=4 * count)
+def _parse_apple_music_results(URL, count):
     response = requests.get(URL)
-    results = response.json()['feed']['results']
-
+    results = filter(lambda r: r.get('kind', None) == 'album', response.json()['feed']['results'])
     search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
-
     search_results = []
     for result in results:
         search_result = search_provider.search_album_name(result['name'], artist_name=result['artistName'], limit=1)
@@ -34,8 +24,26 @@ def get_apple_music_chart(count=10):
 
             if len(search_results) == count:
                 break
-
     return search_results
+
+
+@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
+def get_apple_music_top_albums_chart(count=10):
+    """
+    Gets and parses itunes chart
+    :param count: Number of results to return. Defaults to 10
+    :return: Chart response for itunes
+    """
+    URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/top-albums/all/{count}/explicit.json'.format(
+        count=4 * count)
+    return _parse_apple_music_results(URL, count)
+
+
+@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
+def get_apple_music_new_albums_chart(count=10):
+    URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/new-releases/all/{count}/explicit.json'.format(
+        count=4 * count)
+    return _parse_apple_music_results(URL, count)
 
 
 def get_billboard_200_albums_chart(count=10):

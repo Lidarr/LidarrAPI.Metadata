@@ -200,7 +200,8 @@ def chart_route(name, type_, selection):
 
     # Function to get each chart. Use lower case for keys
     charts = {
-        ('apple-music', 'album', 'top'): chart.get_apple_music_chart,
+        ('apple-music', 'album', 'top'): chart.get_apple_music_top_albums_chart,
+        ('apple-music', 'album', 'new'): chart.get_apple_music_new_albums_chart,
         ('billboard', 'album', 'top'): chart.get_billboard_200_albums_chart,
         ('billboard', 'artist', 'top'): chart.get_billboard_100_artists_chart,
         ('itunes', 'album', 'top'): chart.get_itunes_top_albums_chart,
