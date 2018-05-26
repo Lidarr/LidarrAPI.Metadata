@@ -317,6 +317,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Connection info for sentry
     SENTRY_DSN = ('https://c94975eddcf84d91901ebc1fdba99327:'
                   '605f0689da43434bae633d07c0357c46@sentry.io/215082')
+    SENTRY_ENABLE = True
 
     # Testing mode
     TESTING = False
@@ -324,6 +325,8 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
 class TestConfig(DefaultConfig):
     CACHE_CONFIG = {'CACHE_TYPE': 'null'}
+    SENTRY_ENABLE = False
+    Testing = True
 
 
 __config = None
