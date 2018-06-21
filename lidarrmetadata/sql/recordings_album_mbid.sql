@@ -2,7 +2,7 @@ SELECT
   recording.gid AS recording_id,
   recording.name,
   recording.length,
-  json_agg(json_build_object('release_id', release.id,
+  json_agg(json_build_object('release_id', release.gid,
                              'track_number', track.number,
                              'track_position', track.position,
                              'medium_position', medium.position)) AS releases
