@@ -118,21 +118,22 @@ def get_artist_info(mbid):
 
     # Filter album types and statuses
     # TODO Should types be part of album query?
-    primary_types = request.args.get('primTypes', None)
-    if primary_types:
-        primary_types = primary_types.split('|')
-        artist['Albums'] = filter(lambda album: album.get('Type') in primary_types, artist['Albums'])
-    secondary_types = request.args.get('secTypes', None)
-    if secondary_types:
-        secondary_types = set(secondary_types.split('|'))
-        artist['Albums'] = filter(lambda album: (album['SecondaryTypes'] == [] and 'Studio' in secondary_types)
-                                                or secondary_types.intersection(album.get('SecondaryTypes')),
-                                  artist['Albums'])
-    release_statuses = request.args.get('releaseStatuses', None)
-    if release_statuses:
-        release_statuses = set(release_statuses.split('|'))
-        artist['Albums'] = filter(lambda album: release_statuses.intersection(album.get('ReleaseStatuses')),
-                                  artist['Albums'])
+    if 'Albums' in artist:
+        primary_types = request.args.get('primTypes', None)
+        if primary_types:
+            primary_types = primary_types.split('|')
+            artist['Albums'] = filter(lambda album: album.get('Type') in primary_types, artist['Albums'])
+        secondary_types = request.args.get('secTypes', None)
+        if secondary_types:
+            secondary_types = set(secondary_types.split('|'))
+            artist['Albums'] = filter(lambda album: (album['SecondaryTypes'] == [] and 'Studio' in secondary_types)
+                                                    or secondary_types.intersection(album.get('SecondaryTypes')),
+                                      artist['Albums'])
+        release_statuses = request.args.get('releaseStatuses', None)
+        if release_statuses:
+            release_statuses = set(release_statuses.split('|'))
+            artist['Albums'] = filter(lambda album: release_statuses.intersection(album.get('ReleaseStatuses')),
+                                      artist['Albums'])
 
     return jsonify(artist)
 
@@ -376,6 +377,7 @@ def search_track():
     tracks = search_providers[0].search_track(query, artist_name, album_name, limit)
 
     return jsonify(tracks)
+
 
 @app.route('/search')
 def search_route():
