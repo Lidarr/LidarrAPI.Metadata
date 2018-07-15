@@ -11,6 +11,9 @@ services:
     ports:
       - 3003:5001
       
+    networks:
+      - lidarrmetadata
+      
     environment:
       - APPLICATION_ROOT=/api/v0.3
       - FANART_KEY
@@ -28,6 +31,9 @@ services:
       
     ports:
       - 3001:5001
+      
+    networks:
+      - lidarrmetadata
       
     environment:
       - APPLICATION_ROOT=/api/testing
