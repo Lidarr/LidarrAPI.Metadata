@@ -1,19 +1,56 @@
 version: '2'
 services:
-  metadata:
-    build: .
-    restart: unless-stopped
-
-
+  metadata-v03:
+    image: lidarr/lidarrapi.metadata:develop
+    restart: always
+    
     depends_on:
       - redis
       - musicbrainz
-
-    networks:
-      - lidarrmetadata
-
+      
     ports:
-      - 5001:5001
+      - 3003:5001
+      
+    environment:
+      - APPLICATION_ROOT=/api/v0.3
+      - FANART_KEY
+      - LASTFM_KEY
+      - LASTFM_SECRET
+      - PROVIDERS__FANARTTVPROVIDER__0__0=$FANART_KEY
+      
+  metadata-latest:
+    image: lidarr/lidarrapi.metadata:latest
+    restart: always
+    
+    depends_on:
+      - redis
+      - musicbrainz
+      
+    ports:
+      - 3001:5001
+      
+    environment:
+      - APPLICATION_ROOT=/api/testing
+      - CACHE_CONFIG__CACHE_TYPE=null
+      - FANART_KEY
+      - LASTFM_KEY
+      - LASTFM_SECRET
+      - PROVIDERS__FANARTTVPROVIDER__0__0=$FANART_KEY
+
+#  metadata-build:
+#    build: .
+#    restart: unless-stopped
+#
+#
+#    depends_on:
+#      - redis
+#      - musicbrainz
+#
+#    networks:
+#      - lidarrmetadata
+#
+#    ports:
+#      - 5001:5001
 
   redis:
     image: redis
