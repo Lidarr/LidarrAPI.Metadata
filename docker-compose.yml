@@ -79,10 +79,10 @@ services:
       - lidarrmetadata
 
     environment:
-      - BRAINZCODE=
+      - BRAINZCODE
       - NPROC=3
-      - PUID=
-      - PGID=
+      - PUID
+      - PGID
 
     volumes:
       - /opt/musicbrainz/config:/config
