@@ -38,6 +38,7 @@ setup(
         'flasgger',
         'flask',
         'flask-caching',
+        'pypandoc',
         'mediawikiapi>=1.1.2',
         'musicbrainzngs',
         'psycopg2-binary',
@@ -52,7 +53,7 @@ setup(
     dependency_links = ['https://github.com/danielunderwood/MediaWikiAPI/archive/fix/link-list-access.zip#egg=mediawikiapi-1.1.2'],
 
     extras_require={
-        'test': ['pypandoc', 'pytest', 'tox']
+        'test': ['pytest', 'tox']
     },
 
     package_data={
