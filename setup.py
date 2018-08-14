@@ -38,7 +38,6 @@ setup(
         'flasgger',
         'flask',
         'flask-caching',
-        'pypandoc',
         'mediawikiapi>=1.1.2',
         'musicbrainzngs',
         'psycopg2-binary',
