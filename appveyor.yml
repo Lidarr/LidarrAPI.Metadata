@@ -3,7 +3,7 @@ build: false  # Not a C# project
 matrix:
   fast_finish: true
 
-before:
+before_install:
   - cinst pandoc
 
 install:
