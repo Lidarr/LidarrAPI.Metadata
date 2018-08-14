@@ -3,10 +3,8 @@ build: false  # Not a C# project
 matrix:
   fast_finish: true
 
-before_install:
-  - cinst pandoc
-
 install:
+  - cinst pandoc
   - C:\Python36\python -m pip install --pre -U pypandoc tox
 
 test_script:
