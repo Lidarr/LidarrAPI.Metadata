@@ -267,7 +267,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     in dictionary config variables should be capitalized.
     """
 
-    APPLICATION_ROOT = None
+    APPLICATION_ROOT = '/'
 
     BLACKLISTED_ARTISTS = [
         'f731ccc4-e22a-43af-a747-64213329e088',  # [anonymous]
