@@ -1,6 +1,6 @@
 import uuid
 
-from flask import Flask, request, jsonify
+from flask import Flask, abort, make_response, request, jsonify
 import raven.contrib.flask
 from werkzeug.exceptions import HTTPException
 
@@ -29,9 +29,22 @@ if not app.config['PRODUCTION']:
 # Set up providers
 for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
     provider_key = list(filter(lambda k: k.upper() == provider_name,
-                          provider.PROVIDER_CLASSES.keys()))[0]
+                               provider.PROVIDER_CLASSES.keys()))[0]
     lower_kwargs = {k.lower(): v for k, v in kwargs.items()}
     provider.PROVIDER_CLASSES[provider_key](*args, **lower_kwargs)
+
+
+def get_search_query():
+    """
+    Search for a track
+    """
+    query = request.args.get('query')
+    if not query:
+        abort(make_response(jsonify(error='No query provided'), 400))
+
+    query = query.strip().strip('\x00')
+    return query
+
 
 @app.errorhandler(404)
 @app.errorhandler(500)
@@ -239,10 +252,7 @@ def search_album():
                 "title": "Dark Side of the Moon"
               }
     """
-    query = request.args.get('query')
-    if not query:
-        return jsonify(error="No query provided"), 400
-    query = query.strip()
+    query = get_search_query()
 
     artist_name = request.args.get('artist', '')
 
@@ -298,10 +308,7 @@ def search_artist():
                                     from Ukiah, CA that formed in 1991."
                 }
     """
-    query = request.args.get('query')
-    if not query:
-        return jsonify(error='No query provided'), 400
-    query = query.strip()
+    query = get_search_query()
 
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
@@ -356,13 +363,7 @@ def search_artist():
 @app.route('/search/track')
 @util.CACHE.cached(key_prefix=lambda: request.url)
 def search_track():
-    """
-    Search for a track
-    """
-    query = request.args.get('query')
-    if not query:
-        return jsonify(error='No query provided'), 400
-    query = query.strip()
+    query = get_search_query()
 
     artist_name = request.args.get('artist', None)
     album_name = request.args.get('album', None)
@@ -379,6 +380,7 @@ def search_track():
     tracks = search_providers[0].search_track(query, artist_name, album_name, limit)
 
     return jsonify(tracks)
+
 
 @app.route('/search')
 def search_route():
