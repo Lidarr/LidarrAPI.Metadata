@@ -956,9 +956,6 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         except mediawikiapi.PageError as error:
             logger.error('Wikipedia PageError from {url}: {e}'.format(e=error.message, url=url))
             return ''
-        except mediawikiapi.DisambiguationError as error:
-            logger.error('Wikipedia DisambiguationError from {url}: {e}'.format(e=error.message, url=url))
-            return ''
         except ValueError as error:
             logger.error('Page parse error: {e}'.format(e=error))
             return ''

@@ -1,4 +1,4 @@
-FROM python:2
+FROM python:2-alpine
 
 ARG UID=1000
 
@@ -7,9 +7,13 @@ COPY . /metadata
 
 EXPOSE 5000
 
-RUN pip install --process-dependency-links .
+RUN apk update && \
+ apk add postgresql-libs && \
+ apk add --virtual .build-deps gcc musl-dev postgresql-dev && \
+ pip install --no-cache-dir --process-dependency-links . && \
+ apk --purge del .build-deps
 
-RUN useradd -u $UID metadata
+RUN adduser --system -u $UID metadata
 
 USER metadata
 

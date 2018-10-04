@@ -4,7 +4,8 @@ matrix:
   fast_finish: true
 
 install:
-  - C:\Python36\python -m pip install --pre -U tox
+  - cinst pandoc
+  - C:\Python36\python -m pip install --pre -U pypandoc tox
 
 test_script:
   - C:\Python36\scripts\tox
