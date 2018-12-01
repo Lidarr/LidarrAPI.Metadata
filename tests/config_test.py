@@ -58,14 +58,14 @@ def test_set_nested(iterable, indices, value, expected):
     ('No escape', 'a:b', ':', ['a', 'b']),
     ('No escape multiple chars', 'ab:cd', ':', ['ab', 'cd']),
     ('Multiple no escape', 'a:b:c', ':', ['a', 'b', 'c']),
-    ('Single escape', 'a\:b', ':', ['a:b']),
-    ('Single escape multiple chars', 'ab\:cd', ':', ['ab:cd']),
-    ('Multiple escape', 'a\:b\:c', ':', ['a:b:c']),
-    ('Mixed escaped', 'a\\:b:c', ':', ['a:b', 'c']),
+    ('Single escape', r'a\:b', ':', ['a:b']),
+    ('Single escape multiple chars', r'ab\:cd', ':', ['ab:cd']),
+    ('Multiple escape', r'a\:b\:c', ':', ['a:b:c']),
+    ('Mixed escaped', r'a\:b:c', ':', ['a:b', 'c']),
     ('Beginning no escape', ':a', ':', ['a']),
-    ('Beginning escape', '\:a', ':', [':a']),
+    ('Beginning escape', r'\:a', ':', [':a']),
     ('Ending no escape', 'a:', ':', ['a']),
-    ('Ending escape', 'a\:', ':', ['a:'])
+    ('Ending escape', r'a\:', ':', ['a:'])
 ])
 def test_split_escaped(name, string, split_char, expected):
     result = lidarrmetadata.config.split_escaped(string, split_char=split_char)
