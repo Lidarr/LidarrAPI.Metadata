@@ -895,7 +895,8 @@ class MusicbrainzDbProvider(Provider,
                                       port=self._db_port,
                                       dbname=self._db_name,
                                       user=self._db_user,
-                                      password=self._db_password)
+                                      password=self._db_password,
+                                      connect_timeout=5)
         cursor = connection.cursor()
         yield cursor
         cursor.close()
