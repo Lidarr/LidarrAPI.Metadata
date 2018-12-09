@@ -8,10 +8,10 @@ import imp
 import logging
 import pkg_resources
 import re
+import six
+from urllib3.exceptions import HTTPError
 
 import dateutil.parser
-import six
-
 import mediawikiapi
 import psycopg2
 import pylast
@@ -957,6 +957,9 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             return ''
         except KeyError as error:
             logger.error('KeyError {e}'.format(e=error))
+            return ''
+        except HTTPError as error:
+            logger.error('HTTPError {e}'.format(e=error))
             return ''
 
     @classmethod
