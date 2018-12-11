@@ -54,6 +54,9 @@ def handle_error(e):
     # TODO Could re-queue these requests?
     if isinstance(e, OperationalError):
         return jsonify(error='Musicbrainz not ready'), 503
+    # TODO Bypass caching instead when caching reworked
+    elif isinstance(e, redis.ConnectionError):
+        return jsonify(error='Could not connect to redis'), 503
     elif isinstance(e, redis.BusyLoadingError):
         return jsonify(error='Redis not ready'), 503
     else:
