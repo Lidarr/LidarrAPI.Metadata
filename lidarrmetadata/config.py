@@ -326,13 +326,17 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     TELEGRAF_HOST = 'localhost'
     TELEGRAF_PORT = 8092
 
+    # Telegraf connection details
+    TELEGRAF_HOST = 'localhost'
+    TELEGRAF_PORT = 8092
+
     # Testing mode
     TESTING = False
 
 
 class TestConfig(DefaultConfig):
     CACHE_CONFIG = {'CACHE_TYPE': 'null'}
-    ENABLE_STATS =  False
+    ENABLE_STATS = False
     SENTRY_ENABLE = False
     TESTING = True
 

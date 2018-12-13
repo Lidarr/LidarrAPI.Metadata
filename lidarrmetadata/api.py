@@ -117,6 +117,49 @@ def after_request(response):
     return response
 
 
+@app.before_request
+def before_request():
+    request.start_time = time.time()
+
+
+@app.after_request
+def after_request(response):
+    end_time = time.time()
+    if app.config['ENABLE_STATS']:
+        # TODO Catch and async
+        # Parse the type of resource we have
+        resource_type = request.path.split('/')[1].lower()
+        data = json.loads(response.get_data())
+        print(data)
+        if resource_type == 'artist':
+            resource = u'Artist/{}/{}'.format(data.get(u'Id', None), data.get(u'ArtistName', None))
+        elif resource_type == 'album':
+            resource = u'Album/{}/{}'.format(data.get(u'Id', None), data.get(u'Title', None))
+        elif resource_type == 'chart':
+            resource = u'Chart/{}'.format(request.path)
+        else:
+            resource = u'Unknown/{}'.format(request.path)
+
+        request_time = 1000 * (end_time - request.start_time)
+
+        # User agent info
+        ua_match = UA_REGEX.match(request.user_agent.string)
+        if ua_match:
+            ua_version = ua_match.group('version')
+            ua_platform = ua_match.group('platform')
+        else:
+            ua_version = request.user_agent.version
+            ua_platform = request.user_agent.platform
+
+        telegraf_client.metric('api', {'response_time': request_time},
+                               tags={'path': request.path,
+                                     'platform': ua_platform,
+                                     'version': ua_version,
+                                     'resource': resource})
+
+    return response
+
+
 def validate_mbid(mbid):
     """
     Validates Musicbrainz ID and returns flask response in case of error
