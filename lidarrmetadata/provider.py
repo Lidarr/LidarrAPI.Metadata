@@ -8,10 +8,10 @@ import imp
 import logging
 import pkg_resources
 import re
+import six
+from urllib3.exceptions import HTTPError
 
 import dateutil.parser
-import six
-
 import mediawikiapi
 import psycopg2
 import pylast
@@ -277,6 +277,11 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
 
         if not results:
             results = self.get_by_mbid(artist_id)
+
+            # TODO Improve this during refactor to models
+            if results is None:
+                return self.parse_artist_images({})
+
             self.cache.put(artist_id, results)
             for id, album_result in results.get('albums', {}).items():
                 self.cache.put(id, album_result)
@@ -288,6 +293,11 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
 
         if not results and not cache_only:
             results = self.get_by_mbid(album_id)
+
+            # TODO Improve this during refactor to models
+            if results is None:
+                return self.parse_album_images({})
+
             results = results.get('albums', results).get(album_id, results)
             self.cache.put(album_id, results)
 
@@ -301,7 +311,11 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         :return: fanart.tv response for mbid
         """
         url = self.build_url(mbid)
-        return requests.get(url).json()
+        try:
+            return requests.get(url).json()
+        except HTTPError as error:
+            logger.error('HTTPError: {e}'.format(e=error))
+            return None
 
     def build_url(self, mbid):
         """
@@ -881,7 +895,8 @@ class MusicbrainzDbProvider(Provider,
                                       port=self._db_port,
                                       dbname=self._db_name,
                                       user=self._db_user,
-                                      password=self._db_password)
+                                      password=self._db_password,
+                                      connect_timeout=5)
         cursor = connection.cursor()
         yield cursor
         cursor.close()
@@ -957,6 +972,9 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             return ''
         except KeyError as error:
             logger.error('KeyError {e}'.format(e=error))
+            return ''
+        except HTTPError as error:
+            logger.error('HTTPError {e}'.format(e=error))
             return ''
 
     @classmethod

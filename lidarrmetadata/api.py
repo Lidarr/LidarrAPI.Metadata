@@ -1,7 +1,9 @@
 import uuid
 
 from flask import Flask, abort, make_response, request, jsonify
+from psycopg2 import OperationalError
 import raven.contrib.flask
+import redis
 from werkzeug.exceptions import HTTPException
 
 import lidarrmetadata
@@ -49,10 +51,17 @@ def get_search_query():
 @app.errorhandler(404)
 @app.errorhandler(500)
 def handle_error(e):
-    code = 500
-    if isinstance(e, HTTPException):
-        code = e.code
-    return jsonify(error=str(e)), code
+    # TODO Could re-queue these requests?
+    if isinstance(e, OperationalError):
+        return jsonify(error='Musicbrainz not ready'), 503
+    # TODO Bypass caching instead when caching reworked
+    elif isinstance(e, redis.ConnectionError):
+        return jsonify(error='Could not connect to redis'), 503
+    elif isinstance(e, redis.BusyLoadingError):
+        return jsonify(error='Redis not ready'), 503
+    else:
+        sentry.captureException(e)
+        return jsonify(error='Internal server error'), 500
 
 
 def validate_mbid(mbid):
