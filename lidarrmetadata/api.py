@@ -49,6 +49,10 @@ def get_search_query():
 
 
 @app.errorhandler(404)
+def page_not_found_error(e):
+    return jsonify(error=e), 404
+
+
 @app.errorhandler(500)
 def handle_error(e):
     # TODO Could re-queue these requests?
