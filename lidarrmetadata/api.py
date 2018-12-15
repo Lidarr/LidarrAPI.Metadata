@@ -96,7 +96,6 @@ def default_route():
 @app.route('/artist/<mbid>', methods=['GET'])
 @util.CACHE.cached(key_prefix=lambda: request.url)
 def get_artist_info_route(mbid):
-
     output = get_artist_info(mbid,
                              True,
                              request.args.get('primTypes', None),
@@ -108,8 +107,8 @@ def get_artist_info_route(mbid):
 
     return output
 
+
 def get_artist_info(mbid, include_albums, primary_types, secondary_types, release_statuses):
-    
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
         return uuid_validation_response
@@ -213,11 +212,10 @@ def get_release_group_info(mbid):
 
     if release_providers:
         release_group['Releases'] = release_providers[0].get_releases_by_rgid(mbid)
-        
+
     else:
         # 500 error if we don't have a release provider since it's essential
         return jsonify(error='No release provider available'), 500
-
 
     if track_providers:
         tracks = track_providers[0].get_release_group_tracks(mbid)
@@ -225,7 +223,8 @@ def get_release_group_info(mbid):
             release['Tracks'] = [t for t in tracks if t['ReleaseId'] == release['Id']]
 
         artist_ids = track_providers[0].get_release_group_artist_ids(mbid)
-        artists = [get_artist_info(id, False, None, None, None) for id in artist_ids];
+        artists = [get_artist_info(id, False, None, None, None)
+                   for id in artist_ids if id not in app.config['BLACKLISTED_ARTISTS']]
         release_group['Artists'] = artists
     else:
         # 500 error if we don't have a track provider since it's essential
@@ -251,7 +250,6 @@ def get_release_group_info(mbid):
 
     if 'Overview' not in release_group:
         release_group['Overview'] = ''
-
 
     if album_art_providers:
         release_group['Images'] = album_art_providers[0].get_album_images(
