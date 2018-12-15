@@ -95,7 +95,21 @@ def default_route():
 
 @app.route('/artist/<mbid>', methods=['GET'])
 @util.CACHE.cached(key_prefix=lambda: request.url)
-def get_artist_info(mbid):
+def get_artist_info_route(mbid):
+
+    output = get_artist_info(mbid,
+                             True,
+                             request.args.get('primTypes', None),
+                             request.args.get('secTypes', None),
+                             request.args.get('releaseStatuses', None))
+
+    if isinstance(output, dict):
+        output = jsonify(output)
+
+    return output
+
+def get_artist_info(mbid, include_albums, primary_types, secondary_types, release_statuses):
+    
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
         return uuid_validation_response
@@ -109,8 +123,6 @@ def get_artist_info(mbid):
         provider.ArtistOverviewMixin)
     artist_art_providers = provider.get_providers_implementing(
         provider.ArtistArtworkMixin)
-    album_providers = provider.get_providers_implementing(
-        provider.AlbumByArtistMixin)
 
     # TODO Figure out preferred providers
     if artist_providers:
@@ -120,20 +132,22 @@ def get_artist_info(mbid):
     else:
         # 500 error if we don't have an artist provider since it's essential
         return jsonify(error='No artist provider available'), 500
-    if album_providers:
-        artist['Albums'] = album_providers[0].get_albums_by_artist(mbid)
-    else:
-        # 500 error if we don't have an album provider since it's essential
-        return jsonify(error='No album provider available'), 500
 
     if link_providers and not artist.get('Links', None):
         artist['Links'] = link_providers[0].get_artist_links(mbid)
 
     if overview_providers:
+        wikidata_links = filter(
+            lambda link: 'wikidata' in link.get('target', ''),
+            artist['Links'])
         wikipedia_links = filter(
             lambda link: 'wikipedia' in link.get('target', ''),
             artist['Links'])
-        if wikipedia_links:
+
+        if wikidata_links:
+            artist['Overview'] = overview_providers[0].get_artist_overview(
+                wikidata_links[0]['target'])
+        elif wikipedia_links:
             artist['Overview'] = overview_providers[0].get_artist_overview(
                 wikipedia_links[0]['target'])
 
@@ -145,67 +159,107 @@ def get_artist_info(mbid):
     else:
         artist['Images'] = []
 
-    # Filter album types and statuses
-    # TODO Should types be part of album query?
-    primary_types = request.args.get('primTypes', None)
-    if primary_types:
-        primary_types = primary_types.split('|')
-        artist['Albums'] = filter(lambda album: album.get('Type') in primary_types, artist['Albums'])
-    secondary_types = request.args.get('secTypes', None)
-    if secondary_types:
-        secondary_types = set(secondary_types.split('|'))
-        artist['Albums'] = filter(lambda album: (album['SecondaryTypes'] == [] and 'Studio' in secondary_types)
-                                                or secondary_types.intersection(album.get('SecondaryTypes')),
-                                  artist['Albums'])
-    release_statuses = request.args.get('releaseStatuses', None)
-    if release_statuses:
-        release_statuses = set(release_statuses.split('|'))
-        artist['Albums'] = filter(lambda album: release_statuses.intersection(album.get('ReleaseStatuses')),
-                                  artist['Albums'])
+    if include_albums:
+        release_group_providers = provider.get_providers_implementing(
+            provider.ReleaseGroupByArtistMixin)
+        if release_group_providers:
+            artist['Albums'] = release_group_providers[0].get_release_groups_by_artist(mbid)
+        else:
+            # 500 error if we don't have a release group provider since it's essential
+            return jsonify(error='No release group provider available'), 500
+        
+        # Filter release group types 
+        # TODO Should types be part of album query?
+        if primary_types:
+            primary_types = primary_types.split('|')
+            artist['Albums'] = filter(lambda release_group: release_group.get('Type') in primary_types, artist['Albums'])
+        if secondary_types:
+            secondary_types = set(secondary_types.split('|'))
+            artist['Albums'] = filter(lambda release_group: (release_group['SecondaryTypes'] == [] and 'Studio' in secondary_types)
+                                             or secondary_types.intersection(release_group.get('SecondaryTypes')),
+                                             artist['Albums'])
+        if release_statuses:
+            release_statuses = set(release_statuses.split('|'))
+            artist['Albums'] = filter(lambda album: release_statuses.intersection(album.get('ReleaseStatuses')),
+                                         artist['Albums'])
 
-    return jsonify(artist)
+    return artist
 
 
 @app.route('/album/<mbid>', methods=['GET'])
 @util.CACHE.cached(key_prefix=lambda: request.url)
-def get_album_info(mbid):
+def get_release_group_info(mbid):
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
         return uuid_validation_response
 
-    # Determine which release we want
-    release = request.args.get('release', None)
-
-    album_providers = provider.get_providers_implementing(provider.AlbumByIdMixin)
+    release_group_providers = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)
+    release_providers = provider.get_providers_implementing(provider.ReleasesByReleaseGroupIdMixin)
     album_art_providers = provider.get_providers_implementing(
         provider.AlbumArtworkMixin)
-    media_providers = provider.get_providers_implementing(provider.MediaByAlbumMixin)
-    track_providers = provider.get_providers_implementing(
-        provider.TracksByAlbumMixin)
+    artist_art_providers = provider.get_providers_implementing(
+        provider.ArtistArtworkMixin)
+    track_providers = provider.get_providers_implementing(provider.TracksByReleaseGroupMixin)
+    link_providers = provider.get_providers_implementing(provider.ReleaseGroupLinkMixin)
+    overview_providers = provider.get_providers_implementing(provider.ArtistOverviewMixin)
 
-    if album_providers:
-        album = album_providers[0].get_album_by_id(mbid, release)
+    if release_group_providers:
+        release_group = release_group_providers[0].get_release_group_by_id(mbid)
     else:
         return jsonify(error='No album provider available'), 500
 
-    if not album:
+    if not release_group:
         return jsonify(error='Album not found'), 404
 
+    if release_providers:
+        release_group['Releases'] = release_providers[0].get_releases_by_rgid(mbid)
+        
+    else:
+        # 500 error if we don't have a release provider since it's essential
+        return jsonify(error='No release provider available'), 500
+
+
     if track_providers:
-        if 'Releases' in album and album['Releases'][0]:
-            album['Media'] = media_providers[0].get_album_media(album['SelectedRelease'])
-            album['Tracks'] = track_providers[0].get_album_tracks(album['SelectedRelease'])
+        tracks = track_providers[0].get_release_group_tracks(mbid)
+        for release in release_group['Releases']:
+            release['Tracks'] = [t for t in tracks if t['ReleaseId'] == release['Id']]
+
+        artist_ids = track_providers[0].get_release_group_artist_ids(mbid)
+        artists = [get_artist_info(id, False, None, None, None) for id in artist_ids];
+        release_group['Artists'] = artists
     else:
         # 500 error if we don't have a track provider since it's essential
         return jsonify(error='No track provider available'), 500
 
-    if album_art_providers:
-        album['Images'] = album_art_providers[0].get_album_images(
-            album['Id'], cache_only=True)
-    else:
-        album['Images'] = []
+    if link_providers and not release_group.get('Links', None):
+        release_group['Links'] = link_providers[0].get_release_group_links(mbid)
 
-    return jsonify(album)
+    if overview_providers:
+        wikidata_links = filter(
+            lambda link: 'wikidata' in link.get('target', ''),
+            release_group['Links'])
+        wikipedia_links = filter(
+            lambda link: 'wikipedia' in link.get('target', ''),
+            release_group['Links'])
+
+        if wikidata_links:
+            release_group['Overview'] = overview_providers[0].get_artist_overview(
+                wikidata_links[0]['target'])
+        elif wikipedia_links:
+            release_group['Overview'] = overview_providers[0].get_artist_overview(
+                wikipedia_links[0]['target'])
+
+    if 'Overview' not in release_group:
+        release_group['Overview'] = ''
+
+
+    if album_art_providers:
+        release_group['Images'] = album_art_providers[0].get_album_images(
+            release_group['Id'], cache_only=True)
+    else:
+        release_group['Images'] = []
+
+    return jsonify(release_group)
 
 
 @app.route('/chart/<name>/<type_>/<selection>')

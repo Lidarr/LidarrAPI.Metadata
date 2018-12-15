@@ -1,7 +1,6 @@
 SELECT
   artist.gid,
   artist.name,
-  artist.sort_name,
   ended,
   comment,
   artist_type.name AS type,
