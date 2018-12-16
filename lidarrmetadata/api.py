@@ -68,10 +68,11 @@ def handle_error(e):
         return jsonify(error='Internal server error'), 500
 
 
-def validate_mbid(mbid):
+def validate_mbid(mbid, check_blacklist=True):
     """
     Validates Musicbrainz ID and returns flask response in case of error
     :param mbid: Musicbrainz ID to verify
+    :param check_blacklist: Checks blacklist for blacklisted ids. Defaults to True
     :return: Flask response if error, None if valid
     """
     try:
@@ -79,7 +80,7 @@ def validate_mbid(mbid):
     except ValueError:
         return jsonify(error='Invalid UUID'), 400
 
-    if mbid in config.get_config().BLACKLISTED_ARTISTS:
+    if check_blacklist and mbid in config.get_config().BLACKLISTED_ARTISTS:
         return jsonify(error='Blacklisted artist'), 403
 
 
@@ -108,8 +109,8 @@ def get_artist_info_route(mbid):
     return output
 
 
-def get_artist_info(mbid, include_albums, primary_types, secondary_types, release_statuses):
-    uuid_validation_response = validate_mbid(mbid)
+def get_artist_info(mbid, include_albums, primary_types, secondary_types, release_statuses, check_blacklist=True):
+    uuid_validation_response = validate_mbid(mbid, check_blacklist)
     if uuid_validation_response:
         return uuid_validation_response
 
@@ -223,8 +224,14 @@ def get_release_group_info(mbid):
             release['Tracks'] = [t for t in tracks if t['ReleaseId'] == release['Id']]
 
         artist_ids = track_providers[0].get_release_group_artist_ids(mbid)
-        artists = [get_artist_info(id, False, None, None, None)
-                   for id in artist_ids if id not in app.config['BLACKLISTED_ARTISTS']]
+        artists = [
+            get_artist_info(id,
+                            include_albums=False,
+                            primary_types=None,
+                            secondary_types=None,
+                            release_statuses=None,
+                            check_blacklist=False)
+            for id in artist_ids]
         release_group['Artists'] = artists
     else:
         # 500 error if we don't have a track provider since it's essential
@@ -395,7 +402,8 @@ def search_artist():
         return response
 
     # TODO Prefer certain providers?
-    artists = search_providers[0].search_artist_name(query, limit=limit)
+    artists = filter(lambda a: a['Id'] not in config.get_config().BLACKLISTED_ARTISTS,
+                     search_providers[0].search_artist_name(query, limit=limit))
 
     for artist in artists:
         artist.update(artist_providers[0].get_artist_by_id(artist['Id']))
