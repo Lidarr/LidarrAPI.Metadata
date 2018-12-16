@@ -402,7 +402,8 @@ def search_artist():
         return response
 
     # TODO Prefer certain providers?
-    artists = search_providers[0].search_artist_name(query, limit=limit)
+    artists = filter(lambda a: a['Id'] not in config.get_config().BLACKLISTED_ARTISTS,
+                     search_providers[0].search_artist_name(query, limit=limit))
 
     for artist in artists:
         artist.update(artist_providers[0].get_artist_by_id(artist['Id']))
