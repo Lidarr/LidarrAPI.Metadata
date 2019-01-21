@@ -16,4 +16,6 @@ FROM track
   JOIN artist_credit_name ON artist_credit_name.artist_credit = track.artist_credit
   JOIN artist ON artist_credit_name.artist = artist.id
   JOIN recording ON track.recording = recording.id
-WHERE release_group.gid = %s AND artist_credit_name.position = 0
+WHERE release_group.gid = %s
+  AND artist_credit_name.position = 0
+  AND recording.video = FALSE
