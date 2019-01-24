@@ -476,6 +476,7 @@ class MusicbrainzDbProvider(Provider,
             return {}
         return {'Id': results['gid'],
                 'ArtistName': results['name'],
+                'SortName': results['sort_name'],
                 'Status': 'ended' if results['ended'] else 'active',
                 'Type': results['type'] or 'Artist',
                 'Disambiguation': results['comment'],
