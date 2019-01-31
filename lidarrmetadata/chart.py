@@ -196,7 +196,6 @@ def _parse_album_search_result(search_result):
     return {
         'AlbumId': search_result['Id'],
         'AlbumTitle': search_result['Title'],
-        # 'ArtistName': search_result['Artist']['Name'],
         'ArtistId': search_result['ArtistId'],
         'ReleaseDate': search_result['ReleaseDate']
     }
