@@ -64,7 +64,8 @@ def handle_error(e):
     elif isinstance(e, redis.BusyLoadingError):
         return jsonify(error='Redis not ready'), 503
     else:
-        sentry.captureException(e)
+        raise e
+        # sentry.captureException(e)
         return jsonify(error='Internal server error'), 500
 
 
