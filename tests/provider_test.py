@@ -2,7 +2,7 @@
 import pytest
 
 
-from lidarrmetadata import api # This is imported so the flask app initializes and cache doesn't fail
+from lidarrmetadata import config
 from lidarrmetadata import provider
 
 
@@ -32,6 +32,24 @@ class TestMusicbrainzDbProvider:
         result = provider.MusicbrainzDbProvider().mb_encode(s)
         assert expected == result
 
+    @staticmethod
+    @pytest.mark.parametrize('query,mbid', [
+        ('blink-182', '0743b15a-3c32-48c8-ad58-cb325350befa'),
+        ("Snail’s House", 'cfd45526-701e-457a-b3bd-013506a890a6'),
+        ("Snail's House", 'cfd45526-701e-457a-b3bd-013506a890a6'),
+        ('Yukihiro Fukotomi', '5ae575a5-3c2d-4cbb-9fe5-be806d5946ae'),
+        ('福富幸宏', '5ae575a5-3c2d-4cbb-9fe5-be806d5946ae'),
+        ('Yasuyuki Okamura', 'da3d15ea-4011-4cc7-bd73-b4192891c1d4'),
+        ('岡村靖幸', 'da3d15ea-4011-4cc7-bd73-b4192891c1d4'),
+        ('Кипелов', '76f95aaa-9be1-47a1-8db8-731cb77cf938'),
+    ])
+    def test_search_artist(query, mbid):
+        args, kwargs = config.TestConfig.PROVIDERS['MUSICBRAINZDBPROVIDER']
+        kwargs = {k.lower(): v for k, v in kwargs.items()}
+        db_provider = provider.MusicbrainzDbProvider(*args, **kwargs)
+        results = db_provider.search_artist_name(query)
+        print(results)
+        assert mbid in map(lambda r: r['Id'], results)
 
 class TestWikipediaProvider:
     def setup(self):
