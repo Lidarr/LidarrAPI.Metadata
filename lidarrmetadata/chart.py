@@ -130,7 +130,7 @@ def get_lastfm_album_chart(count=10, user=None):
         tag = util.cache_or_call(client.get_tag, 'all')
         lastfm_albums = util.cache_or_call(tag.get_top_albums)
 
-    album_provider = provider.get_providers_implementing(provider.AlbumByIdMixin)[0]
+    album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
     albums = []
     for result in pylast.extract_items(lastfm_albums):
         # TODO Figure out a cleaner way to do this
@@ -143,7 +143,7 @@ def get_lastfm_album_chart(count=10, user=None):
             [result.get_mbid()])
 
         if rgid:
-            search_result = album_provider.get_album_by_id(rgid[0]['gid'])
+            search_result = album_provider.get_release_group_by_id(rgid[0]['gid'])
             if search_result:
                 albums.append(_parse_album_search_result(search_result))
 
@@ -196,7 +196,6 @@ def _parse_album_search_result(search_result):
     return {
         'AlbumId': search_result['Id'],
         'AlbumTitle': search_result['Title'],
-        'ArtistName': search_result['Artist']['Name'],
-        'ArtistId': search_result['Artist']['Id'],
+        'ArtistId': search_result['ArtistId'],
         'ReleaseDate': search_result['ReleaseDate']
     }
