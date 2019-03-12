@@ -15,7 +15,7 @@ from lidarrmetadata import util
 app = Flask(__name__)
 app.config.from_object(config.get_config())
 
-if app.config['SENTRY_ENABLE']:
+if app.config['SENTRY_DSN']:
     sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
 
 if app.config['USE_CACHE']:
