@@ -2,8 +2,9 @@ import uuid
 
 from flask import Flask, abort, make_response, request, jsonify
 from psycopg2 import OperationalError
-import raven.contrib.flask
 import redis
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
 from werkzeug.exceptions import HTTPException
 
 import lidarrmetadata
@@ -16,7 +17,7 @@ app = Flask(__name__)
 app.config.from_object(config.get_config())
 
 if app.config['SENTRY_DSN']:
-    sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
+    sentry = sentry_sdk.init(dsn=app.config['SENTRY_DSN'], integrations=[FlaskIntegration()])
 
 if app.config['USE_CACHE']:
     util.CACHE.config = config.get_config().CACHE_CONFIG
