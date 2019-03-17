@@ -17,7 +17,16 @@ app = Flask(__name__)
 app.config.from_object(config.get_config())
 
 if app.config['SENTRY_DSN']:
-    sentry = sentry_sdk.init(dsn=app.config['SENTRY_DSN'], integrations=[FlaskIntegration()])
+    if app.config['SENTRY_REDIS_HOST'] is not None:
+        processor = util.SentryRedisTtlProcessor(redis_host=app.config['SENTRY_REDIS_HOST'],
+                                                redis_port=app.config['SENTRY_REDIS_PORT'],
+                                                ttl=app.config['SENTRY_TTL'])
+    else:
+        processor = util.SentryTtlProcessor(ttl=app.config['SENTRY_TTL'])
+
+    sentry_sdk.init(dsn=app.config['SENTRY_DSN'],
+                    integrations=[FlaskIntegration()],
+                    before_send=processor.create_event)
 
 if app.config['USE_CACHE']:
     util.CACHE.config = config.get_config().CACHE_CONFIG
@@ -83,7 +92,6 @@ def validate_mbid(mbid, check_blacklist=True):
 
     if check_blacklist and mbid in config.get_config().BLACKLISTED_ARTISTS:
         return jsonify(error='Blacklisted artist'), 403
-
 
 @app.route('/')
 def default_route():

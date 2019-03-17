@@ -317,12 +317,21 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Connection info for sentry. Defaults to None, in which case Sentry won't be used
     SENTRY_DSN = None
 
+    # Redis connection info for sentry event processor. No redis connection info will fall back to a local processor
+    SENTRY_REDIS_HOST = 'redis'
+    SENTRY_REDIS_PORT = 6379
+
+    # Sentry rate limit TTL in seconds
+    SENTRY_TTL = 1
+
     # Testing mode
     TESTING = False
 
 
 class TestConfig(DefaultConfig):
     CACHE_CONFIG = {'CACHE_TYPE': 'null'}
+    SENTRY_REDIS_HOST = None
+    SENTRY_REDIS_PORT = None
     Testing = True
 
 
