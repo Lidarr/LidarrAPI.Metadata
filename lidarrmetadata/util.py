@@ -166,7 +166,7 @@ class Cache(object):
 class SentryProcessor(object):
     @abc.abstractmethod
     def _allowed(self):
-        pass
+        raise NotImplementedError()
 
     def create_event(self, event, hint):
         return event if self._allowed() else None
@@ -202,3 +202,5 @@ class SentryRedisTtlProcessor(SentryProcessor):
             return False
         else:
             self.redis.set(self._KEY, True, ex=self.ttl)
+
+        return True
