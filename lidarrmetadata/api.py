@@ -336,6 +336,16 @@ def search_album():
 
     if search_providers:
         albums = search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
+
+        for album in albums:
+            album['Artists'] = [
+                get_artist_info(album['ArtistId'],
+                                include_albums=False,
+                                primary_types=None,
+                                secondary_types=None,
+                                release_statuses=None,
+                                check_blacklist=False)
+                ]
     else:
         response = jsonify(error="No album search providers")
         response.status_code = 500
