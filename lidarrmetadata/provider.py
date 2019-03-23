@@ -542,8 +542,10 @@ class MusicbrainzDbProvider(Provider,
                  'ReleaseDate': datetime.datetime(result['year'] or 1,
                                                   result['month'] or 1,
                                                   result['day'] or 1),
-                 'Artist': {'Id': result['artist_id'], 'Name': result['artist_name']},
-                'Rating': {'Count': result['rating_count'] or 0, 'Value': result['rating'] / 10 if result['rating'] is not None else None}}
+                 'ArtistId': result['artist_id'],
+                 'Rating': {'Count': result['rating_count'] or 0,
+                       'Value': result['rating'] / 10 if result['rating'] is not None else None}
+                 }
                 for result in results]
 
     def get_release_group_by_id(self, rgid):
