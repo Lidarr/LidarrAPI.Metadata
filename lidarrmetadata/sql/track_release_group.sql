@@ -19,3 +19,4 @@ FROM track
 WHERE release_group.gid = %s
   AND artist_credit_name.position = 0
   AND recording.video = FALSE
+  AND track.is_data_track = FALSE
