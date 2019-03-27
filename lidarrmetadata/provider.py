@@ -118,21 +118,6 @@ class ReleasesByReleaseGroupIdMixin(MixinBase):
         """
         pass
 
-
-class MediaByAlbumMixin(MixinBase):
-    """
-    Gets medium for album
-    """
-
-    @abc.abstractmethod
-    def get_album_media(self, album_id):
-        """
-        Gets media for album
-        :param album_id: ID of album
-        :return: List of media
-        """
-
-
 class TracksByReleaseGroupMixin(MixinBase):
     """
     Gets tracks by release group
@@ -428,7 +413,6 @@ class MusicbrainzDbProvider(Provider,
                             ReleasesByReleaseGroupIdMixin,
                             ReleaseGroupLinkMixin,
                             AlbumNameSearchMixin,
-                            MediaByAlbumMixin,
                             TracksByReleaseGroupMixin,
                             TrackSearchMixin):
     """
