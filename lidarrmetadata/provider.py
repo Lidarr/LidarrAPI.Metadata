@@ -583,14 +583,6 @@ class MusicbrainzDbProvider(Provider,
     def get_release_group_artist_ids(self, rgid):
         return [x['gid'] for x in self.query_from_file('artist_by_release_group.sql', [rgid])]
 
-    def get_album_media(self, album_id):
-        results = self.query_from_file('media_album_mbid.sql',
-                                       [album_id])
-        return [{'Format': result['medium_format'] or '',
-                 'Name': result['medium_name'],
-                 'Position': result['medium_position']}
-                for result in results]
-
     def get_release_group_tracks(self, rgid):
         results = self.query_from_file('track_release_group.sql', [rgid])
 
