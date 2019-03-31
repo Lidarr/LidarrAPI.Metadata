@@ -1,3 +1,4 @@
+import os
 import uuid
 
 from flask import Flask, abort, make_response, request, jsonify
@@ -93,13 +94,18 @@ def validate_mbid(mbid, check_blacklist=True):
     if check_blacklist and mbid in config.get_config().BLACKLISTED_ARTISTS:
         return jsonify(error='Blacklisted artist'), 403
 
+
 @app.route('/')
 def default_route():
     """
     Default route with API information
     :return:
     """
-    info = {'version': lidarrmetadata.__version__}
+    info = {
+        'branch': os.getenv('GIT_BRANCH'),
+        'commit': os.getenv('COMMIT_HASH'),
+        'version': lidarrmetadata.__version__
+    }
     return jsonify(info)
 
 

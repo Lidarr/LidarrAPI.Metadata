@@ -1,0 +1,3 @@
+#!/bin/bash
+# Custom build hook to pass in arguments
+docker build --build-arg GIT_BRANCH=$SOURCE_BRANCH --build-arg COMMIT_HASH=$SOURCE_COMMIT -f $DOCKERFILE_PATH -t $IMAGE_NAME .
