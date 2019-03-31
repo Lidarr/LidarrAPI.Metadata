@@ -43,7 +43,7 @@ setup(
         'psycopg2-binary',
         'pylast<=1.9.0',
         'python-dateutil',
-        'raven[flask]',
+        'sentry-sdk[flask]',
         'redis',
         'requests',
         'werkzeug>=0.7.0',

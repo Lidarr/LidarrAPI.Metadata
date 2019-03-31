@@ -2,8 +2,9 @@ import uuid
 
 from flask import Flask, abort, make_response, request, jsonify
 from psycopg2 import OperationalError
-import raven.contrib.flask
 import redis
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
 from werkzeug.exceptions import HTTPException
 
 import lidarrmetadata
@@ -15,8 +16,17 @@ from lidarrmetadata import util
 app = Flask(__name__)
 app.config.from_object(config.get_config())
 
-if app.config['SENTRY_ENABLE']:
-    sentry = raven.contrib.flask.Sentry(app, dsn=app.config['SENTRY_DSN'])
+if app.config['SENTRY_DSN']:
+    if app.config['SENTRY_REDIS_HOST'] is not None:
+        processor = util.SentryRedisTtlProcessor(redis_host=app.config['SENTRY_REDIS_HOST'],
+                                                redis_port=app.config['SENTRY_REDIS_PORT'],
+                                                ttl=app.config['SENTRY_TTL'])
+    else:
+        processor = util.SentryTtlProcessor(ttl=app.config['SENTRY_TTL'])
+
+    sentry_sdk.init(dsn=app.config['SENTRY_DSN'],
+                    integrations=[FlaskIntegration()],
+                    before_send=processor.create_event)
 
 if app.config['USE_CACHE']:
     util.CACHE.config = config.get_config().CACHE_CONFIG
@@ -64,7 +74,7 @@ def handle_error(e):
     elif isinstance(e, redis.BusyLoadingError):
         return jsonify(error='Redis not ready'), 503
     else:
-        sentry.captureException(e)
+        sentry_sdk.capture_exception(e)
         return jsonify(error='Internal server error'), 500
 
 
@@ -82,7 +92,6 @@ def validate_mbid(mbid, check_blacklist=True):
 
     if check_blacklist and mbid in config.get_config().BLACKLISTED_ARTISTS:
         return jsonify(error='Blacklisted artist'), 403
-
 
 @app.route('/')
 def default_route():

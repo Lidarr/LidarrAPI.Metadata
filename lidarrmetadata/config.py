@@ -314,10 +314,15 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
         'WIKIPEDIAPROVIDER': ([], {})
     }
 
-    # Connection info for sentry
-    SENTRY_DSN = ('https://c94975eddcf84d91901ebc1fdba99327:'
-                  '605f0689da43434bae633d07c0357c46@sentry.io/215082')
-    SENTRY_ENABLE = True
+    # Connection info for sentry. Defaults to None, in which case Sentry won't be used
+    SENTRY_DSN = None
+
+    # Redis connection info for sentry event processor. No redis connection info will fall back to a local processor
+    SENTRY_REDIS_HOST = 'redis'
+    SENTRY_REDIS_PORT = 6379
+
+    # Sentry rate limit TTL in seconds
+    SENTRY_TTL = 1
 
     # Testing mode
     TESTING = False
@@ -325,7 +330,8 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
 class TestConfig(DefaultConfig):
     CACHE_CONFIG = {'CACHE_TYPE': 'null'}
-    SENTRY_ENABLE = False
+    SENTRY_REDIS_HOST = None
+    SENTRY_REDIS_PORT = None
     Testing = True
 
 
