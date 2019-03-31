@@ -21,6 +21,12 @@ SELECT
       'month', date_month,
       'day', date_day) FROM release_country
     WHERE release_country.release = release.id
+  ) || array(
+    SELECT json_build_object(
+      'year', date_year,
+      'month', date_month,
+      'day', date_day) FROM release_unknown_country
+    WHERE release_unknown_country.release = release.id
   )                                                                                   AS release_dates,
   array(
     SELECT json_build_object(
