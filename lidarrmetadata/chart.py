@@ -28,20 +28,29 @@ def _parse_itunes_chart(URL, count):
 
 
 @util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
-def get_apple_music_top_albums_chart(count=10):
+def get_apple_music_top_albums_chart(count=10, country='us'):
     """
     Gets and parses itunes chart
     :param count: Number of results to return. Defaults to 10
+    :param country: Country code to request. Defaults to us
     :return: Chart response for itunes
     """
-    URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/top-albums/all/{count}/explicit.json'.format(
+    URL = 'https://rss.itunes.apple.com/api/v1/{country}/apple-music/top-albums/all/{count}/explicit.json'.format(
+        country=country,
         count=4 * count)
     return _parse_itunes_chart(URL, count)
 
 
 @util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
-def get_apple_music_new_albums_chart(count=10):
-    URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/new-releases/all/{count}/explicit.json'.format(
+def get_apple_music_new_albums_chart(count=10, country='us'):
+    """
+    Gets and parses itunes chart
+    :param count: Number of results to return. Defaults to 10
+    :param country: Country code to request. Defaults to us
+    :return: Chart response for itunes
+    """
+    URL = 'https://rss.itunes.apple.com/api/v1/{country}/apple-music/new-releases/all/{count}/explicit.json'.format(
+        country=country,
         count=4 * count)
     return _parse_itunes_chart(URL, count)
 
@@ -92,25 +101,29 @@ def get_billboard_100_artists_chart(count=10):
 
 
 @util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
-def get_itunes_top_albums_chart(count=10):
+def get_itunes_top_albums_chart(count=10, country='us'):
     """
     Gets and parses itunes chart
     :param count: Number of results to return. Defaults to 10
+    :param country: Country code to request. Defaults to us
     :return: Chart response for itunes
     """
-    URL = 'https://rss.itunes.apple.com/api/v1/us/itunes-music/top-albums/all/{count}/explicit.json'.format(
+    URL = 'https://rss.itunes.apple.com/api/v1/{country}/itunes-music/top-albums/all/{count}/explicit.json'.format(
+        country=country,
         count=4 * count)
     return _parse_itunes_chart(URL, count)
 
 
 @util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
-def get_itunes_new_albums_chart(count=10):
+def get_itunes_new_albums_chart(count=10, country='us'):
     """
     Gets and parses itunes new chart
     :param count: Number of results to return. Defaults to 10
+    :param country: Country code to request. Defaults to us
     :return: Chart response for itunes
     """
-    URL = 'https://rss.itunes.apple.com/api/v1/us/itunes-music/new-music/all/{count}/explicit.json'.format(
+    URL = 'https://rss.itunes.apple.com/api/v1/{country}/itunes-music/new-music/all/{count}/explicit.json'.format(
+        country=country,
         count=4 * count)
     return _parse_itunes_chart(URL, count)
 
