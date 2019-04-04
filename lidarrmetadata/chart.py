@@ -189,7 +189,7 @@ def get_lastfm_artist_chart(count=10, user=None):
     else:
         lastfm_artists = util.cache_or_call(client.get_top_artists)
 
-    return _parse_lastfm_artists(lastfm_artists)
+    return _parse_lastfm_artists(count, lastfm_artists)
 
 
 @util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
