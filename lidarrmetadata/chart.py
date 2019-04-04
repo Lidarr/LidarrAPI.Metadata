@@ -14,10 +14,12 @@ from lidarrmetadata import util
 def _parse_itunes_chart(URL, count):
     response = requests.get(URL)
     results = filter(lambda r: r.get('kind', '') == 'album', response.json()['feed']['results'])
+    return results
     search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
     search_results = []
     for result in results:
-        search_result = search_provider.search_album_name(result['name'], artist_name=result['artistName'], limit=1)
+        search_result = search_provider.search_album_name(result['name'],
+                                                          artist_name=result['artistName'], limit=1)
         if search_result:
             search_result = search_result[0]
             search_results.append(_parse_album_search_result(search_result))
@@ -128,13 +130,15 @@ def get_itunes_new_albums_chart(count=10, country='us'):
     return _parse_itunes_chart(URL, count)
 
 
+@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
 def get_lastfm_album_chart(count=10, user=None):
     """
     Gets and parses lastfm chart
     :param count: Number of results to return. Defaults to 10
     :return: Parsed chart
     """
-    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY, api_secret=config.get_config().LASTFM_SECRET)
+    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY,
+                                  api_secret=config.get_config().LASTFM_SECRET)
 
     if user:
         user = util.cache_or_call(client.get_user, user[0])
@@ -169,13 +173,15 @@ def get_lastfm_album_chart(count=10, user=None):
     return albums
 
 
+@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
 def get_lastfm_artist_chart(count=10, user=None):
     """
     Gets and parses lastfm chart
     :param count: Number of results to return. Defaults to 10
     :return: Parsed chart
     """
-    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY, api_secret=config.get_config().LASTFM_SECRET)
+    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY,
+                                  api_secret=config.get_config().LASTFM_SECRET)
 
     if user:
         user = util.cache_or_call(client.get_user, user[0])
@@ -183,8 +189,23 @@ def get_lastfm_artist_chart(count=10, user=None):
     else:
         lastfm_artists = util.cache_or_call(client.get_top_artists)
 
+    return _parse_lastfm_artists(lastfm_artists)
+
+
+@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
+def get_lastfm_geo_artists(count, country='UNITED STATES'):
+    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY,
+                                  api_secret=config.get_config().LASTFM_SECRET)
+
+    lastfm_artists = util.cache_or_call(client.get_geo_top_artists, country)
+
+    return _parse_lastfm_artists(count, lastfm_artists)
+
+
+def _parse_lastfm_artists(count, lastfm_artists):
     artists = []
     search_provider = provider.get_providers_implementing(provider.ArtistNameSearchMixin)[0]
+
     for lastfm_artist in pylast.extract_items(lastfm_artists):
         artist = {'ArtistName': lastfm_artist.name, 'ArtistId': lastfm_artist.get_mbid()}
 
@@ -198,7 +219,6 @@ def get_lastfm_artist_chart(count=10, user=None):
 
         if all(artist.values()):
             artists.append(artist)
-
     if len(artists) > count:
         artists = artists[:count]
 
