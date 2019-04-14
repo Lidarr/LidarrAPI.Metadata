@@ -50,6 +50,7 @@ setup(
     ],
 
     extras_require={
+        'deploy': ['gunicorn'],
         'test': ['pytest', 'tox']
     },
 
