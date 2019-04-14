@@ -20,4 +20,4 @@ RUN adduser --system -u $UID metadata
 
 USER metadata
 
-ENTRYPOINT ["gunicorn", "lidarrmetadata.api:app", "-b", "0.0.0.0:5001", "-w", "4"]
+ENTRYPOINT ["lidarr-metadata-server"]
