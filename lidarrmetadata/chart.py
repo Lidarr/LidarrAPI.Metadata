@@ -14,10 +14,12 @@ from lidarrmetadata import util
 def _parse_itunes_chart(URL, count):
     response = requests.get(URL)
     results = filter(lambda r: r.get('kind', '') == 'album', response.json()['feed']['results'])
+    return results
     search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
     search_results = []
     for result in results:
-        search_result = search_provider.search_album_name(result['name'], artist_name=result['artistName'], limit=1)
+        search_result = search_provider.search_album_name(result['name'],
+                                                          artist_name=result['artistName'], limit=1)
         if search_result:
             search_result = search_result[0]
             search_results.append(_parse_album_search_result(search_result))
@@ -28,20 +30,29 @@ def _parse_itunes_chart(URL, count):
 
 
 @util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
-def get_apple_music_top_albums_chart(count=10):
+def get_apple_music_top_albums_chart(count=10, country='us'):
     """
     Gets and parses itunes chart
     :param count: Number of results to return. Defaults to 10
+    :param country: Country code to request. Defaults to us
     :return: Chart response for itunes
     """
-    URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/top-albums/all/{count}/explicit.json'.format(
+    URL = 'https://rss.itunes.apple.com/api/v1/{country}/apple-music/top-albums/all/{count}/explicit.json'.format(
+        country=country,
         count=4 * count)
     return _parse_itunes_chart(URL, count)
 
 
 @util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
-def get_apple_music_new_albums_chart(count=10):
-    URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/new-releases/all/{count}/explicit.json'.format(
+def get_apple_music_new_albums_chart(count=10, country='us'):
+    """
+    Gets and parses itunes chart
+    :param count: Number of results to return. Defaults to 10
+    :param country: Country code to request. Defaults to us
+    :return: Chart response for itunes
+    """
+    URL = 'https://rss.itunes.apple.com/api/v1/{country}/apple-music/new-releases/all/{count}/explicit.json'.format(
+        country=country,
         count=4 * count)
     return _parse_itunes_chart(URL, count)
 
@@ -92,36 +103,42 @@ def get_billboard_100_artists_chart(count=10):
 
 
 @util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
-def get_itunes_top_albums_chart(count=10):
+def get_itunes_top_albums_chart(count=10, country='us'):
     """
     Gets and parses itunes chart
     :param count: Number of results to return. Defaults to 10
+    :param country: Country code to request. Defaults to us
     :return: Chart response for itunes
     """
-    URL = 'https://rss.itunes.apple.com/api/v1/us/itunes-music/top-albums/all/{count}/explicit.json'.format(
+    URL = 'https://rss.itunes.apple.com/api/v1/{country}/itunes-music/top-albums/all/{count}/explicit.json'.format(
+        country=country,
         count=4 * count)
     return _parse_itunes_chart(URL, count)
 
 
 @util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
-def get_itunes_new_albums_chart(count=10):
+def get_itunes_new_albums_chart(count=10, country='us'):
     """
     Gets and parses itunes new chart
     :param count: Number of results to return. Defaults to 10
+    :param country: Country code to request. Defaults to us
     :return: Chart response for itunes
     """
-    URL = 'https://rss.itunes.apple.com/api/v1/us/itunes-music/new-music/all/{count}/explicit.json'.format(
+    URL = 'https://rss.itunes.apple.com/api/v1/{country}/itunes-music/new-music/all/{count}/explicit.json'.format(
+        country=country,
         count=4 * count)
     return _parse_itunes_chart(URL, count)
 
 
+@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
 def get_lastfm_album_chart(count=10, user=None):
     """
     Gets and parses lastfm chart
     :param count: Number of results to return. Defaults to 10
     :return: Parsed chart
     """
-    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY, api_secret=config.get_config().LASTFM_SECRET)
+    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY,
+                                  api_secret=config.get_config().LASTFM_SECRET)
 
     if user:
         user = util.cache_or_call(client.get_user, user[0])
@@ -156,13 +173,15 @@ def get_lastfm_album_chart(count=10, user=None):
     return albums
 
 
+@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
 def get_lastfm_artist_chart(count=10, user=None):
     """
     Gets and parses lastfm chart
     :param count: Number of results to return. Defaults to 10
     :return: Parsed chart
     """
-    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY, api_secret=config.get_config().LASTFM_SECRET)
+    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY,
+                                  api_secret=config.get_config().LASTFM_SECRET)
 
     if user:
         user = util.cache_or_call(client.get_user, user[0])
@@ -170,8 +189,23 @@ def get_lastfm_artist_chart(count=10, user=None):
     else:
         lastfm_artists = util.cache_or_call(client.get_top_artists)
 
+    return _parse_lastfm_artists(count, lastfm_artists)
+
+
+@util.CACHE.memoize(timeout=60 * 60 * 24 * 7)
+def get_lastfm_geo_artists(count, country='UNITED STATES'):
+    client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY,
+                                  api_secret=config.get_config().LASTFM_SECRET)
+
+    lastfm_artists = util.cache_or_call(client.get_geo_top_artists, country)
+
+    return _parse_lastfm_artists(count, lastfm_artists)
+
+
+def _parse_lastfm_artists(count, lastfm_artists):
     artists = []
     search_provider = provider.get_providers_implementing(provider.ArtistNameSearchMixin)[0]
+
     for lastfm_artist in pylast.extract_items(lastfm_artists):
         artist = {'ArtistName': lastfm_artist.name, 'ArtistId': lastfm_artist.get_mbid()}
 
@@ -185,7 +219,6 @@ def get_lastfm_artist_chart(count=10, user=None):
 
         if all(artist.values()):
             artists.append(artist)
-
     if len(artists) > count:
         artists = artists[:count]
 

@@ -308,7 +308,8 @@ def chart_route(name, type_, selection):
         ('itunes', 'album', 'top'): chart.get_itunes_top_albums_chart,
         ('itunes', 'album', 'new'): chart.get_itunes_new_albums_chart,
         ('lastfm', 'album', 'top'): chart.get_lastfm_album_chart,
-        ('lastfm', 'artist', 'top'): chart.get_lastfm_artist_chart
+        ('lastfm', 'artist', 'top'): chart.get_lastfm_artist_chart,
+        ('lastfm', 'artist-geo', 'top'): chart.get_lastfm_geo_artists
     }
 
     if key not in charts.keys():
