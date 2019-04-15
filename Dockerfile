@@ -10,16 +10,14 @@ ENV GIT_BRANCH $GIT_BRANCH
 WORKDIR /metadata
 COPY . /metadata
 
-EXPOSE 5000
-
 RUN apk update && \
  apk add postgresql-libs && \
  apk add --virtual .build-deps gcc musl-dev postgresql-dev && \
- pip install --no-cache-dir . && \
+ pip install --no-cache-dir .[deploy] && \
  apk --purge del .build-deps
 
 RUN adduser --system -u $UID metadata
 
 USER metadata
 
-CMD ["lidarr-metadata-server"]
+ENTRYPOINT ["lidarr-metadata-server"]
