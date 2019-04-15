@@ -32,10 +32,7 @@ def main():
     """
     config = get_config()
 
-    mount_point = config.APPLICATION_ROOT or '/'
-    if not mount_point.startswith('/'):
-        mount_point = '/' + mount_point
-
+    mount_point = config.APPLICATION_ROOT.lstrip('/').rstrip('/')
     os.environ['SCRIPT_NAME'] = mount_point
 
     options = {
