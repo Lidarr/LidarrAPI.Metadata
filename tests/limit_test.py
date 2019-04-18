@@ -22,4 +22,4 @@ class TestSimpleRateLimiter(object):
     def test_queue_popped(self):
         for _ in range(10):
             with self.limiter.limited():
-                time.sleep(0.5)
+                time.sleep(1)
