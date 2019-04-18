@@ -17,7 +17,7 @@ import psycopg2
 import pylast
 import requests
 
-import lidarrmetadata
+from lidarrmetadata.config import get_config
 from lidarrmetadata import limit
 from lidarrmetadata import util
 
@@ -27,6 +27,8 @@ else:
     from urllib.parse import unquote as url_unquote
 
 logger = logging.getLogger(__name__)
+
+CONFIG = get_config()
 
 # Provider class dictionary
 PROVIDER_CLASSES = {}
@@ -291,7 +293,8 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         self.cache = util.Cache()
         self._api_key = api_key
         self._base_url = base_url
-        self._limiter = limit.SimpleRateLimiter(queue_size=60, time_delta=1000)
+        self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
+                                                time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
         self.use_https = use_https
 
     def get_artist_images(self, artist_id):
@@ -780,7 +783,8 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         super(WikipediaProvider, self).__init__()
         self._client = mediawikiapi.MediaWikiAPI()
-        self._limiter = limit.SimpleRateLimiter()
+        self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
+                                                time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
 
     def get_artist_overview(self, url):
         if 'wikidata' in url:
