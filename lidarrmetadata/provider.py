@@ -18,6 +18,7 @@ import pylast
 import requests
 
 import lidarrmetadata
+from lidarrmetadata import limit
 from lidarrmetadata import util
 
 if six.PY2:
@@ -290,6 +291,7 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         self.cache = util.Cache()
         self._api_key = api_key
         self._base_url = base_url
+        self._limiter = limit.SimpleRateLimiter(queue_size=60, time_delta=1000)
         self.use_https = use_https
 
     def get_artist_images(self, artist_id):
@@ -332,9 +334,13 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         """
         url = self.build_url(mbid)
         try:
-            return requests.get(url).json()
+            with self._limiter.limited():
+                return requests.get(url).json()
         except HTTPError as error:
             logger.error('HTTPError: {e}'.format(e=error))
+            return None
+        except limit.RateLimitedError as error:
+            logger.error('Fanart request to {} rate limited'.format(mbid))
             return None
 
     def build_url(self, mbid):
@@ -774,6 +780,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         super(WikipediaProvider, self).__init__()
         self._client = mediawikiapi.MediaWikiAPI()
+        self._limiter = limit.SimpleRateLimiter()
 
     def get_artist_overview(self, url):
         if 'wikidata' in url:
@@ -796,7 +803,8 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         :return: Summary String
         """
         try:
-            return self._client.summary(title, auto_suggest=False)
+            with self._limiter.limited():
+                return self._client.summary(title, auto_suggest=False)
         # FIXME Both of these may be recoverable
         except mediawikiapi.PageError as error:
             logger.error(u'Wikipedia PageError from {title}: {e}' % {'e':error, 'title':title})
@@ -809,6 +817,9 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             return ''
         except HTTPError as error:
             logger.error('HTTPError {e}'.format(e=error))
+            return ''
+        except limit.RateLimitedError as error:
+            logger.error('Wikipedia Request for {e} rate limited'.format(e=error))
             return ''
 
     @classmethod

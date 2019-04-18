@@ -210,13 +210,11 @@ def get_release_group_info(mbid):
 
     release_group_providers = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)
     release_providers = provider.get_providers_implementing(provider.ReleasesByReleaseGroupIdMixin)
-    album_art_providers = [] and provider.get_providers_implementing(
-        provider.AlbumArtworkMixin)
-    artist_art_providers = [] and provider.get_providers_implementing(
-        provider.ArtistArtworkMixin)
+    album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)
+    artist_art_providers = provider.get_providers_implementing(provider.ArtistArtworkMixin)
     track_providers = provider.get_providers_implementing(provider.TracksByReleaseGroupMixin)
     link_providers = provider.get_providers_implementing(provider.ReleaseGroupLinkMixin)
-    overview_providers = [] and provider.get_providers_implementing(provider.ArtistOverviewMixin)
+    overview_providers = provider.get_providers_implementing(provider.ArtistOverviewMixin)
 
     if release_group_providers:
         release_group = release_group_providers[0].get_release_group_by_id(mbid)
