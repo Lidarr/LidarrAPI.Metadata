@@ -338,9 +338,12 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         url = self.build_url(mbid)
         try:
             with self._limiter.limited():
-                return requests.get(url).json()
+                return requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT).json()
         except HTTPError as error:
             logger.error('HTTPError: {e}'.format(e=error))
+            return None
+        except requests.exceptions.Timeout as error:
+            logger.error('Timeout: {e}'.format(e=error))
             return None
         except limit.RateLimitedError as error:
             logger.error('Fanart request to {} rate limited'.format(mbid))
