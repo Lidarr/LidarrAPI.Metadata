@@ -58,7 +58,6 @@ class SimpleRateLimiter(QueueRateLimiter):
 
 
     def close(self):
-        # Poison pill the queue
         self._running.value = False
         self._pop_process.join()
 
