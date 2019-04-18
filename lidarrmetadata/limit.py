@@ -42,7 +42,6 @@ class SimpleRateLimiter(QueueRateLimiter):
     """
     Simple queue-based rate limiter that uses a ``multiprocessing.Queue``
     """
-    QUEUE_STOP = 'stop'
 
     def __init__(self, queue_size=60, time_delta=100):
         super(SimpleRateLimiter, self).__init__(queue_size, time_delta)
