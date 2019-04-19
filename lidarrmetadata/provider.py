@@ -818,7 +818,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
                 return self._client.summary(title, auto_suggest=False)
         # FIXME Both of these may be recoverable
         except mediawikiapi.PageError as error:
-            logger.error(u'Wikipedia PageError from {title}: {e}' % {'e':error, 'title':title})
+            logger.error(u'Wikipedia PageError from {title}: {e}'.format(e=error, title=title))
             return ''
         except ValueError as error:
             logger.error(u'Page parse error: {e}'.format(e=error))
