@@ -19,6 +19,7 @@ import requests
 
 from lidarrmetadata.config import get_config
 from lidarrmetadata import limit
+from lidarrmetadata import stats
 from lidarrmetadata import util
 
 if six.PY2:
@@ -110,6 +111,7 @@ class ReleaseGroupByIdMixin(MixinBase):
         """
         pass
 
+
 class ReleasesByReleaseGroupIdMixin(MixinBase):
     """
     Gets releases by ReleaseGroup ID
@@ -123,6 +125,7 @@ class ReleasesByReleaseGroupIdMixin(MixinBase):
         :return: Releases corresponding to rgid or rid
         """
         pass
+
 
 class TracksByReleaseGroupMixin(MixinBase):
     """
@@ -146,6 +149,7 @@ class TracksByReleaseGroupMixin(MixinBase):
         :return: All artists credited as lead credit on tracks on releases
         """
         pass
+
 
 class TrackSearchMixin(MixinBase):
     """
@@ -218,6 +222,7 @@ class ArtistLinkMixin(MixinBase):
         :return: List of links
         """
         pass
+
 
 class ReleaseGroupLinkMixin(MixinBase):
     """
@@ -299,6 +304,8 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         self._base_url = base_url
         self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
                                                 time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
+        self._stats = stats.TelegrafClient(CONFIG.STATS_HOST,
+                                           CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
         self.use_https = use_https
 
     def get_artist_images(self, artist_id):
@@ -342,6 +349,7 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         url = self.build_url(mbid)
         try:
             with self._limiter.limited():
+                self._stats.metric('fanart', {'request': 1}) if self._stats else None
                 return requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT).json()
         except HTTPError as error:
             logger.error('HTTPError: {e}'.format(e=error))
@@ -349,8 +357,9 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         except requests.exceptions.Timeout as error:
             logger.error('Timeout: {e}'.format(e=error))
             return None
-        except limit.RateLimitedError as error:
+        except limit.RateLimitedError:
             logger.error('Fanart request to {} rate limited'.format(mbid))
+            self._stats.metric('fanart', {'ratelimit': 1}) if self._stats else None
             return None
 
     def build_url(self, mbid):
@@ -793,6 +802,9 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
                                                 time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
 
+        self._stats = stats.TelegrafClient(CONFIG.STATS_HOST,
+                                           CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
+
     def get_artist_overview(self, url):
         if 'wikidata' in url:
             title = self.get_wikipedia_title(url)
@@ -804,7 +816,8 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         entity = self.entity_from_url(url)
         wikidata_url = 'https://www.wikidata.org/w/api.php?action=wbgetentities&ids=' + entity + '&props=sitelinks&sitefilter=enwiki&format=json'
         data = requests.get(wikidata_url).json()
-        return data.get('entities', {}).get(entity, {}).get('sitelinks', {}).get('enwiki', {}).get('title', '')
+        return data.get('entities', {}).get(entity, {}).get('sitelinks', {}).get('enwiki', {}).get(
+            'title', '')
 
     @util.CACHE.memoize()
     def get_summary(self, title):
@@ -815,6 +828,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         try:
             with self._limiter.limited():
+                self._stats.metric('wikipedia', {'request': 1}) if self._stats else None
                 return self._client.summary(title, auto_suggest=False)
         # FIXME Both of these may be recoverable
         except mediawikiapi.PageError as error:
@@ -830,6 +844,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             logger.error('HTTPError {e}'.format(e=error))
             return ''
         except limit.RateLimitedError as error:
+            self._stats.metric('wikipedia', {'ratelimit': 1}) if self._stats else None
             logger.error('Wikipedia Request for {title} rate limited'.format(title=title))
             return ''
 

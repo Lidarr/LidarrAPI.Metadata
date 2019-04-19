@@ -294,6 +294,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Debug mode
     DEBUG = False
 
+    # Enable sending stats
+    ENABLE_STATS = True
+
     # External request parameters
     # Size of rate limit queue
     EXTERNAL_LIMIT_QUEUE_SIZE = 60
@@ -332,12 +335,17 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Sentry rate limit TTL in seconds
     SENTRY_TTL = 1
 
+    # Stats server
+    STATS_HOST = 'telegraf'
+    STATS_PORT = 8092
+
     # Testing mode
     TESTING = False
 
 
 class TestConfig(DefaultConfig):
     CACHE_CONFIG = {'CACHE_TYPE': 'null'}
+    ENABLE_STATS = False
     SENTRY_REDIS_HOST = None
     SENTRY_REDIS_PORT = None
     Testing = True
