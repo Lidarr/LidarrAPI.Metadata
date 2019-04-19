@@ -29,6 +29,7 @@ else:
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
+logging.info('Have provider logger')
 
 CONFIG = get_config()
 
@@ -274,6 +275,7 @@ class Provider(six.with_metaclass(ProviderMeta, object)):
     providers = []
 
     def __init__(self):
+        logging.info('Initializing provider {}'.format(self.__class__))
         self.providers.append(self)
 
 
