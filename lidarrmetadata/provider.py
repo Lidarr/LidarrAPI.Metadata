@@ -27,6 +27,8 @@ else:
     from urllib.parse import unquote as url_unquote
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.INFO)
 
 CONFIG = get_config()
 
