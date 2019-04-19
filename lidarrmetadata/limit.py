@@ -32,6 +32,13 @@ class QueueRateLimiter(object):
         else:
             raise RateLimitedError()
 
+class NullRateLimiter(QueueRateLimiter):
+    """
+    Rate limiter that doesn't do any limiting for testing
+    """
+    def _allowed(self):
+        return True
+
 class RedisRateLimiter(QueueRateLimiter):
     """
     TODO Implement this for handling rate limiting across server instances

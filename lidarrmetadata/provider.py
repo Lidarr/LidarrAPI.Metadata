@@ -293,7 +293,7 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         self.cache = util.Cache()
         self._api_key = api_key
         self._base_url = base_url
-        self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
+        self._limiter = limit.NullRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
                                                 time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
         self.use_https = use_https
 
@@ -786,7 +786,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         super(WikipediaProvider, self).__init__()
         self._client = mediawikiapi.MediaWikiAPI()
-        self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
+        self._limiter = limit.NullRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
                                                 time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
 
     def get_artist_overview(self, url):
