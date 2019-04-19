@@ -830,7 +830,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             logger.error('HTTPError {e}'.format(e=error))
             return ''
         except limit.RateLimitedError as error:
-            logger.error('Wikipedia Request for {e} rate limited'.format(e=error))
+            logger.error('Wikipedia Request for {title} rate limited'.format(title=title))
             return ''
 
     @classmethod
