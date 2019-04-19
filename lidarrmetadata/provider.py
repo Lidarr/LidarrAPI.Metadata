@@ -17,7 +17,8 @@ import psycopg2
 import pylast
 import requests
 
-import lidarrmetadata
+from lidarrmetadata.config import get_config
+from lidarrmetadata import limit
 from lidarrmetadata import util
 
 if six.PY2:
@@ -26,6 +27,11 @@ else:
     from urllib.parse import unquote as url_unquote
 
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.INFO)
+logger.info('Have provider logger')
+
+CONFIG = get_config()
 
 # Provider class dictionary
 PROVIDER_CLASSES = {}
@@ -269,6 +275,7 @@ class Provider(six.with_metaclass(ProviderMeta, object)):
     providers = []
 
     def __init__(self):
+        logger.info('Initializing provider {}'.format(self.__class__))
         self.providers.append(self)
 
 
@@ -290,6 +297,8 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         self.cache = util.Cache()
         self._api_key = api_key
         self._base_url = base_url
+        self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
+                                                time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
         self.use_https = use_https
 
     def get_artist_images(self, artist_id):
@@ -332,9 +341,16 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         """
         url = self.build_url(mbid)
         try:
-            return requests.get(url).json()
+            with self._limiter.limited():
+                return requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT).json()
         except HTTPError as error:
             logger.error('HTTPError: {e}'.format(e=error))
+            return None
+        except requests.exceptions.Timeout as error:
+            logger.error('Timeout: {e}'.format(e=error))
+            return None
+        except limit.RateLimitedError as error:
+            logger.error('Fanart request to {} rate limited'.format(mbid))
             return None
 
     def build_url(self, mbid):
@@ -774,6 +790,8 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         super(WikipediaProvider, self).__init__()
         self._client = mediawikiapi.MediaWikiAPI()
+        self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
+                                                time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
 
     def get_artist_overview(self, url):
         if 'wikidata' in url:
@@ -796,7 +814,8 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         :return: Summary String
         """
         try:
-            return self._client.summary(title, auto_suggest=False)
+            with self._limiter.limited():
+                return self._client.summary(title, auto_suggest=False)
         # FIXME Both of these may be recoverable
         except mediawikiapi.PageError as error:
             logger.error(u'Wikipedia PageError from {title}: {e}' % {'e':error, 'title':title})
@@ -809,6 +828,9 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             return ''
         except HTTPError as error:
             logger.error('HTTPError {e}'.format(e=error))
+            return ''
+        except limit.RateLimitedError as error:
+            logger.error('Wikipedia Request for {e} rate limited'.format(e=error))
             return ''
 
     @classmethod

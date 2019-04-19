@@ -294,6 +294,14 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Debug mode
     DEBUG = False
 
+    # External request parameters
+    # Size of rate limit queue
+    EXTERNAL_LIMIT_QUEUE_SIZE = 60
+    # Rate limit time delta in ms
+    EXTERNAL_LIMIT_TIME_DELTA = 1000
+    # Request timeout in ms
+    EXTERNAL_TIMEOUT = 1000
+
     # Fanart.tv API credentials
     FANART_KEY = ''
 
