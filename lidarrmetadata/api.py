@@ -134,10 +134,8 @@ def get_artist_info(mbid, include_albums, primary_types, secondary_types, releas
         provider.ArtistByIdMixin)
     link_providers = provider.get_providers_implementing(
         provider.ArtistLinkMixin)
-    overview_providers = [] and provider.get_providers_implementing(
-        provider.ArtistOverviewMixin)
-    artist_art_providers = [] and provider.get_providers_implementing(
-        provider.ArtistArtworkMixin)
+    overview_providers = provider.get_providers_implementing(provider.ArtistOverviewMixin)
+    artist_art_providers = provider.get_providers_implementing(provider.ArtistArtworkMixin)
 
     # TODO Figure out preferred providers
     if artist_providers:
