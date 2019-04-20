@@ -42,6 +42,7 @@ setup(
         'musicbrainzngs',
         'psycopg2-binary',
         'pylast<=1.9.0',
+        'pytelegraf',
         'python-dateutil',
         'sentry-sdk[flask]',
         'redis',
