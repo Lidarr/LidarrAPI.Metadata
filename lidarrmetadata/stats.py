@@ -15,5 +15,6 @@ class TelegrafStatsClient(object):
 
     def metric(self, key, value, tags=None):
         tags = tags or {}
-        tags['root'] = CONFIG.APPLICATION_ROOT
+        tags['application_path'] = CONFIG.APPLICATION_ROOT
+        print(tags)
         self._client.metric(key, value, tags=tags)
