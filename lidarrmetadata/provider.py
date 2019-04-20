@@ -304,8 +304,8 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         self._base_url = base_url
         self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
                                                 time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
-        self._stats = stats.TelegrafClient(CONFIG.STATS_HOST,
-                                           CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
+        self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
+                                                CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
         self.use_https = use_https
 
     def get_artist_images(self, artist_id):
@@ -807,8 +807,8 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
                                                 time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
 
-        self._stats = stats.TelegrafClient(CONFIG.STATS_HOST,
-                                           CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
+        self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
+                                                CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
 
     def get_artist_overview(self, url):
         if 'wikidata' in url:
