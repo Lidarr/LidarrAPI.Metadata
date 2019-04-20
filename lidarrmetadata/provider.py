@@ -500,7 +500,7 @@ class MusicbrainzDbProvider(Provider,
                                                                   'rating'] is not None else None}}
 
     def get_album_images(self, album_id):
-        filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'caa_by_mbid.sql')
+        filename = '../sql/caa_by_mbid.sql'
         results = self.query_from_file(filename, [album_id])
 
         type_mapping = {'Front': 'Cover', 'Medium': 'Disc'}
