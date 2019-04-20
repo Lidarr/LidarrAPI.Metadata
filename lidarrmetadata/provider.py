@@ -349,7 +349,8 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         url = self.build_url(mbid)
         try:
             with self._limiter.limited():
-                self._stats.metric('fanart', {'request': 1}) if self._stats else None
+                self._stats.metric('external', {'request': 1},
+                                   tags={'provider': 'fanart'}) if self._stats else None
                 return requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT).json()
         except HTTPError as error:
             logger.error('HTTPError: {e}'.format(e=error))
@@ -359,7 +360,8 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
             return None
         except limit.RateLimitedError:
             logger.error('Fanart request to {} rate limited'.format(mbid))
-            self._stats.metric('fanart', {'ratelimit': 1}) if self._stats else None
+            self._stats.metric('external', {'ratelimit': 1},
+                               tags={'provider': 'fanart'}) if self._stats else None
             return None
 
     def build_url(self, mbid):
@@ -828,7 +830,8 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         try:
             with self._limiter.limited():
-                self._stats.metric('wikipedia', {'request': 1}) if self._stats else None
+                self._stats.metric('external', {'request': 1},
+                                   tags={'provider': 'wikipedia'}) if self._stats else None
                 return self._client.summary(title, auto_suggest=False)
         # FIXME Both of these may be recoverable
         except mediawikiapi.PageError as error:
@@ -844,7 +847,8 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             logger.error('HTTPError {e}'.format(e=error))
             return ''
         except limit.RateLimitedError as error:
-            self._stats.metric('wikipedia', {'ratelimit': 1}) if self._stats else None
+            self._stats.metric('external', {'ratelimit': 1},
+                               tags={'provider': 'wikipedia'}) if self._stats else None
             logger.error('Wikipedia Request for {title} rate limited'.format(title=title))
             return ''
 
