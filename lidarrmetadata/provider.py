@@ -349,19 +349,18 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         url = self.build_url(mbid)
         try:
             with self._limiter.limited():
-                self._stats.metric('external', {'request': 1},
-                                   tags={'provider': 'fanart'}) if self._stats else None
+                self._count_request('request')
                 return requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT).json()
         except HTTPError as error:
             logger.error('HTTPError: {e}'.format(e=error))
             return None
         except requests.exceptions.Timeout as error:
             logger.error('Timeout: {e}'.format(e=error))
+            self._count_request('timeout')
             return None
         except limit.RateLimitedError:
             logger.error('Fanart request to {} rate limited'.format(mbid))
-            self._stats.metric('external', {'ratelimit': 1},
-                               tags={'provider': 'fanart'}) if self._stats else None
+            self._count_request('ratelimit')
             return None
 
     def build_url(self, mbid):
@@ -377,6 +376,10 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         url += mbid
         url += '/?api_key={api_key}'.format(api_key=self._api_key)
         return url
+
+    def _count_request(self, result_type):
+        if self._stats:
+            self._stats.metric('external', {result_type: 1}, tags={'provider': 'fanart'})
 
     @staticmethod
     def parse_album_images(response):
@@ -830,8 +833,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         try:
             with self._limiter.limited():
-                self._stats.metric('external', {'request': 1},
-                                   tags={'provider': 'wikipedia'}) if self._stats else None
+                self._count_request('request')
                 return self._client.summary(title, auto_suggest=False)
         # FIXME Both of these may be recoverable
         except mediawikiapi.PageError as error:
@@ -847,10 +849,13 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             logger.error('HTTPError {e}'.format(e=error))
             return ''
         except limit.RateLimitedError as error:
-            self._stats.metric('external', {'ratelimit': 1},
-                               tags={'provider': 'wikipedia'}) if self._stats else None
+            self._count_request('ratelimit')
             logger.error('Wikipedia Request for {title} rate limited'.format(title=title))
             return ''
+
+    def _count_request(self, result_type):
+        if self._stats:
+            self._stats.metric('external', {result_type: 1}, tags={'provider': 'wikipedia'})
 
     @classmethod
     def title_from_url(cls, url):
