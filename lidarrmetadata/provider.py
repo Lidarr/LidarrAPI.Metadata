@@ -435,6 +435,7 @@ class LastFmProvider(Provider,
 
 
 class MusicbrainzDbProvider(Provider,
+                            AlbumArtworkMixin,
                             ArtistByIdMixin,
                             ArtistLinkMixin,
                             ArtistNameSearchMixin,
@@ -494,7 +495,26 @@ class MusicbrainzDbProvider(Provider,
                 'Status': 'ended' if results['ended'] else 'active',
                 'Type': results['type'] or 'Artist',
                 'Disambiguation': results['comment'],
-                'Rating': {'Count': results['rating_count'] or 0, 'Value': results['rating'] / 10 if results['rating'] is not None else None}}
+                'Rating': {'Count': results['rating_count'] or 0,
+                           'Value': results['rating'] / 10 if results[
+                                                                  'rating'] is not None else None}}
+
+    def get_album_images(self, album_id):
+        filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'caa_by_mbid.sql')
+        results = self.query_from_file(filename, [album_id])
+
+        type_mapping = {'Front': 'Cover', 'Medium': 'Disc'}
+
+        art = {}
+        for result in results:
+            cover_type = type_mapping.get(result['type'], None)
+            if cover_type is not None and cover_type not in art:
+                art[cover_type] = self._build_caa_url(result['release_gid'], result['type'])
+        return [{'CoverType': art_type, 'Url': url} for art_type, url in art.items()]
+
+    @staticmethod
+    def _build_caa_url(release_id, art_type):
+        return 'https://coverartarchive.org/release/{}/{}.jpg'.format(release_id, art_type.lower())
 
     def search_artist_name(self, name, limit=None):
         name = self.mb_encode(name)
