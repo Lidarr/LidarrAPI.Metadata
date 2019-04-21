@@ -70,7 +70,6 @@ class RedisRateLimiter(QueueRateLimiter):
 
     def _put(self):
         items = self._client.incr(self._key)
-        print(items)
 
         # Set up expiration if we put the first item in the queue
         if items == 1:
