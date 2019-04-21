@@ -48,7 +48,8 @@ class NullRateLimiter(QueueRateLimiter):
 
 class RedisRateLimiter(QueueRateLimiter):
     """
-    Uses redis for rate limiting over
+    Uses redis for rate limiting over multiple processes using a redis counter with a timeout. This
+    should be the preferred rate limiter where redis is available.
     """
 
     def __init__(self,
@@ -65,7 +66,6 @@ class RedisRateLimiter(QueueRateLimiter):
 
     def _allowed(self):
         queued_items = int(self._client.get(self._key) or 0)
-        print(queued_items)
         return queued_items < self.queue_size
 
     def _put(self):
