@@ -47,6 +47,34 @@ def get_providers_implementing(cls):
     return [p for p in Provider.providers if isinstance(p, cls)]
 
 
+def _get_rate_limiter():
+    """
+    Builds a rate limiter from config values
+    :return: RateLimiter appropriate to config
+    """
+    try:
+        limit_class = getattr(limit, CONFIG.EXTERNAL_LIMIT_CLASS)
+    except AttributeError:
+        logger.error('Limit class "{}" does not exist. Defaulting to NullRateLimiter'.format(CONFIG.EXTERNAL_LIMIT_CLASS))
+        return limit.NullRateLimiter()
+
+    logger.info('Initializing rate limiter class {}'.format(limit_class))
+    if limit_class == limit.NullRateLimiter:
+        return limit.NullRateLimiter()
+    elif limit_class == limit.RedisRateLimiter:
+        return limit.RedisRateLimiter(redis_host=CONFIG.EXTERNAL_LIMIT_REDIS_HOST,
+                                      redis_port=CONFIG.EXTERNAL_LIMIT_REDIS_PORT,
+                                      redis_db=CONFIG.EXTERNAL_LIMIT_REDIS_DB,
+                                      queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
+                                      time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
+    elif limit_class == limit.SimpleRateLimiter:
+        return limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
+                                       time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
+    else:
+        logger.warning("Don't know how to instantiate {}. Defaulting to NullRateLimiter".format(limit_class))
+        return limit.NullRateLimiter()
+
+
 class MixinBase(six.with_metaclass(abc.ABCMeta, object)):
     pass
 
@@ -302,8 +330,7 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         self.cache = util.Cache()
         self._api_key = api_key
         self._base_url = base_url
-        self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
-                                                time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
+        self._limiter = _get_rate_limiter()
         self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
         self.use_https = use_https
@@ -804,8 +831,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         super(WikipediaProvider, self).__init__()
         self._client = mediawikiapi.MediaWikiAPI()
-        self._limiter = limit.SimpleRateLimiter(queue_size=CONFIG.EXTERNAL_LIMIT_QUEUE_SIZE,
-                                                time_delta=CONFIG.EXTERNAL_LIMIT_TIME_DELTA)
+        self._limiter = _get_rate_limiter()
 
         self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
