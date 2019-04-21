@@ -875,11 +875,11 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             logger.error(u'KeyError {e}'.format(e=error))
             return ''
         except HTTPError as error:
-            logger.error('HTTPError {e}'.format(e=error))
+            logger.error(u'HTTPError {e}'.format(e=error))
             return ''
         except limit.RateLimitedError as error:
             self._count_request('ratelimit')
-            logger.error('Wikipedia Request for {title} rate limited'.format(title=title))
+            logger.error(u'Wikipedia Request for {title} rate limited'.format(title=title))
             return ''
 
     def _count_request(self, result_type):
