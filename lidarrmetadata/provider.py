@@ -59,7 +59,7 @@ def _get_rate_limiter(key=None):
             CONFIG.EXTERNAL_LIMIT_CLASS))
         return limit.NullRateLimiter()
 
-    logger.info('Initializing rate limiter class {}'.format(limit_class))
+    logger.info('Initializing rate limiter class {} with key {}'.format(limit_class, key))
     if limit_class == limit.NullRateLimiter:
         return limit.NullRateLimiter()
     elif limit_class == limit.RedisRateLimiter:
