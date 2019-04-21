@@ -1,13 +1,15 @@
 import time
 
+import mockredis
 import pytest
 
 from lidarrmetadata import limit
 
-class TestSimpleRateLimiter(object):
-    def setup(self):
-        self.limiter = limit.SimpleRateLimiter(queue_size=5, time_delta=1000)
+# Patch our mock redis
+limit.redis.Redis = mockredis.mock_redis_client
 
+
+class BaseTestRateLimiter(object):
     def test_allowed(self):
         for _ in range(5):
             with self.limiter.limited():
@@ -21,5 +23,23 @@ class TestSimpleRateLimiter(object):
 
     def test_queue_popped(self):
         for _ in range(10):
+            with self.limiter.limited():
+                time.sleep(1)
+
+
+class TestSimpleRateLimiter(BaseTestRateLimiter):
+    def setup(self):
+        self.limiter = limit.SimpleRateLimiter(queue_size=5, time_delta=1000)
+
+
+class TestRedisRateLimiter(BaseTestRateLimiter):
+    def setup_method(self, method):
+        print(method)
+        self.limiter = limit.RedisRateLimiter(key=method.__name__, queue_size=5, time_delta=1000)
+
+    def test_queue_popped(self):
+        for _ in range(10):
+            # Mock client doesn't support automatic expiration
+            self.limiter._client.do_expire()
             with self.limiter.limited():
                 time.sleep(1)
