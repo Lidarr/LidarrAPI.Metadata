@@ -1,11 +1,14 @@
 import atexit
 from contextlib import contextmanager
 from multiprocessing import Queue, Process, Value
-
 import time
+
+import redis
+
 
 class RateLimitedError(Exception):
     pass
+
 
 class QueueRateLimiter(object):
     """
@@ -14,6 +17,7 @@ class QueueRateLimiter(object):
     and a ``RateLimitedError`` is raised if not. This approach is more flexible that a plain time difference as bursts
     of events can be allowed.
     """
+
     def __init__(self, queue_size=60, time_delta=10):
         self.queue_size = queue_size
         self.time_delta = time_delta
@@ -32,18 +36,47 @@ class QueueRateLimiter(object):
         else:
             raise RateLimitedError()
 
+
 class NullRateLimiter(QueueRateLimiter):
     """
     Rate limiter that doesn't do any limiting for testing
     """
+
     def _allowed(self):
         return True
 
+
 class RedisRateLimiter(QueueRateLimiter):
     """
-    TODO Implement this for handling rate limiting across server instances
+    Uses redis for rate limiting over multiple processes using a redis counter with a timeout. This
+    should be the preferred rate limiter where redis is available.
     """
-    pass
+
+    def __init__(self,
+                 key=None,
+                 redis_host='localhost',
+                 redis_port=6379,
+                 redis_db=10,
+                 queue_size=60,
+                 time_delta=100):
+        super(RedisRateLimiter, self).__init__(queue_size=queue_size, time_delta=time_delta)
+
+        self._client = redis.Redis(host=redis_host, port=redis_port, db=redis_db)
+        self._key = key or __name__
+
+    def _allowed(self):
+        queued_items = int(self._client.get(self._key) or 0)
+        return queued_items < self.queue_size
+
+    def _put(self):
+        items = self._client.incr(self._key)
+        print(items)
+
+        # Set up expiration if we put the first item in the queue
+        if items == 1:
+            expire_time = (self.queue_size - 1) * self.time_delta / 1000
+            self._client.expire(self._key, expire_time)
+
 
 class SimpleRateLimiter(QueueRateLimiter):
     """
@@ -59,9 +92,9 @@ class SimpleRateLimiter(QueueRateLimiter):
         self._pop_process = Process(target=self._pop_old)
         self._pop_process.start()
 
-        # Register to be closed at the end. This isn't ideal, but flask doesn't give us a shutdown hook
+        # Register to be closed at the end. This isn't ideal, but flask doesn't give us a shutdown
+        # hook
         atexit.register(self.close)
-
 
     def close(self):
         self._running.value = False

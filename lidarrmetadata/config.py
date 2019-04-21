@@ -298,12 +298,21 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     ENABLE_STATS = True
 
     # External request parameters
+    # Class of limiter
+    EXTERNAL_LIMIT_CLASS = 'RedisRateLimiter'
     # Size of rate limit queue
     EXTERNAL_LIMIT_QUEUE_SIZE = 60
     # Rate limit time delta in ms
     EXTERNAL_LIMIT_TIME_DELTA = 1000
     # Request timeout in ms
     EXTERNAL_TIMEOUT = 1000
+
+    # Redis db if using RedisRateLimiter
+    EXTERNAL_LIMIT_REDIS_DB = 10
+    # Redis host if using RedisRateLimiter
+    EXTERNAL_LIMIT_REDIS_HOST = 'redis'
+    # Redis port if using RedisRateLimiter
+    EXTERNAL_LIMIT_REDIS_PORT = 6379
 
     # Fanart.tv API credentials
     FANART_KEY = ''
@@ -346,6 +355,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 class TestConfig(DefaultConfig):
     CACHE_CONFIG = {'CACHE_TYPE': 'null'}
     ENABLE_STATS = False
+    EXTERNAL_LIMIT_CLASS = 'NullRateLimiter'
     SENTRY_REDIS_HOST = None
     SENTRY_REDIS_PORT = None
     Testing = True
