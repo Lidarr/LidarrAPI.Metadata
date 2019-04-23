@@ -539,12 +539,12 @@ class MusicbrainzDbProvider(Provider,
         for result in results:
             cover_type = type_mapping.get(result['type'], None)
             if cover_type is not None and cover_type not in art:
-                art[cover_type] = self._build_caa_url(result['release_gid'], result['type'])
+                art[cover_type] = self._build_caa_url(result['release_gid'], result['image_id'])
         return [{'CoverType': art_type, 'Url': url} for art_type, url in art.items()]
 
     @staticmethod
-    def _build_caa_url(release_id, art_type):
-        return 'https://coverartarchive.org/release/{}/{}.jpg'.format(release_id, art_type.lower())
+    def _build_caa_url(release_id, image_id):
+        return 'https://coverartarchive.org/release/{}/{}.jpg'.format(release_id, image_id)
 
     def search_artist_name(self, name, limit=None):
         name = self.mb_encode(name)
