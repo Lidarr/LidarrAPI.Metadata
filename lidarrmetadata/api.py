@@ -208,7 +208,7 @@ def get_release_group_info(mbid):
 
     release_group_providers = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)
     release_providers = provider.get_providers_implementing(provider.ReleasesByReleaseGroupIdMixin)
-    album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)
+    album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)[::-1]
     artist_art_providers = provider.get_providers_implementing(provider.ArtistArtworkMixin)
     track_providers = provider.get_providers_implementing(provider.TracksByReleaseGroupMixin)
     link_providers = provider.get_providers_implementing(provider.ReleaseGroupLinkMixin)
@@ -271,7 +271,9 @@ def get_release_group_info(mbid):
 
     if album_art_providers:
         release_group['Images'] = album_art_providers[0].get_album_images(
-            release_group['Id'], cache_only=True)
+            release_group['Id'])
+        if not release_group['Images'] and len(album_art_providers) > 1:
+            release_group['Images'] = album_art_providers[1].get_album_images(release_group['Id'])
     else:
         release_group['Images'] = []
 
@@ -343,7 +345,7 @@ def search_album():
     limit = None if limit < 1 else limit
 
     search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
-    album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)
+    album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)[::-1]
 
     if search_providers:
         albums = search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
@@ -365,6 +367,9 @@ def search_album():
     if album_art_providers:
         for album in albums:
             album['Images'] = album_art_providers[0].get_album_images(album['Id'])
+
+            if not album['Images'] and len(album_art_providers) > 1:
+                album['Images'] = album_art_providers[1].get_album_images(album['Id'])
 
     return jsonify(albums)
 
@@ -493,4 +498,4 @@ def search_route():
 
 
 if __name__ == '__main__':
-    app.run(port=config.get_config().HTTP_PORT)
+    app.run(debug=True, port=config.get_config().HTTP_PORT)
