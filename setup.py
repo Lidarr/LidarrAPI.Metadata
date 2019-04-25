@@ -46,8 +46,8 @@ setup(
         'python-dateutil',
         'sentry-sdk[flask]',
         'redis',
-        'requests',
-        'urllib3>1.24.2',
+        'requests==2.21.0',
+        'urllib3==1.25.1',
         'werkzeug>=0.7.0',
     ],
 
