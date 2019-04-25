@@ -47,7 +47,7 @@ setup(
         'sentry-sdk[flask]',
         'redis',
         'requests',
-        'urllib3==1.23',
+        'urllib3>1.24.2',
         'werkzeug>=0.7.0',
     ],
 
