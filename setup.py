@@ -52,7 +52,7 @@ setup(
     ],
 
     extras_require={
-        'deploy': ['gunicorn'],
+        'deploy': ['gunicorn[gevent]'],
         'test': ['mockredispy', 'pytest', 'tox']
     },
 

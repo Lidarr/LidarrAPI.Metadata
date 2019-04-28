@@ -37,7 +37,9 @@ def main():
 
     options = {
         'bind': '0.0.0.0:{port}'.format(port=config.HTTP_PORT),
-        'workers': (multiprocessing.cpu_count() * 2) + 1
+        'log_level': 'debug',
+        'workers': (multiprocessing.cpu_count() * 2) + 1,
+        'worker_class': 'gevent'
     }
 
     StandaloneApplication(app, options).run()
