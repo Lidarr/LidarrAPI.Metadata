@@ -380,7 +380,7 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         try:
             with self._limiter.limited():
                 self._count_request('request')
-                response = requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT)
+                response = requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT / 1000)
                 try:
                     return response.json()
                 except Exception as e:
