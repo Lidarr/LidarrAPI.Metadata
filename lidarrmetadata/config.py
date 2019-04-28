@@ -309,9 +309,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
     # Provider -> (args, kwargs) dictionaries
     PROVIDERS = {
-        'FANARTTVPROVIDER': ([FANART_KEY], {}),
+        #'FANARTTVPROVIDER': ([FANART_KEY], {}),
         'MUSICBRAINZDBPROVIDER': ([], {'DB_HOST': 'musicbrainz'}),
-        'WIKIPEDIAPROVIDER': ([], {})
+        #'WIKIPEDIAPROVIDER': ([], {})
     }
 
     # Connection info for sentry
