@@ -15,6 +15,7 @@ import dateutil.parser
 import mediawikiapi
 import psycopg2
 import psycopg2.extensions
+from psycopg2 import sql
 import pylast
 import requests
 
@@ -108,7 +109,7 @@ class ArtistNameSearchMixin(MixinBase):
     """
 
     @abc.abstractmethod
-    def search_artist_name(self, name, limit=None):
+    def search_artist_name(self, name, limit=None, albums=None):
         """
         Searches for artist with name
         :param name: Name to search for
@@ -291,6 +292,14 @@ class AlbumNameSearchMixin(MixinBase):
         """
         pass
 
+class DataVintageMixin(MixinBase):
+    """
+    Returns vintage of data in use
+    """
+    
+    @abc.abstractmethod
+    def data_vintage(self):
+        pass
 
 class ProviderMeta(abc.ABCMeta):
     def __new__(mcls, name, bases, namespace):
@@ -474,9 +483,189 @@ class LastFmProvider(Provider,
         return [{'Id': result.get_mbid(),
                  'Overview': result.get_bio_summary()}
                 for result in results]
+    
+class SolrSearchProvider(Provider,
+                         ArtistNameSearchMixin,
+                         AlbumNameSearchMixin):
+    
+    """
+    Provider that uses a solr indexed search
+    """
+    def __init__(self,
+                 search_server='http://solr:8983/solr'):
+        """
+        Class initialization
 
+        Defaults to the offical musicbrainz webservice but in principle we could
+        host our own mirror using https://github.com/metabrainz/musicbrainz-docker
 
+        :param search_server: URL for the search server.  Note that using HTTPS adds around 100ms to search time.
+        """
+        super(SolrSearchProvider, self).__init__()
+
+        self._search_server = search_server
+        self._limiter = _get_rate_limiter(key='solr_search')
+        
+        self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
+                                                CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
+
+            
+    def _count_request(self, result_type):
+        if self._stats:
+            self._stats.metric('external', {result_type: 1}, tags={'provider': 'solr_search'})
+
+    def _record_response_result(self, response):
+        if self._stats:
+            self._stats.metric('external',
+                               {
+                                   'response_time': response.elapsed.microseconds / 1000,
+                                   'response_status_code': response.status_code
+                               },
+                               tags={'provider': 'solr_search'})
+        
+    def get_with_limit(self, url):
+        
+        try:
+            with self._limiter.limited():
+                self._count_request('request')
+                response = requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT)
+                self._record_response_result(response)
+
+                if response.status_code == 200:
+                    return response
+                else:
+                    logger.error('Non-200 response code for search: {}\n\t{}'.format(response.status_code,
+                                                                                     response))
+                    return {}
+
+        except HTTPError as error:
+            logger.error('HTTPError: {e}'.format(e=error))
+            return {}
+        except requests.exceptions.Timeout as error:
+            logger.error('Timeout: {e}'.format(e=error))
+            self._count_request('timeout')
+            return {}
+        except limit.RateLimitedError:
+            logger.error('Musicbrainz search request rate limited')
+            self._count_request('ratelimit')
+            return {}
+        
+    def search_artist_name(self, name, limit=None, albums=None):
+        
+        if albums:
+            return self.search_artist_name_with_albums(name, albums, self.parse_artist_search_with_albums, limit)
+
+        # Note that when using a dismax query we shouldn't apply lucene escaping
+        # See https://github.com/metabrainz/musicbrainz-server/blob/master/lib/MusicBrainz/Server/Data/WebService.pm
+        url = u'{server}/artist/select?wt=mbjson&q={query}'.format(server=self._search_server, query=name)
+        
+        if limit:
+            url += u'&rows={}'.format(limit)
+        
+        response = self.get_with_limit(url)
+        
+        if not response:
+            return {}
+        
+        logger.debug("Search for {query} completed in {time}ms".format(query=name, time=response.elapsed.microseconds / 1000))
+        
+        return self.parse_artist_search(response.json())
+    
+    def search_artist_name_with_albums(self, artist, albums, handler, limit=None):
+        
+        album_query = u" ".join(albums)
+        query = u"({album_query}) AND (artist:{artist} OR artistname:{artist} OR creditname:{artist})".format(album_query=album_query, artist=artist)
+        
+        url = u'{server}/release-group/advanced?wt=mbjson&q={query}'.format(server=self._search_server,
+                                                                            query=self.escape_lucene_query(query))
+        
+        if limit:
+            url += u'&rows={}'.format(limit)
+            
+        response = self.get_with_limit(url)
+        
+        if not response:
+            return {}
+
+        logger.debug("Search for {query} completed in {time}ms".format(query=query, time=response.elapsed.microseconds / 1000))
+        
+        return handler(response.json())
+    
+    def search_album_name(self, name, limit=None, artist_name=''):
+        
+        if artist_name:
+            return self.search_artist_name_with_albums(artist_name, [name], self.parse_album_search, limit)
+
+        # Note that when using a dismax query we shouldn't apply lucene escaping
+        # See https://github.com/metabrainz/musicbrainz-server/blob/master/lib/MusicBrainz/Server/Data/WebService.pm
+        url = u'{server}/release-group/select?wt=mbjson&q={query}'.format(server=self._search_server, query=name)
+        
+        if limit:
+            url += u'&rows={}'.format(limit)
+        
+        response = self.get_with_limit(url)
+        
+        if not response:
+            return {}
+        
+        logger.debug("Search for {query} completed in {time}ms".format(query=name, time=response.elapsed.microseconds / 1000))
+        
+        return self.parse_album_search(response.json())
+
+    
+    @staticmethod
+    def escape_lucene_query(text):
+        return re.sub(r'([+\-&|!(){}\[\]\^"~*?:\\/])', r'\\\1', text)
+        
+    @staticmethod
+    def parse_artist_search(response):
+        
+        if not 'count' in response or response['count'] == 0:
+            return []
+        
+        return [{'Id': x['id'],
+                 'ArtistName': x['name'],
+                 'Type': x['type'] if 'type' in x else '',
+                 'Disambiguation': x['disambiguation'] if 'disambiguation' in x else ''}
+                for x in response['artists']];
+    
+    @staticmethod
+    def parse_artist_search_with_albums(response):
+        
+        if not 'count' in response or response['count'] == 0:
+            return []
+        
+        artists = []
+        seen_artists = set()
+        
+        for rg in response['release-groups']:
+            for credit in rg['artist-credit']:
+                if not credit['artist']['id'] in seen_artists:
+                    seen_artists.add(credit['artist']['id'])
+                    artists.append(credit['artist'])
+                
+        result = [{'Id': artist['id'],
+                    'ArtistName': artist['name'],
+                    'Disambiguation': artist['disambiguation'] if 'disambiguation' in artist else ''}
+                  for artist in artists]
+        
+        return result
+    
+    @staticmethod
+    def parse_album_search(response):
+        
+        if not 'count' in response or response['count'] == 0:
+            return []
+        
+        result = [{'Id': result['id'],
+                 'Title': result['title'],
+                 'Type': result['primary-type'] if 'primary-type' in result else 'Unknown'}
+                for result in response['release-groups']]
+
+        return result
+    
 class MusicbrainzDbProvider(Provider,
+                            DataVintageMixin,
                             AlbumArtworkMixin,
                             ArtistByIdMixin,
                             ArtistLinkMixin,
@@ -524,6 +713,9 @@ class MusicbrainzDbProvider(Provider,
         self._db_name = db_name
         self._db_user = db_user
         self._db_password = db_password
+        
+    def data_vintage(self):
+        return self.query_from_file('../sql/data_vintage.sql')[0]['vintage']
 
     def get_artist_by_id(self, artist_id):
         results = self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])
@@ -558,10 +750,17 @@ class MusicbrainzDbProvider(Provider,
     def _build_caa_url(release_id, image_id):
         return 'https://coverartarchive.org/release/{}/{}.jpg'.format(release_id, image_id)
 
-    def search_artist_name(self, name, limit=None):
+    def search_artist_name(self, name, limit=None, albums=None):
         name = self.mb_encode(name)
+        
+        filename = 'artist_search_name_with_album.sql' if albums else 'artist_search_name.sql'
 
-        filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'artist_search_name.sql')
+        args = {'artist': name}
+        if albums:
+            with self._cursor() as cursor:
+                args['album_query'] = sql.SQL(' | ').join([sql.Literal(album) for album in albums]).as_string(cursor)
+
+        filename = pkg_resources.resource_filename('lidarrmetadata.sql', filename)
         with open(filename, 'r') as infile:
             query = infile.read()
 
@@ -570,7 +769,7 @@ class MusicbrainzDbProvider(Provider,
                 if limit:
                     query += cursor.mogrify(' LIMIT %s', [limit])
 
-        results = self.map_query(query, [name, name, name, name])
+        results = self.map_query(query, **args)
 
         return [{'Id': result['gid'],
                  'ArtistName': result['name'],
@@ -694,19 +893,10 @@ class MusicbrainzDbProvider(Provider,
                                        [artist_id])
 
         return [{'Id': result['gid'],
-                 'ArtistId': artist_id,
-                 'Disambiguation': result['comment'],
                  'Title': result['album'],
                  'Type': result['primary_type'],
                  'SecondaryTypes': result['secondary_types'],
-                 'ReleaseStatuses': result['release_statuses'],
-                 'ReleaseDate': datetime.datetime(result['year'] or 1,
-                                                  result['month'] or 1,
-                                                  result['day'] or 1),
-                 'Rating': {
-                     'Count': result['rating_count'] or 0,
-                     'Value': result['rating'] / 10 if result['rating'] is not None else None
-                 }}
+                 'ReleaseStatuses': result['release_statuses']}
                 for result in results]
 
     def get_artist_links(self, artist_id):
@@ -782,16 +972,18 @@ class MusicbrainzDbProvider(Provider,
         with open(filename, 'r') as sql:
             return util.cache_or_call(self.map_query, sql.read(), *args, **kwargs)
 
-    def map_query(self, *args, **kwargs):
+    def map_query(self, sql, *args, **kwargs):
         """
         Maps a SQL query to a list of dicts of column name: value
         :param args: Args to pass to cursor.execute
         :param kwargs: Keyword args to pass to cursor.execute
         :return: List of dict with column: value
         """
+        
+        cursor_args = args[0] if args else kwargs
 
         with self._cursor() as cursor:
-            cursor.execute(*args, **kwargs)
+            cursor.execute(sql, cursor_args)
             columns = collections.OrderedDict(
                 (column.name, None) for column in cursor.description)
             results = cursor.fetchall()

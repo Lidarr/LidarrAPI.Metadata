@@ -1,92 +1,99 @@
-version: '2'
+version: "3"
+
+volumes:
+  pgdata:
+    driver: local
+  dbdump:
+    driver: local
+  solrdata:
+    driver: local
+  rabbitdata:
+    driver: local
+  redisdata:
+    driver: local
+
+networks:
+  lidarrmetadata:
+
 services:
-  metadata-v03:
-    image: lidarr/lidarrapi.metadata:develop
-    restart: always
-    
-    depends_on:
-      - redis
-      - musicbrainz
-      
-    ports:
-      - 3003:5001
-      
-    networks:
-      - lidarrmetadata
-      
-    environment:
-      - APPLICATION_ROOT=/api/v0.3
-      - FANART_KEY
-      - LASTFM_KEY
-      - LASTFM_SECRET
-      - PROVIDERS__FANARTTVPROVIDER__0__0=$FANART_KEY
-      
-  metadata-latest:
-    image: lidarr/lidarrapi.metadata:latest
-    restart: always
-    
-    depends_on:
-      - redis
-      - musicbrainz
-      
-    ports:
-      - 3001:5001
-      
-    networks:
-      - lidarrmetadata
-      
-    environment:
-      - APPLICATION_ROOT=/api/testing
-      - CACHE_CONFIG__CACHE_TYPE=null
-      - FANART_KEY
-      - LASTFM_KEY
-      - LASTFM_SECRET
-      - PROVIDERS__FANARTTVPROVIDER__0__0=$FANART_KEY
-
-#  metadata-build:
-#    build: .
-#    restart: unless-stopped
-#
-#
-#    depends_on:
-#      - redis
-#      - musicbrainz
-#
-#    networks:
-#      - lidarrmetadata
-#
-#    ports:
-#      - 5001:5001
-
   redis:
     image: redis
     command: redis-server /usr/local/etc/redis/redis.conf
     restart: unless-stopped
 
-    networks:
-      - lidarrmetadata
-
     volumes:
-      - /opt/redis:/data
+      - redisdata:/data
       - $PWD/redis.conf:/usr/local/etc/redis/redis.conf
 
+    networks:
+      - lidarrmetadata
+      
+  db:
+    image: ta264/musicbrainz-postgres
+    restart: unless-stopped
+    
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+    env_file:
+      - ./postgres.env
+    
+    networks:
+      - lidarrmetadata
+
   musicbrainz:
-    image: linuxserver/musicbrainz
+    image: ta264/musicbrainz-server
     restart: unless-stopped
 
+    volumes:
+      - dbdump:/media/dbdump
+
+    env_file:
+      - ./postgres.env
+
+    depends_on:
+      - db
+      - redis
 
     networks:
       - lidarrmetadata
 
-    environment:
-      - BRAINZCODE
-      - NPROC=3
-      - PUID
-      - PGID
+  solr:
+    image: ta264/musicbrainz-solr
+    restart: unless-stopped
+  
+    volumes:
+      - solrdata:/opt/solr/server/solr/data
+    
+    networks:
+      - lidarrmetadata
+
+  sir:
+    build:
+        context: sir
+    restart: unless-stopped
+
+    depends_on:
+      - db
+      - rabbit
+      - solr
+    
+    networks:
+      - lidarrmetadata
+
+  rabbit:
+    image: rabbitmq:3.6
+    restart: unless-stopped
 
     volumes:
-      - /opt/musicbrainz/config:/config
-      - /opt/musicbrainz/data:/data
+      - rabbitdata:/var/lib/rabbitmq/mnesia
+    
+    hostname: rabbit
+  
+    environment:
+      RABBITMQ_DEFAULT_USER: "abc"
+      RABBITMQ_DEFAULT_PASS: "abc"
+    
+    networks:
+      - lidarrmetadata
 
-networks:
-  lidarrmetadata:

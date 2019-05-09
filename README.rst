@@ -25,3 +25,24 @@ Running
 The metadata API server may be run by executing the ``server.py`` file or by
 the command ``lidarr-metadata-server`` that is installed with the installation
 instructions above.
+
+Docker services
+===============
+
+The metadata server requires access to a musicbrainz postgresql database and solr search server.
+
+To initialize these in docker you can run
+
+```
+docker-compose build
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+docker-compose exec musicbrainz /createdb.sh -fetch
+docker-compose exec sir make install
+docker-compose exec sir make index
+```
+
+These will take several hours to complete.
+
+ - `docker-compose.yml` defines the base services required - the musicbrainz database, server, solr and supporting services.
+ - `docker-compose.dev.yml` exposes ports for the supporting services in `docker-compose.yml` to allow running the lidarr metadata service on the host.
+ - `docker-compose.prod.yml` runs the lidarr metadata service in docker in addition to the supporting services.  Supporting services are not exposed.
