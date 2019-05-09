@@ -866,6 +866,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
 
+    @util.CACHE.memoize()
     def get_artist_overview(self, url):
         if 'wikidata' in url:
             title = self.get_wikipedia_title(url)
@@ -880,7 +881,6 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         return data.get('entities', {}).get(entity, {}).get('sitelinks', {}).get('enwiki', {}).get(
             'title', '')
 
-    @util.CACHE.memoize()
     def get_summary(self, title):
         """
         Gets summary of a wikipedia page
