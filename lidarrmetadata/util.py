@@ -103,7 +103,7 @@ def translate_string(s, table):
     :param table: Tranalation table as dictionary
     :return: Translated string
     """
-    return ''.join([table.get(c, c) for c in s])
+    return u''.join([table.get(c, c) for c in s])
 
 
 class BidirectionalDictionary(dict):
