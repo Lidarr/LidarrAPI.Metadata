@@ -14,6 +14,7 @@ from urllib3.exceptions import HTTPError
 import dateutil.parser
 import mediawikiapi
 import psycopg2
+import psycopg2.extensions
 import pylast
 import requests
 
@@ -31,6 +32,10 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 logger.info('Have provider logger')
+
+# always get strings from database in unicode
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
+psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 CONFIG = get_config()
 
@@ -488,9 +493,9 @@ class MusicbrainzDbProvider(Provider,
     """
 
     TRANSLATION_TABLE = util.BidirectionalDictionary({
-        u'\u2026': '...',  # HORIZONTAL ELLIPSIS (U+2026)
-        u'\u0027': "'",  # APOSTROPHE (U+0027)
-        u'\u2010': '-',  # HYPHEN (U+2010)
+        u'\u2026': u'...',  # HORIZONTAL ELLIPSIS (U+2026)
+        u'\u0027': u"'",  # APOSTROPHE (U+0027)
+        u'\u2010': u'-',  # HYPHEN (U+2010)
         u'\u8243': u'\u2033',  # DOUBLE PRIME (U+8243)
     })
 
