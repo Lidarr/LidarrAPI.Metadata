@@ -176,9 +176,7 @@ def get_lastfm_artist_chart(count=10, user=None):
         artist = {'ArtistName': lastfm_artist.name, 'ArtistId': lastfm_artist.get_mbid()}
 
         if not all(artist.values()):
-            print(artist)
             results = search_provider.search_artist_name(artist['ArtistName'], limit=1)
-            print(results)
             if results:
                 results = results[0]
                 artist = {'ArtistName': results['ArtistName'], 'ArtistId': results['Id']}
@@ -193,9 +191,11 @@ def get_lastfm_artist_chart(count=10, user=None):
 
 
 def _parse_album_search_result(search_result):
+    album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
+    album = album_provider.get_release_group_by_id(search_result['Id'])
     return {
-        'AlbumId': search_result['Id'],
-        'AlbumTitle': search_result['Title'],
-        'ArtistId': search_result['ArtistId'],
-        'ReleaseDate': search_result['ReleaseDate']
+        'AlbumId': album['Id'],
+        'AlbumTitle': album['Title'],
+        'ArtistId': album['ArtistId'],
+        'ReleaseDate': album['ReleaseDate']
     }
