@@ -7,6 +7,7 @@ import redis
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 from werkzeug.exceptions import HTTPException
+import datetime
 
 import lidarrmetadata
 from lidarrmetadata import chart
@@ -46,7 +47,28 @@ for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
     lower_kwargs = {k.lower(): v for k, v in kwargs.items()}
     provider.PROVIDER_CLASSES[provider_key](*args, **lower_kwargs)
 
-
+# Allow all endpoints to be cached by default
+@app.after_request
+def add_cloudflare_cache_header(response):
+    if not response.cache_control:
+        ttl = app.config['CLOUDFLARE_CACHE_TTL']
+        if ttl > 0:
+            response.cache_control.public = True
+            response.cache_control.max_age = ttl
+            response.cache_control.s_maxage = ttl
+            response.expires = datetime.datetime.utcnow() + datetime.timedelta(seconds = ttl)
+        else:
+            response.cache_control.no_cache = True
+    return response
+    
+# Decorator to disable caching by endpoint
+def no_cache(func):
+    def wrapper(*args, **kwargs):
+        response = func(*args, **kwargs)
+        response.cache_control.no_cache = True
+        return response
+    return wrapper
+    
 def get_search_query():
     """
     Search for a track
@@ -96,6 +118,7 @@ def validate_mbid(mbid, check_blacklist=True):
 
 
 @app.route('/')
+@no_cache
 def default_route():
     """
     Default route with API information

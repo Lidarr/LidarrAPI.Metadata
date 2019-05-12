@@ -288,6 +288,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
         'CACHE_REDIS_HOST': 'redis'
     }
 
+    # TTL set in Cache-Control headers.  Use 0 to disable caching.
+    CLOUDFLARE_CACHE_TTL = 60 * 60 * 8
+
     # File to use for DB
     DB_FILE = os.path.abspath('./music-metadata.db')
 
@@ -355,6 +358,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
 class TestConfig(DefaultConfig):
     CACHE_CONFIG = {'CACHE_TYPE': 'null'}
+    CLOUDFLARE_CACHE_TTL = 0
     ENABLE_STATS = False
     EXTERNAL_LIMIT_CLASS = 'NullRateLimiter'
     SENTRY_REDIS_HOST = None
