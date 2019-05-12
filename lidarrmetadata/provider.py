@@ -534,8 +534,8 @@ class SolrSearchProvider(Provider,
                 if response.status_code == 200:
                     return response
                 else:
-                    logger.error('Non-200 response code for search: {}\n\t{}'.format(response.status_code,
-                                                                                     response))
+                    logger.error(u'Non-200 response code for search: {}\n\t{}'.format(response.status_code,
+                                                                                      response))
                     return {}
 
         except HTTPError as error:
@@ -567,7 +567,7 @@ class SolrSearchProvider(Provider,
         if not response:
             return {}
         
-        logger.debug("Search for {query} completed in {time}ms".format(query=name, time=response.elapsed.microseconds / 1000))
+        logger.debug(u'Search for {query} completed in {time}ms'.format(query=name, time=response.elapsed.microseconds / 1000))
         
         return self.parse_artist_search(response.json())
     
@@ -587,7 +587,7 @@ class SolrSearchProvider(Provider,
         if not response:
             return {}
 
-        logger.debug("Search for {query} completed in {time}ms".format(query=query, time=response.elapsed.microseconds / 1000))
+        logger.debug(u'Search for {query} completed in {time}ms'.format(query=query, time=response.elapsed.microseconds / 1000))
         
         return handler(response.json())
     
@@ -608,7 +608,7 @@ class SolrSearchProvider(Provider,
         if not response:
             return {}
         
-        logger.debug("Search for {query} completed in {time}ms".format(query=name, time=response.elapsed.microseconds / 1000))
+        logger.debug(u'Search for {query} completed in {time}ms'.format(query=name, time=response.elapsed.microseconds / 1000))
         
         return self.parse_album_search(response.json())
 
