@@ -126,7 +126,7 @@ def get_artist_info_route(mbid):
         return artist
 
     albums = get_artist_albums(mbid)
-    if not albums:
+    if albums is None:
         return jsonify(error='No release group provider available'), 500
         
     # Filter release group types
