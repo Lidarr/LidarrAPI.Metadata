@@ -10,6 +10,7 @@ import functools
 import redis
 
 from lidarrmetadata import config
+from lidarrmetadata import cache
 
 # Cache for application
 CACHE = flask_caching.Cache(config=config.get_config().CACHE_CONFIG)

@@ -38,7 +38,7 @@ class TestWikipediaProvider:
         self.provider = provider.WikipediaProvider()
 
     def test_summary_invalid_url_empty(self):
-        assert '' == self.provider.get_summary('fakeurl')
+        assert None == self.provider.get_summary('fakeurl')
 
     @pytest.mark.parametrize('url,expected', [
         ('http://en.wikipedia.org/wiki/Blink-182', 'Blink-182'),
