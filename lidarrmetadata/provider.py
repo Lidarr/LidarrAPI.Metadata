@@ -352,7 +352,7 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         self.use_https = use_https
         
     def _redis_key(self, id):
-        return u'fanart{}'.format(id)
+        return u'fa:{}'.format(id)
 
     def get_artist_images(self, artist_id):
         results = util.CACHE.get(self._redis_key(artist_id))
@@ -385,7 +385,6 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
 
         return self.parse_album_images(results)
 
-    @util.CACHE.memoize()
     def get_by_mbid(self, mbid):
         """
         Gets the fanart.tv response for resource with Musicbrainz id mbid
@@ -970,7 +969,7 @@ class MusicbrainzDbProvider(Provider,
         filename = pkg_resources.resource_filename('lidarrmetadata.sql', sql_file)
 
         with open(filename, 'r') as sql:
-            return util.cache_or_call(self.map_query, sql.read(), *args, **kwargs)
+            return self.map_query(sql.read(), *args, **kwargs)
 
     def map_query(self, sql, *args, **kwargs):
         """
@@ -1062,21 +1061,32 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
 
         self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
+        
+    def _redis_key(self, id):
+        return u'wiki:{}'.format(id)
 
-    @util.CACHE.memoize()
     def get_artist_overview(self, url):
+        summary = util.CACHE.get(self._redis_key(url))
+        if summary:
+            return summary
+        
         if 'wikidata' in url:
             title = self.get_wikipedia_title(url)
         else:
             title = self.title_from_url(url)
-        return self.get_summary(title)
+            
+        summary = self.get_summary(title)
+        if summary is None:
+            return ''
+        
+        util.CACHE.set(self._redis_key(url), summary)
+        return summary
 
     def get_wikipedia_title(self, url):
         entity = self.entity_from_url(url)
         wikidata_url = 'https://www.wikidata.org/w/api.php?action=wbgetentities&ids=' + entity + '&props=sitelinks&sitefilter=enwiki&format=json'
         data = requests.get(wikidata_url).json()
-        return data.get('entities', {}).get(entity, {}).get('sitelinks', {}).get('enwiki', {}).get(
-            'title', '')
+        return data.get('entities', {}).get(entity, {}).get('sitelinks', {}).get('enwiki', {}).get('title', '')
 
     def get_summary(self, title):
         """
@@ -1091,20 +1101,20 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         # FIXME Both of these may be recoverable
         except mediawikiapi.PageError as error:
             logger.error(u'Wikipedia PageError from {title}: {e}'.format(e=error, title=title))
-            return ''
+            return None
         except ValueError as error:
             logger.error(u'Page parse error: {e}'.format(e=error))
-            return ''
+            return None
         except KeyError as error:
             logger.error(u'KeyError {e}'.format(e=error))
-            return ''
+            return None
         except HTTPError as error:
             logger.error(u'HTTPError {e}'.format(e=error))
-            return ''
+            return None
         except limit.RateLimitedError as error:
             self._count_request('ratelimit')
             logger.error(u'Wikipedia Request for {title} rate limited'.format(title=title))
-            return ''
+            return None
 
     def _count_request(self, result_type):
         if self._stats:

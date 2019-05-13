@@ -114,7 +114,6 @@ def default_route():
 
 
 @app.route('/artist/<mbid>', methods=['GET'])
-@util.CACHE.cached(key_prefix=lambda: request.url)
 def get_artist_info_route(mbid):
     uuid_validation_response = validate_mbid(mbid, True)
     if uuid_validation_response:
@@ -208,7 +207,6 @@ def get_artist_albums(mbid):
         return None
 
 @app.route('/album/<mbid>', methods=['GET'])
-@util.CACHE.cached(key_prefix=lambda: request.url)
 def get_release_group_info_route(mbid):
     output = get_release_group_info(mbid)
     
@@ -290,7 +288,6 @@ def get_release_group_info(mbid):
     return release_group
 
 @app.route('/chart/<name>/<type_>/<selection>')
-@util.CACHE.cached(key_prefix=lambda: request.url)
 def chart_route(name, type_, selection):
     """
     Gets chart
@@ -325,7 +322,6 @@ def chart_route(name, type_, selection):
 
 
 @app.route('/search/album')
-@util.CACHE.cached(key_prefix=lambda: request.url)
 def search_album():
     """Search for a human-readable album
     ---
@@ -369,7 +365,6 @@ def search_album():
 
 
 @app.route('/search/artist', methods=['GET'])
-@util.CACHE.cached(key_prefix=lambda: request.url)
 def search_artist():
     """Search for a human-readable artist
     ---
@@ -424,7 +419,6 @@ def search_artist():
 
 
 @app.route('/search/track')
-@util.CACHE.cached(key_prefix=lambda: request.url)
 def search_track():
     query = get_search_query()
 
