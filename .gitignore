@@ -109,3 +109,7 @@ config.json
 
 # Database stuff
 db.json
+
+# Emacs
+*~
+\#*\#

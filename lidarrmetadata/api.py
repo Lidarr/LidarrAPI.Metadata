@@ -101,10 +101,14 @@ def default_route():
     Default route with API information
     :return:
     """
+    vintage_providers = provider.get_providers_implementing(
+        provider.DataVintageMixin)
+
     info = {
         'branch': os.getenv('GIT_BRANCH'),
         'commit': os.getenv('COMMIT_HASH'),
-        'version': lidarrmetadata.__version__
+        'version': lidarrmetadata.__version__,
+        'replication_date': vintage_providers[0].data_vintage()
     }
     return jsonify(info)
 
@@ -112,23 +116,43 @@ def default_route():
 @app.route('/artist/<mbid>', methods=['GET'])
 @util.CACHE.cached(key_prefix=lambda: request.url)
 def get_artist_info_route(mbid):
-    output = get_artist_info(mbid,
-                             True,
-                             request.args.get('primTypes', None),
-                             request.args.get('secTypes', None),
-                             request.args.get('releaseStatuses', None))
-
-    if isinstance(output, dict):
-        output = jsonify(output)
-
-    return output
-
-
-def get_artist_info(mbid, include_albums, primary_types, secondary_types, release_statuses, check_blacklist=True):
-    uuid_validation_response = validate_mbid(mbid, check_blacklist)
+    uuid_validation_response = validate_mbid(mbid, True)
     if uuid_validation_response:
         return uuid_validation_response
 
+    artist = get_artist_info(mbid)
+    if not isinstance(artist, dict):
+        # i.e. we have returned an error response
+        return artist
+
+    albums = get_artist_albums(mbid)
+    if not albums:
+        return jsonify(error='No release group provider available'), 500
+        
+    # Filter release group types
+    # This will soon happen client side but keep around until api version is bumped for older clients
+    primary_types = request.args.get('primTypes', None)
+    if primary_types:
+        primary_types = primary_types.split('|')
+        albums = filter(lambda release_group: release_group.get('Type') in primary_types, albums)
+    secondary_types = request.args.get('secTypes', None)
+    if secondary_types:
+        secondary_types = set(secondary_types.split('|'))
+        albums = filter(lambda release_group: (release_group['SecondaryTypes'] == [] and 'Studio' in secondary_types)
+                        or secondary_types.intersection(release_group.get('SecondaryTypes')),
+                        albums)
+    release_statuses = request.args.get('releaseStatuses', None)
+    if release_statuses:
+        release_statuses = set(release_statuses.split('|'))
+        albums = filter(lambda album: release_statuses.intersection(album.get('ReleaseStatuses')),
+                        albums)
+
+    artist['Albums'] = albums
+
+    return jsonify(artist)
+
+@util.CACHE.memoize()
+def get_artist_info(mbid):
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(
         provider.ArtistByIdMixin)
@@ -171,36 +195,29 @@ def get_artist_info(mbid, include_albums, primary_types, secondary_types, releas
         artist['Images'] = artist_art_providers[0].get_artist_images(mbid)
     else:
         artist['Images'] = []
-
-    if include_albums:
-        release_group_providers = provider.get_providers_implementing(
-            provider.ReleaseGroupByArtistMixin)
-        if release_group_providers:
-            artist['Albums'] = release_group_providers[0].get_release_groups_by_artist(mbid)
-        else:
-            # 500 error if we don't have a release group provider since it's essential
-            return jsonify(error='No release group provider available'), 500
         
-        # Filter release group types 
-        # TODO Should types be part of album query?
-        if primary_types:
-            primary_types = primary_types.split('|')
-            artist['Albums'] = filter(lambda release_group: release_group.get('Type') in primary_types, artist['Albums'])
-        if secondary_types:
-            secondary_types = set(secondary_types.split('|'))
-            artist['Albums'] = filter(lambda release_group: (release_group['SecondaryTypes'] == [] and 'Studio' in secondary_types)
-                                             or secondary_types.intersection(release_group.get('SecondaryTypes')),
-                                             artist['Albums'])
-        if release_statuses:
-            release_statuses = set(release_statuses.split('|'))
-            artist['Albums'] = filter(lambda album: release_statuses.intersection(album.get('ReleaseStatuses')),
-                                         artist['Albums'])
-
     return artist
 
+@util.CACHE.memoize()
+def get_artist_albums(mbid):
+    release_group_providers = provider.get_providers_implementing(
+        provider.ReleaseGroupByArtistMixin)
+    if release_group_providers:
+        return release_group_providers[0].get_release_groups_by_artist(mbid)
+    else:
+        return None
 
 @app.route('/album/<mbid>', methods=['GET'])
 @util.CACHE.cached(key_prefix=lambda: request.url)
+def get_release_group_info_route(mbid):
+    output = get_release_group_info(mbid)
+    
+    if isinstance(output, dict):
+        output = jsonify(output)
+
+    return output
+
+@util.CACHE.memoize()
 def get_release_group_info(mbid):
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
@@ -235,14 +252,7 @@ def get_release_group_info(mbid):
             release['Tracks'] = [t for t in tracks if t['ReleaseId'] == release['Id']]
 
         artist_ids = track_providers[0].get_release_group_artist_ids(mbid)
-        artists = [
-            get_artist_info(id,
-                            include_albums=False,
-                            primary_types=None,
-                            secondary_types=None,
-                            release_statuses=None,
-                            check_blacklist=False)
-            for id in artist_ids]
+        artists = [get_artist_info(gid) for gid in artist_ids]
         release_group['Artists'] = artists
     else:
         # 500 error if we don't have a track provider since it's essential
@@ -277,8 +287,7 @@ def get_release_group_info(mbid):
     else:
         release_group['Images'] = []
 
-    return jsonify(release_group)
-
+    return release_group
 
 @app.route('/chart/<name>/<type_>/<selection>')
 @util.CACHE.cached(key_prefix=lambda: request.url)
@@ -345,31 +354,16 @@ def search_album():
     limit = None if limit < 1 else limit
 
     search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
-    album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)[::-1]
-
+    
     if search_providers:
-        albums = search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
-
-        for album in albums:
-            album['Artists'] = [
-                get_artist_info(album['ArtistId'],
-                                include_albums=False,
-                                primary_types=None,
-                                secondary_types=None,
-                                release_statuses=None,
-                                check_blacklist=False)
-                ]
+        album_ids = search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
+        
+        albums = [get_release_group_info(item['Id']) for item in album_ids]
+        
     else:
         response = jsonify(error="No album search providers")
         response.status_code = 500
         return response
-
-    if album_art_providers:
-        for album in albums:
-            album['Images'] = album_art_providers[0].get_album_images(album['Id'])
-
-            if not album['Images'] and len(album_art_providers) > 1:
-                album['Images'] = album_art_providers[1].get_album_images(album['Id'])
 
     return jsonify(albums)
 
@@ -407,20 +401,13 @@ def search_artist():
                 }
     """
     query = get_search_query()
+    albums = request.args.getlist('album')
 
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
 
     search_providers = provider.get_providers_implementing(
         provider.ArtistNameSearchMixin)
-    artist_providers = provider.get_providers_implementing(
-        provider.ArtistByIdMixin)
-    overview_providers = provider.get_providers_implementing(
-        provider.ArtistOverviewMixin)
-    link_providers = provider.get_providers_implementing(
-        provider.ArtistLinkMixin)
-    artist_art_providers = provider.get_providers_implementing(
-        provider.ArtistArtworkMixin)
 
     if not search_providers:
         response = jsonify(error='No search providers available')
@@ -428,33 +415,10 @@ def search_artist():
         return response
 
     # TODO Prefer certain providers?
-    artists = filter(lambda a: a['Id'] not in config.get_config().BLACKLISTED_ARTISTS,
-                     search_providers[0].search_artist_name(query, limit=limit))
-
-    for artist in artists:
-        artist.update(artist_providers[0].get_artist_by_id(artist['Id']))
-        if link_providers:
-            artist['Links'] = link_providers[0].get_artist_links(artist['Id'])
-
-            # FIXME Repeated above
-            wikipedia_links = filter(
-                lambda link: 'wikipedia' in link.get('target', ''),
-                artist['Links'])
-            if wikipedia_links:
-                try:
-                    artist['Overview'] = overview_providers[
-                        0].get_artist_overview(
-                        wikipedia_links[0]['target'])
-                except ValueError:
-                    pass
-
-        if 'Overview' not in artist:
-            artist['Overview'] = ''
-
-        if artist_art_providers and request.args.get('images', 'True').lower() == 'true':
-            artist['Images'] = artist_art_providers[0].get_artist_images(artist['Id'])
-        else:
-            artist['Images'] = []
+    artist_ids = filter(lambda a: a['Id'] not in config.get_config().BLACKLISTED_ARTISTS,
+                        search_providers[0].search_artist_name(query, limit=limit, albums=albums))
+    
+    artists = [get_artist_info(item['Id']) for item in artist_ids]
 
     return jsonify(artists)
 
