@@ -7,11 +7,13 @@ import redis
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 from werkzeug.exceptions import HTTPException
+import datetime
 
 import lidarrmetadata
 from lidarrmetadata import chart
 from lidarrmetadata import config
 from lidarrmetadata import provider
+from lidarrmetadata.provider import ProviderUnavailableException
 from lidarrmetadata import util
 
 app = Flask(__name__)
@@ -46,6 +48,26 @@ for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
     lower_kwargs = {k.lower(): v for k, v in kwargs.items()}
     provider.PROVIDER_CLASSES[provider_key](*args, **lower_kwargs)
 
+# Allow all endpoints to be cached by default
+@app.after_request
+def add_cache_control_header(response, ttl = app.config['CACHE_TTL_GOOD']):
+    if not response.cache_control:
+        if ttl > 0:
+            response.cache_control.public = True
+            response.cache_control.max_age = ttl
+            response.cache_control.s_maxage = ttl
+            response.expires = datetime.datetime.utcnow() + datetime.timedelta(seconds = ttl)
+        else:
+            response.cache_control.no_cache = True
+    return response
+    
+# Decorator to disable caching by endpoint
+def no_cache(func):
+    def wrapper(*args, **kwargs):
+        response = func(*args, **kwargs)
+        response.cache_control.no_cache = True
+        return response
+    return wrapper
 
 def get_search_query():
     """
@@ -96,6 +118,7 @@ def validate_mbid(mbid, check_blacklist=True):
 
 
 @app.route('/')
+@no_cache
 def default_route():
     """
     Default route with API information
@@ -119,7 +142,7 @@ def get_artist_info_route(mbid):
     if uuid_validation_response:
         return uuid_validation_response
 
-    artist = get_artist_info(mbid)
+    artist, validity = get_artist_info(mbid)
     if not isinstance(artist, dict):
         # i.e. we have returned an error response
         return artist
@@ -148,54 +171,66 @@ def get_artist_info_route(mbid):
 
     artist['Albums'] = albums
 
-    return jsonify(artist)
+    return add_cache_control_header(jsonify(artist), validity)
 
-@util.CACHE.memoize()
+@util.CACHE.memoize_variable_timeout()
 def get_artist_info(mbid):
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(
         provider.ArtistByIdMixin)
     link_providers = provider.get_providers_implementing(
         provider.ArtistLinkMixin)
-    overview_providers = provider.get_providers_implementing(provider.ArtistOverviewMixin)
+
     artist_art_providers = provider.get_providers_implementing(provider.ArtistArtworkMixin)
 
     # TODO Figure out preferred providers
     if artist_providers:
         artist = artist_providers[0].get_artist_by_id(mbid)
         if not artist:
-            return jsonify(error='Artist not found'), 404
+            return (jsonify(error='Artist not found'), 404), 0
     else:
         # 500 error if we don't have an artist provider since it's essential
-        return jsonify(error='No artist provider available'), 500
-
+        return (jsonify(error='No artist provider available'), 500), 0
+    
     if link_providers and not artist.get('Links', None):
         artist['Links'] = link_providers[0].get_artist_links(mbid)
+
+    validity = app.config['CACHE_TTL_GOOD']
+        
+    try:
+        artist['Overview'] = get_overview(artist['Links'])
+    except ProviderUnavailableException:
+        artist['Overview'] = ''
+        validity = app.config['CACHE_TTL_BAD']
+        
+    if artist_art_providers:
+        try:
+            artist['Images'] = artist_art_providers[0].get_artist_images(mbid)
+        except ProviderUnavailableException:
+            artist['Images'] = []
+            validity = app.config['CACHE_TTL_BAD']
+    else:
+        artist['Images'] = []
+        
+    return artist, validity
+
+def get_overview(links):
+    overview_providers = provider.get_providers_implementing(provider.ArtistOverviewMixin)    
 
     if overview_providers:
         wikidata_links = filter(
             lambda link: 'wikidata' in link.get('target', ''),
-            artist['Links'])
+            links)
         wikipedia_links = filter(
             lambda link: 'wikipedia' in link.get('target', ''),
-            artist['Links'])
+            links)
 
         if wikidata_links:
-            artist['Overview'] = overview_providers[0].get_artist_overview(
-                wikidata_links[0]['target'])
+            return overview_providers[0].get_artist_overview(wikidata_links[0]['target'])
         elif wikipedia_links:
-            artist['Overview'] = overview_providers[0].get_artist_overview(
-                wikipedia_links[0]['target'])
-
-    if 'Overview' not in artist:
-        artist['Overview'] = ''
-
-    if artist_art_providers:
-        artist['Images'] = artist_art_providers[0].get_artist_images(mbid)
-    else:
-        artist['Images'] = []
+            return overview_providers[0].get_artist_overview(wikipedia_links[0]['target'])
         
-    return artist
+    return ''
 
 @util.CACHE.memoize()
 def get_artist_albums(mbid):
@@ -208,41 +243,39 @@ def get_artist_albums(mbid):
 
 @app.route('/album/<mbid>', methods=['GET'])
 def get_release_group_info_route(mbid):
-    output = get_release_group_info(mbid)
+    output, validity = get_release_group_info(mbid)
     
     if isinstance(output, dict):
-        output = jsonify(output)
+        output = add_cache_control_header(jsonify(output), validity)
 
     return output
 
-@util.CACHE.memoize()
+@util.CACHE.memoize_variable_timeout()
 def get_release_group_info(mbid):
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
-        return uuid_validation_response
+        return (uuid_validation_response, 0)
 
     release_group_providers = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)
     release_providers = provider.get_providers_implementing(provider.ReleasesByReleaseGroupIdMixin)
     album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)[::-1]
-    artist_art_providers = provider.get_providers_implementing(provider.ArtistArtworkMixin)
     track_providers = provider.get_providers_implementing(provider.TracksByReleaseGroupMixin)
     link_providers = provider.get_providers_implementing(provider.ReleaseGroupLinkMixin)
-    overview_providers = provider.get_providers_implementing(provider.ArtistOverviewMixin)
 
     if release_group_providers:
         release_group = release_group_providers[0].get_release_group_by_id(mbid)
     else:
-        return jsonify(error='No album provider available'), 500
+        return (jsonify(error='No album provider available'), 500), 0
 
     if not release_group:
-        return jsonify(error='Album not found'), 404
+        return (jsonify(error='Album not found'), 404), 0
 
     if release_providers:
         release_group['Releases'] = release_providers[0].get_releases_by_rgid(mbid)
 
     else:
         # 500 error if we don't have a release provider since it's essential
-        return jsonify(error='No release provider available'), 500
+        return(jsonify(error='No release provider available'), 500), 0
 
     if track_providers:
         tracks = track_providers[0].get_release_group_tracks(mbid)
@@ -250,42 +283,36 @@ def get_release_group_info(mbid):
             release['Tracks'] = [t for t in tracks if t['ReleaseId'] == release['Id']]
 
         artist_ids = track_providers[0].get_release_group_artist_ids(mbid)
-        artists = [get_artist_info(gid) for gid in artist_ids]
+        artists = [get_artist_info(gid)[0] for gid in artist_ids]
         release_group['Artists'] = artists
     else:
         # 500 error if we don't have a track provider since it's essential
-        return jsonify(error='No track provider available'), 500
+        return (jsonify(error='No track provider available'), 500), 0
 
     if link_providers and not release_group.get('Links', None):
         release_group['Links'] = link_providers[0].get_release_group_links(mbid)
-
-    if overview_providers:
-        wikidata_links = filter(
-            lambda link: 'wikidata' in link.get('target', ''),
-            release_group['Links'])
-        wikipedia_links = filter(
-            lambda link: 'wikipedia' in link.get('target', ''),
-            release_group['Links'])
-
-        if wikidata_links:
-            release_group['Overview'] = overview_providers[0].get_artist_overview(
-                wikidata_links[0]['target'])
-        elif wikipedia_links:
-            release_group['Overview'] = overview_providers[0].get_artist_overview(
-                wikipedia_links[0]['target'])
-
-    if 'Overview' not in release_group:
+        
+    validity = app.config['CACHE_TTL_GOOD']
+        
+    try:
+        release_group['Overview'] = get_overview(release_group['Links'])
+    except ProviderUnavailableException:
         release_group['Overview'] = ''
+        validity = app.config['CACHE_TTL_BAD']
 
     if album_art_providers:
-        release_group['Images'] = album_art_providers[0].get_album_images(
-            release_group['Id'])
-        if not release_group['Images'] and len(album_art_providers) > 1:
-            release_group['Images'] = album_art_providers[1].get_album_images(release_group['Id'])
+        try:
+            release_group['Images'] = album_art_providers[0].get_album_images(
+                release_group['Id'])
+            if not release_group['Images'] and len(album_art_providers) > 1:
+                release_group['Images'] = album_art_providers[1].get_album_images(release_group['Id'])
+        except ProviderUnavailableException:
+            release_group['Images'] = []
+            validity = app.config['CACHE_TTL_BAD']
     else:
         release_group['Images'] = []
 
-    return release_group
+    return release_group, validity
 
 @app.route('/chart/<name>/<type_>/<selection>')
 def chart_route(name, type_, selection):
@@ -353,16 +380,14 @@ def search_album():
     
     if search_providers:
         album_ids = search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
-        
-        albums = [get_release_group_info(item['Id']) for item in album_ids]
+        results = [get_release_group_info(item['Id']) for item in album_ids]
+        albums = [result[0] for result in results]
+        validity = min([result[1] for result in results] or [0])
         
     else:
-        response = jsonify(error="No album search providers")
-        response.status_code = 500
-        return response
+        return jsonify(error="No album search providers"), 500
 
-    return jsonify(albums)
-
+    return add_cache_control_header(jsonify(albums), validity)
 
 @app.route('/search/artist', methods=['GET'])
 def search_artist():
@@ -405,18 +430,17 @@ def search_artist():
         provider.ArtistNameSearchMixin)
 
     if not search_providers:
-        response = jsonify(error='No search providers available')
-        response.status_code = 500
-        return response
+        return jsonify(error='No search providers available'), 500
 
     # TODO Prefer certain providers?
     artist_ids = filter(lambda a: a['Id'] not in config.get_config().BLACKLISTED_ARTISTS,
                         search_providers[0].search_artist_name(query, limit=limit, albums=albums))
+
+    results = [get_artist_info(item['Id']) for item in artist_ids]
+    artists = [result[0] for result in results]
+    validity = min([result[1] for result in results] or [0])
     
-    artists = [get_artist_info(item['Id']) for item in artist_ids]
-
-    return jsonify(artists)
-
+    return add_cache_control_header(jsonify(artists), validity)
 
 @app.route('/search/track')
 def search_track():
@@ -430,9 +454,7 @@ def search_track():
 
     search_providers = provider.get_providers_implementing(provider.TrackSearchMixin)
     if not search_providers:
-        response = jsonify(error='No search providers available')
-        response.status_code = 500
-        return response
+        return jsonify(error='No search providers available'), 500
 
     tracks = search_providers[0].search_track(query, artist_name, album_name, limit)
 

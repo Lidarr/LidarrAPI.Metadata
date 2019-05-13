@@ -327,6 +327,10 @@ class Provider(six.with_metaclass(ProviderMeta, object)):
     def __init__(self):
         logger.info('Initializing provider {}'.format(self.__class__))
         self.providers.append(self)
+        
+class ProviderUnavailableException(Exception):
+    """ Thown on error for providers we can cope without """
+    pass
 
 
 class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
@@ -403,15 +407,15 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
                     return None
         except HTTPError as error:
             logger.error('HTTPError: {e}'.format(e=error))
-            return None
+            raise ProviderUnavailableException('Fanart provider returned error')
         except requests.exceptions.Timeout as error:
             logger.error('Timeout: {e}'.format(e=error))
             self._count_request('timeout')
-            return None
+            raise ProviderUnavailableException('Fanart provider timed out')
         except limit.RateLimitedError:
             logger.error('Fanart request to {} rate limited'.format(mbid))
             self._count_request('ratelimit')
-            return None
+            raise ProviderUnavailableException('Fanart provider rate limited')
 
     def build_url(self, mbid):
         """
@@ -1110,11 +1114,11 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             return None
         except HTTPError as error:
             logger.error(u'HTTPError {e}'.format(e=error))
-            return None
+            raise ProviderUnavailableException('Wikipedia provider returned error')
         except limit.RateLimitedError as error:
             self._count_request('ratelimit')
             logger.error(u'Wikipedia Request for {title} rate limited'.format(title=title))
-            return None
+            raise ProviderUnavailableException('Wikipedia provider rate limited')
 
     def _count_request(self, result_type):
         if self._stats:
