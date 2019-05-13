@@ -281,15 +281,21 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
     # Cache options
     USE_CACHE = True
+    
+    # TTL set in Cache-Control headers.  Use 0 to disable caching.
+    # The GOOD value is used if we got info from all providers
+    # The BAD value is used if some providers were unavailable but
+    # there was enough information to return a useful response
+    # (e.g. we are missing overviews or images)
+    CACHE_TTL_GOOD = 60 * 60 * 24
+    CACHE_TTL_BAD = 60 * 30
+    
     CACHE_CONFIG = {
         'CACHE_TYPE': 'lidarrmetadata.cache.redis_gzip',
-        'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24,
+        'CACHE_DEFAULT_TIMEOUT': CACHE_TTL_GOOD,
         'CACHE_KEY_PREFIX': 'lm:',
         'CACHE_REDIS_HOST': 'redis'
     }
-
-    # File to use for DB
-    DB_FILE = os.path.abspath('./music-metadata.db')
 
     # Debug mode
     DEBUG = False
@@ -355,6 +361,8 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
 class TestConfig(DefaultConfig):
     CACHE_CONFIG = {'CACHE_TYPE': 'null'}
+    CACHE_TTL_GOOD = 0
+    CACHE_TTL_BAD = 0
     ENABLE_STATS = False
     EXTERNAL_LIMIT_CLASS = 'NullRateLimiter'
     SENTRY_REDIS_HOST = None
