@@ -360,16 +360,6 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         if cached and not expired:
             return self.parse_artist_images(cached)
         
-        # Temporary addition to move results from redis to SQL backend
-        results = util.CACHE.get(u'fa:{}'.format(artist_id))
-        if results:
-            util.FANART_CACHE.set(artist_id, results)
-            for id, album_result in results.get('albums', {}).items():
-                util.FANART_CACHE.set(artist_id, album_result)
-            
-            return self.parse_artist_images(results)
-        # End temporary addition
-
         try:
             results = self.get_by_mbid(artist_id)
 
@@ -390,13 +380,6 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
 
         if cached and not expired:
             return self.parse_album_images(cached)
-        
-        # Temporary addition to move results from redis to SQL backend
-        results = util.CACHE.get(u'fa:{}'.format(album_id))
-        if results:
-            util.FANART_CACHE.set(album_id, results)
-            return self.parse_album_images(results)
-        # End temporary addition
         
         try:
             results = self.get_by_mbid(album_id)
@@ -1130,13 +1113,6 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         
         if cached and not expired:
             return cached
-        
-        # Temporary addition to move cache from redis to SQL
-        summary = util.CACHE.get(u'wiki:{}'.format(url))
-        if summary:
-            util.WIKI_CACHE.set(url, summary)
-            return summary
-        # End temporary addition
         
         try:
             if 'wikidata' in url:
