@@ -32,8 +32,14 @@ if app.config['SENTRY_DSN']:
                     before_send=processor.create_event)
 
 if app.config['USE_CACHE']:
-    util.CACHE.config = config.get_config().CACHE_CONFIG
+    util.CACHE.config = config.get_config().REDIS_CACHE_CONFIG
     util.CACHE.init_app(app)
+    
+    util.FANART_CACHE.config = config.get_config().FANART_CACHE_CONFIG
+    util.FANART_CACHE.init_app(app)
+    
+    util.WIKI_CACHE.config = config.get_config().WIKI_CACHE_CONFIG
+    util.WIKI_CACHE.init_app(app)
 
 if not app.config['PRODUCTION']:
     # Run api doc server if not running in production

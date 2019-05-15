@@ -356,36 +356,42 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
         self.use_https = use_https
         
     def _redis_key(self, id):
-        return u'fa:{}'.format(id)
+        return id
 
     def get_artist_images(self, artist_id):
-        results = util.CACHE.get(self._redis_key(artist_id))
+        cached, expired = util.FANART_CACHE.get(self._redis_key(artist_id))
 
-        if not results:
+        if cached and not expired:
+            results = cached
+        else:
             results = self.get_by_mbid(artist_id)
-
-            # TODO Improve this during refactor to models
-            if results is None:
-                return self.parse_artist_images({})
-
-            util.CACHE.set(self._redis_key(artist_id), results)
-            for id, album_result in results.get('albums', {}).items():
-                util.CACHE.set(self._redis_key(id), album_result)
+            
+            if results is not None:
+                util.FANART_CACHE.set(self._redis_key(artist_id), results)
+                for id, album_result in results.get('albums', {}).items():
+                    util.FANART_CACHE.set(self._redis_key(id), album_result)
+            elif cached:
+                results = cached
+            else:
+                results = {}
 
         return self.parse_artist_images(results)
 
     def get_album_images(self, album_id):
-        results = util.CACHE.get(self._redis_key(album_id))
+        cached, expired = util.FANART_CACHE.get(self._redis_key(album_id))
 
-        if not results:
+        if cached and not expired:
+            results = cached
+        else:
             results = self.get_by_mbid(album_id)
 
-            # TODO Improve this during refactor to models
-            if results is None:
-                return self.parse_album_images({})
-
-            results = results.get('albums', results).get(album_id, results)
-            util.CACHE.set(self._redis_key(album_id), results)
+            if results is not None:
+                results = results.get('albums', results).get(album_id, results)
+                util.FANART_CACHE.set(self._redis_key(album_id), results)
+            elif cached:
+                results = cached
+            else:
+                results = {}
 
         return self.parse_album_images(results)
 
@@ -1067,12 +1073,13 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
         
     def _redis_key(self, id):
-        return u'wiki:{}'.format(id)
+        return id
 
     def get_artist_overview(self, url):
-        summary = util.CACHE.get(self._redis_key(url))
-        if summary:
-            return summary
+        cached, expired = util.WIKI_CACHE.get(self._redis_key(url))
+        
+        if cached and not expired:
+            return cached
         
         if 'wikidata' in url:
             title = self.get_wikipedia_title(url)
@@ -1083,7 +1090,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         if summary is None:
             return ''
         
-        util.CACHE.set(self._redis_key(url), summary)
+        util.WIKI_CACHE.set(self._redis_key(url), summary)
         return summary
 
     def get_wikipedia_title(self, url):
