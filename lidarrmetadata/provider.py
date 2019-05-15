@@ -12,7 +12,6 @@ import six
 from urllib3.exceptions import HTTPError
 
 import dateutil.parser
-import mediawikiapi
 import psycopg2
 import psycopg2.extensions
 from psycopg2 import sql
@@ -25,9 +24,9 @@ from lidarrmetadata import stats
 from lidarrmetadata import util
 
 if six.PY2:
-    from urllib import unquote as url_unquote
+    from urllib import quote as url_quote
 else:
-    from urllib.parse import unquote as url_unquote
+    from urllib.parse import quote as url_quote
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -355,45 +354,60 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
         self.use_https = use_https
         
-    def _redis_key(self, id):
-        return id
-
     def get_artist_images(self, artist_id):
-        cached, expired = util.FANART_CACHE.get(self._redis_key(artist_id))
+        cached, expired = util.FANART_CACHE.get(artist_id) or (None, True)
 
         if cached and not expired:
-            results = cached
-        else:
-            results = self.get_by_mbid(artist_id)
+            return self.parse_artist_images(cached)
+        
+        # Temporary addition to move results from redis to SQL backend
+        results = util.CACHE.get(u'fa:{}'.format(artist_id))
+        if results:
+            util.FANART_CACHE.set(artist_id, results)
+            for id, album_result in results.get('albums', {}).items():
+                util.FANART_CACHE.set(artist_id, album_result)
             
-            if results is not None:
-                util.FANART_CACHE.set(self._redis_key(artist_id), results)
-                for id, album_result in results.get('albums', {}).items():
-                    util.FANART_CACHE.set(self._redis_key(id), album_result)
-            elif cached:
-                results = cached
-            else:
-                results = {}
+            return self.parse_artist_images(results)
+        # End temporary addition
 
-        return self.parse_artist_images(results)
+        try:
+            results = self.get_by_mbid(artist_id)
+
+            util.FANART_CACHE.set(artist_id, results)
+            for id, album_result in results.get('albums', {}).items():
+                util.FANART_CACHE.set(artist_id, album_result)
+                    
+            return self.parse_artist_images(results)
+
+        except ProviderUnavailableException:
+            if cached:
+                return self.parse_artist_images(cached)
+            else:
+                raise
 
     def get_album_images(self, album_id):
-        cached, expired = util.FANART_CACHE.get(self._redis_key(album_id))
+        cached, expired = util.FANART_CACHE.get(album_id) or (None, True)
 
         if cached and not expired:
-            results = cached
-        else:
+            return self.parse_album_images(cached)
+        
+        # Temporary addition to move results from redis to SQL backend
+        results = util.CACHE.get(u'fa:{}'.format(album_id))
+        if results:
+            util.FANART_CACHE.set(album_id, results)
+            return self.parse_album_images(results)
+        # End temporary addition
+        
+        try:
             results = self.get_by_mbid(album_id)
+            results = results.get('albums', results).get(album_id, results)            
+            util.FANART_CACHE.set(album_id, results)
 
-            if results is not None:
-                results = results.get('albums', results).get(album_id, results)
-                util.FANART_CACHE.set(self._redis_key(album_id), results)
-            elif cached:
-                results = cached
+        except ProviderUnavailableException:
+            if cached:
+                return self.parse_album_images(cached)
             else:
-                results = {}
-
-        return self.parse_album_images(results)
+                raise
 
     def get_by_mbid(self, mbid):
         """
@@ -406,11 +420,12 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
             with self._limiter.limited():
                 self._count_request('request')
                 response = requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT / 1000)
+                self._log_response_time(response)
                 try:
                     return response.json()
                 except Exception as e:
                     logger.error('Error decoding {}'.format(response))
-                    return None
+                    raise ProviderUnavailableException('Error decoding fanart response')
         except HTTPError as error:
             logger.error('HTTPError: {e}'.format(e=error))
             raise ProviderUnavailableException('Fanart provider returned error')
@@ -440,6 +455,11 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
     def _count_request(self, result_type):
         if self._stats:
             self._stats.metric('external', {result_type: 1}, tags={'provider': 'fanart'})
+            
+    def _log_response_time(self, response):
+        if self._stats:
+            self._stats.metric('external', {'response_time', response.elapsed.microseconds / 1000},
+                               tags={'provider': 'fanart'})
 
     @staticmethod
     def parse_album_images(response):
@@ -1058,7 +1078,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
     Provider for querying wikipedia
     """
 
-    WIKIPEDIA_REGEX = re.compile(r'https?://\w+\.wikipedia\.org/wiki/(?P<title>.+)')
+    WIKIPEDIA_REGEX = re.compile(r'https?://(?P<language>\w+)\.wikipedia\.org/wiki/(?P<title>.+)')
     WIKIDATA_REGEX = re.compile(r'https?://www.wikidata.org/(wiki|entity)/(?P<entity>.+)')
 
     def __init__(self):
@@ -1066,53 +1086,27 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         Class initialization
         """
         super(WikipediaProvider, self).__init__()
-        self._client = mediawikiapi.MediaWikiAPI()
         self._limiter = _get_rate_limiter(key='wikipedia')
 
         self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
-        
-    def _redis_key(self, id):
-        return id
 
-    def get_artist_overview(self, url):
-        cached, expired = util.WIKI_CACHE.get(self._redis_key(url))
-        
-        if cached and not expired:
-            return cached
-        
-        if 'wikidata' in url:
-            title = self.get_wikipedia_title(url)
-        else:
-            title = self.title_from_url(url)
+    def _count_request(self, result_type):
+        if self._stats:
+            self._stats.metric('external', {result_type: 1}, tags={'provider': 'wikipedia'})
             
-        summary = self.get_summary(title)
-        if summary is None:
-            return ''
-        
-        util.WIKI_CACHE.set(self._redis_key(url), summary)
-        return summary
-
-    def get_wikipedia_title(self, url):
-        entity = self.entity_from_url(url)
-        wikidata_url = 'https://www.wikidata.org/w/api.php?action=wbgetentities&ids=' + entity + '&props=sitelinks&sitefilter=enwiki&format=json'
-        data = requests.get(wikidata_url).json()
-        return data.get('entities', {}).get(entity, {}).get('sitelinks', {}).get('enwiki', {}).get('title', '')
-
-    def get_summary(self, title):
-        """
-        Gets summary of a wikipedia page
-        :param url: URL of wikipedia page
-        :return: Summary String
-        """
+    def _log_response_time(self, response):
+        if self._stats:
+            self._stats.metric('external', {'response_time', response.elapsed.microseconds / 1000},
+                               tags={'provider': 'wikipedia'})
+            
+    def get_with_limit(self, url):
         try:
             with self._limiter.limited():
                 self._count_request('request')
-                return self._client.summary(title, auto_suggest=False)
-        # FIXME Both of these may be recoverable
-        except mediawikiapi.PageError as error:
-            logger.error(u'Wikipedia PageError from {title}: {e}'.format(e=error, title=title))
-            return None
+                response = requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT / 1000)
+                self._log_response_time(response)
+                return response.json()
         except ValueError as error:
             logger.error(u'Page parse error: {e}'.format(e=error))
             return None
@@ -1122,14 +1116,72 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         except HTTPError as error:
             logger.error(u'HTTPError {e}'.format(e=error))
             raise ProviderUnavailableException('Wikipedia provider returned error')
+        except requests.exceptions.Timeout as error:
+            logger.error('Timeout: {e}'.format(e=error))
+            self._count_request('timeout')
+            raise ProviderUnavailableException('Wikipedia provider timed out')
         except limit.RateLimitedError as error:
             self._count_request('ratelimit')
-            logger.error(u'Wikipedia Request for {title} rate limited'.format(title=title))
+            logger.error(u'Wikipedia Request to {url} rate limited'.format(url=url))
             raise ProviderUnavailableException('Wikipedia provider rate limited')
+        
+    def get_artist_overview(self, url):
+        cached, expired = util.WIKI_CACHE.get(url) or (None, True)
+        
+        if cached and not expired:
+            return cached
+        
+        # Temporary addition to move cache from redis to SQL
+        summary = util.CACHE.get(u'wiki:{}'.format(url))
+        if summary:
+            util.WIKI_CACHE.set(url, summary)
+            return summary
+        # End temporary addition
+        
+        try:
+            if 'wikidata' in url:
+                title, language = self.get_wikipedia_title(url), 'en'
+            else:
+                title, language = self.title_from_url(url)
+                if language != 'en':
+                    en_title = self.get_en_title(title, language)
+                    if en_title is not None:
+                        title, language = en_title, 'en'
+            
+            summary = self.get_summary(title, language) if title else ''
+            util.WIKI_CACHE.set(url, summary)
+            return summary
+        
+        except ProviderUnavailableException:
+            if cached:
+                return cached
+            else:
+                raise
 
-    def _count_request(self, result_type):
-        if self._stats:
-            self._stats.metric('external', {result_type: 1}, tags={'provider': 'wikipedia'})
+    def get_wikipedia_title(self, url):
+        entity = self.entity_from_url(url)
+        wikidata_url = 'https://www.wikidata.org/w/api.php?action=wbgetentities&ids={}&props=sitelinks&sitefilter=enwiki&format=json'.format(entity)
+        
+        data = self.get_with_limit(wikidata_url)
+        return url_quote(data.get('entities', {}).get(entity, {}).get('sitelinks', {}).get('enwiki', {}).get('title', '').encode('utf-8'))
+    
+    def get_en_title(self, local_title, local_language):
+        wiki_url = 'https://{language}.wikipedia.org/w/api.php?action=query&prop=langlinks&lllang=en&format=json&formatversion=2&titles={title}'.format(language = local_language, title = local_title)
+        
+        data = self.get_with_limit(wiki_url)
+        return data.get('query', {}).get('pages', [{}])[0].get('langlinks', [{}])[0].get('title', None)
+
+    def get_summary(self, title, language):
+        """
+        Gets summary of a wikipedia page
+        :param url: URL of wikipedia page
+        :return: Summary String
+        """
+        
+        wiki_url = 'https://{language}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&format=json&formatversion=2&titles={title}'.format(language = language, title = title)
+        
+        data = self.get_with_limit(wiki_url)
+        return data.get('query', {}).get('pages', [{}])[0].get('extract', '')
 
     @classmethod
     def title_from_url(cls, url):
@@ -1142,10 +1194,11 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         match = cls.WIKIPEDIA_REGEX.match(url)
 
         if not match:
-            raise ValueError('URL {} does not match regex `{}`'.format(url, cls.WIKIPEDIA_REGEX.pattern))
+            raise ValueError(u'URL {} does not match regex `{}`'.format(url, cls.WIKIPEDIA_REGEX.pattern))
 
         title = match.group('title')
-        return url_unquote(title)
+        language = match.group('language')
+        return title, language
 
     @classmethod
     def entity_from_url(cls, url):
@@ -1158,7 +1211,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         match = cls.WIKIDATA_REGEX.match(url)
 
         if not match:
-            raise ValueError('URL {} does not match regex `{}`'.format(url, cls.WIKIDATA_REGEX.pattern))
+            raise ValueError(u'URL {} does not match regex `{}`'.format(url, cls.WIKIDATA_REGEX.pattern))
 
         id = match.group('entity')
-        return url_unquote(id)
+        return id
