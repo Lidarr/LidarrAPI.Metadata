@@ -57,7 +57,9 @@ for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
 # Allow all endpoints to be cached by default
 @app.after_request
 def add_cache_control_header(response, ttl = app.config['CACHE_TTL_GOOD']):
-    if not response.cache_control:
+    if response.status_code not in set([200, 400, 403, 404]):
+        response.cache_control.no_cache = True
+    elif not response.cache_control:
         if ttl > 0:
             response.cache_control.public = True
             response.cache_control.max_age = ttl
