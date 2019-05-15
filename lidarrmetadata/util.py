@@ -12,9 +12,9 @@ from lidarrmetadata import config
 from lidarrmetadata import cache
 
 # Cache for application
-CACHE = cache.LidarrCache(config=config.get_config().CACHE_CONFIG)
-
-
+CACHE = cache.LidarrCache(config=config.get_config().REDIS_CACHE_CONFIG)
+FANART_CACHE = cache.LidarrCache(config=config.get_config().FANART_CACHE_CONFIG)
+WIKI_CACHE = cache.LidarrCache(config=config.get_config().WIKI_CACHE_CONFIG)
 
 def cache_or_call(func, *args, **kwargs):
     """

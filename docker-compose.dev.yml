@@ -8,3 +8,7 @@ services:
   solr:
     ports:
       - "8983:8983"
+      
+  redis:
+    ports:
+      - "6379:6379"
