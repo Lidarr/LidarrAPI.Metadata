@@ -62,9 +62,11 @@ def add_cache_control_header(response, ttl = app.config['CACHE_TTL_GOOD']):
     elif not response.cache_control:
         if ttl > 0:
             response.cache_control.public = True
-            response.cache_control.max_age = ttl
+            # We want to allow caching on cloudflare (which we can invalidate)
+            # but disallow caching for local users (which we cannot invalidate)
             response.cache_control.s_maxage = ttl
-            response.expires = datetime.datetime.utcnow() + datetime.timedelta(seconds = ttl)
+            response.cache_control.max_age = 0
+            response.expires = datetime.datetime.utcnow() - datetime.timedelta(days=1)
         else:
             response.cache_control.no_cache = True
     return response
