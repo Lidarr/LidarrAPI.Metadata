@@ -1,13 +1,17 @@
 import os
 import uuid
+import functools
 
 from flask import Flask, abort, make_response, request, jsonify
+from flask_httpauth import HTTPBasicAuth
 from psycopg2 import OperationalError
 import redis
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 from werkzeug.exceptions import HTTPException
 import datetime
+import requests
+import logging
 
 import lidarrmetadata
 from lidarrmetadata import chart
@@ -16,8 +20,21 @@ from lidarrmetadata import provider
 from lidarrmetadata.provider import ProviderUnavailableException
 from lidarrmetadata import util
 
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.INFO)
+logger.info('Have api logger')
+
 app = Flask(__name__)
 app.config.from_object(config.get_config())
+
+auth = HTTPBasicAuth()
+
+@auth.get_password
+def get_pw(username):
+    if username == app.config['INVALIDATE_USERNAME']:
+        return app.config['INVALIDATE_PASSWORD']
+    return None
 
 if app.config['SENTRY_DSN']:
     if app.config['SENTRY_REDIS_HOST'] is not None:
@@ -73,6 +90,7 @@ def add_cache_control_header(response, ttl = app.config['CACHE_TTL_GOOD']):
     
 # Decorator to disable caching by endpoint
 def no_cache(func):
+    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         response = func(*args, **kwargs)
         response.cache_control.no_cache = True
@@ -486,6 +504,80 @@ def search_route():
             error='Unsupported search type {}'.format(type))
         return error, 400
 
+@app.route('/invalidate')
+@auth.login_required
+@no_cache
+def invalidate_cache():
+    
+    ## this is used as a prefix in various places to make sure
+    ## we keep cache for different metadata versions separate
+    base_url = request.url_root
+    
+    ## Use a cache key to make sure we don't trigger this in parallel
+    invalidation_in_progress_key = base_url + 'CacheInvalidationInProgress'
+    in_progress = util.CACHE.get(invalidation_in_progress_key)
+    if in_progress:
+        return jsonify('Invalidation already in progress'), 500
+    
+    try:
+        util.CACHE.set(invalidation_in_progress_key, True, timeout=60*5)
+        logger.info('Invalidating cache')
 
+        ## clear cache for all providers, aggregating a list of artists/albums
+        ## that we need to invalidate the final responses for
+        artists = set()
+        albums = set()
+        invalidated = []
+
+        cache_users = provider.get_providers_implementing(provider.InvalidateCacheMixin)
+        for cache_user in cache_users:
+            result = cache_user.invalidate_cache(base_url)
+
+            artists = artists.union(result['artists'])
+            albums = albums.union(result['albums'])
+
+        for artist in artists:
+            util.CACHE.delete_memoized(get_artist_info, artist)
+            util.CACHE.delete_memoized(get_artist_albums, artist)
+
+            key = '{url}artist/{artist}'.format(url=base_url, artist=artist)
+            invalidated.append(key)
+
+        for album in albums:
+            util.CACHE.delete_memoized(get_release_group_info, album)
+
+            key = '{url}album/{album}'.format(url=base_url, album=album)
+            invalidated.append(key)
+
+        # cloudflare only accepts 500 files at a time
+        for i in xrange(0, len(invalidated), 500):
+            invalidate_cloudflare(invalidated[i:i+500])
+    
+    finally:
+        util.CACHE.delete(invalidation_in_progress_key)
+        # make sure any exceptions are not swallowed
+        pass
+        
+    logger.info('Invalidation complete')
+    
+    return jsonify(invalidated)
+
+def invalidate_cloudflare(files):
+
+    zoneid = app.config['CLOUDFLARE_ZONE_ID']
+    if not zoneid:
+        return
+    
+    url = 'https://api.cloudflare.com/client/v4/zones/{}/purge_cache'.format(zoneid)
+    headers = {'X-Auth-Email': app.config['CLOUDFLARE_AUTH_EMAIL'],
+               'X-Auth-Key': app.config['CLOUDFLARE_AUTH_KEY'],
+               'Content-Type': 'application/json'}
+    data = {'files': files}
+    
+    logger.info('Invalidating the following urls with cloudflare:\n{}'.format(data))
+
+    r = requests.post(url, headers=headers, json=data)
+    logger.info(r.text)
+    
 if __name__ == '__main__':
     app.run(debug=True, port=config.get_config().HTTP_PORT)
