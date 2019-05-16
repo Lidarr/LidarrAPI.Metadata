@@ -38,7 +38,11 @@ class TestWikipediaProvider:
         self.provider = provider.WikipediaProvider()
 
     def test_summary_invalid_url_empty(self):
-        assert '' == self.provider.get_summary('fakeurl', 'en')
+        assert '' == self.provider.wikipedia_get_summary_from_title('fakeurl', 'en')
+        
+    def test_title_from_url_invalid(self):
+        with pytest.raises(ValueError):
+            self.provider.wikipedia_title_from_url('fakeurl')
 
     @pytest.mark.parametrize('url,expected', [
         ('http://en.wikipedia.org/wiki/Blink-182', ('Blink-182', 'en')),
@@ -49,27 +53,14 @@ class TestWikipediaProvider:
         ('https://ja.wikipedia.org/wiki/%CE%9D_(%E3%83%90%E3%83%B3%E3%83%89)', ('%CE%9D_(%E3%83%90%E3%83%B3%E3%83%89)', 'ja'))
     ])
     def test_title_from_url(self, url, expected):
-        assert expected == self.provider.title_from_url(url)
-        
-    @pytest.mark.parametrize('url', [
-         ('http://en.wikipedia.org/wiki/Blink-182'),
-         ('https://ja.wikipedia.org/wiki/%CE%9D_(%E3%83%90%E3%83%B3%E3%83%89)'),
-         ('https://de.wikipedia.org/wiki/The_Boys#The_Mattless_Boys'),
-         ('https://www.wikidata.org/wiki/Q953918'),
-     ])
-    def test_summary_from_url(self, url):
-        assert self.provider.get_artist_overview(url) != ''
+        assert expected == self.provider.wikipedia_title_from_url(url)
         
     @pytest.mark.parametrize('url,expected', [
-        ('https://www.wikidata.org/wiki/Q953918', 'Mumford%20%26%20Sons'),
-        ('https://www.wikidata.org/wiki/Q19873750', 'B%C3%B8rns'),
-        ('https://www.wikidata.org/wiki/Q236762', 'Mari%C3%A9%20Digby'),
-        # This one has no english wiki page
-        ('https://www.wikidata.org/wiki/Q127939', '')
-    ])
-    def test_get_wikipedia_title(self, url, expected):
-        assert self.provider.get_wikipedia_title(url) == expected
-
-    def test_title_from_url_invalid(self):
-        with pytest.raises(ValueError):
-            self.provider.title_from_url('fakeurl')
+        ('http://en.wikipedia.org/wiki/Blink-182', u'Blink-182 (often stylized as blink-182'),
+        ('https://ja.wikipedia.org/wiki/%CE%9D_(%E3%83%90%E3%83%B3%E3%83%89)', u'\u03bd'),
+        ('https://de.wikipedia.org/wiki/The_Boys#The_Mattless_Boys', 'The Boys are an English punk rock'),
+        ('https://www.wikidata.org/wiki/Q953918', 'Mumford & Sons are  a British band formed in 2007'),
+        ('https://www.wikidata.org/wiki/Q127939', 'Russian folk rock band'),
+     ])
+    def test_summary_from_url(self, url, expected):
+        assert self.provider.get_artist_overview(url).startswith(expected)

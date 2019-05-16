@@ -1074,6 +1074,14 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
 
+        # https://github.com/metabrainz/musicbrainz-server/blob/v-2019-05-13-schema-change/lib/MusicBrainz/Server/Data/WikipediaExtract.pm#L61
+        self.language_preference = (
+            'en', 'ja', 'de', 'fr', 'fi', 'it', 'sv', 'es', 'ru', 'pl',
+            'nl', 'pt', 'et', 'da', 'ko', 'ca', 'cs', 'cy', 'el', 'he',
+            'hu', 'id', 'lt', 'lv', 'no', 'ro', 'sk', 'sl', 'tr', 'uk',
+            'vi', 'zh'
+        )
+
     def _count_request(self, result_type):
         if self._stats:
             self._stats.metric('external', {result_type: 1}, tags={'provider': 'wikipedia'})
@@ -1115,16 +1123,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             return cached
         
         try:
-            if 'wikidata' in url:
-                title, language = self.get_wikipedia_title(url), 'en'
-            else:
-                title, language = self.title_from_url(url)
-                if language != 'en':
-                    en_title = self.get_en_title(title, language)
-                    if en_title is not None:
-                        title, language = en_title, 'en'
-            
-            summary = self.get_summary(title, language) if title else ''
+            summary = self.wikidata_get_summary_from_url(url) if 'wikidata' in url else self.wikipedia_get_summary_from_url(url)
             util.WIKI_CACHE.set(url, summary)
             return summary
         
@@ -1133,34 +1132,93 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
                 return cached
             else:
                 raise
-
-    def get_wikipedia_title(self, url):
-        entity = self.entity_from_url(url)
-        wikidata_url = 'https://www.wikidata.org/w/api.php?action=wbgetentities&ids={}&props=sitelinks&sitefilter=enwiki&format=json'.format(entity)
+            
+    def wikidata_get_summary_from_url(self, url):
+        data = self.wikidata_get_entity_data_from_url(url)
+        return self.wikidata_get_summary_from_entity_data(data)
+            
+    def wikidata_get_summary_from_entity_data(self, data):
         
-        data = self.get_with_limit(wikidata_url)
-        return url_quote(data.get('entities', {}).get(entity, {}).get('sitelinks', {}).get('enwiki', {}).get('title', '').encode('utf-8'))
+        sites = { item['site']: url_quote(item['title'].encode('utf-8')) for item in data.get('sitelinks', {}).values() }
+
+        # return english wiki if possible
+        if 'enwiki' in sites:
+            return self.wikipedia_get_summary_from_title(sites['enwiki'], 'en')
+        
+        # if not, return english entity description
+        description = data.get('descriptions', {}).get('en', {}).get('value', '')
+        if description:
+            return description
+        
+        # otherwise fall back to most common language available
+        language = next(x for x in self.language_preference if sites.get('{}wiki'.format(x), ''))
+        title = sites['{}wiki'.format(language)]
+        
+        return self.wikipedia_get_summary_from_title(title, language)
     
-    def get_en_title(self, local_title, local_language):
-        wiki_url = 'https://{language}.wikipedia.org/w/api.php?action=query&prop=langlinks&lllang=en&format=json&formatversion=2&titles={title}'.format(language = local_language, title = local_title)
+    def wikidata_get_entity_data_from_url(self, url):
+        entity = self.wikidata_entity_from_url(url)
+        wikidata_url = (
+            'https://www.wikidata.org/w/api.php'
+            '?action=wbgetentities'
+            '&ids={}'
+            '&props=sitelinks|descriptions'
+            '&format=json'
+        ).format(entity)
         
-        data = self.get_with_limit(wiki_url)
-        return data.get('query', {}).get('pages', [{}])[0].get('langlinks', [{}])[0].get('title', None)
-
-    def get_summary(self, title, language):
+        return (
+            self.get_with_limit(wikidata_url)
+            .get('entities', {})
+            .get(entity, {})
+        )
+    
+    def wikidata_get_entity_data_from_language_title(self, title, language):
+        title = title.split("#", 1)[0]
+        wikidata_url = (
+            'https://www.wikidata.org/w/api.php'
+            '?action=wbgetentities'
+            '&sites={language}wiki'
+            '&titles={title}'
+            '&props=sitelinks|descriptions'
+            '&format=json'
+        ).format(language=language, title=title)
+        entities = self.get_with_limit(wikidata_url).get('entities', {})
+        return entities[next(iter(entities))]
+    
+    def wikipedia_get_summary_from_url(self, url):
+        url_title, url_language = self.wikipedia_title_from_url(url)
+        
+        # if English link, just use that
+        if url_language == 'en':
+            return self.wikipedia_get_summary_from_title(url_title, url_language)
+        
+        # Otherwise go via wikidata to try to get something in English or best other language
+        data = self.wikidata_get_entity_data_from_language_title(url_title, url_language)
+        return self.wikidata_get_summary_from_entity_data(data)
+        
+    def wikipedia_get_summary_from_title(self, title, language):
         """
         Gets summary of a wikipedia page
         :param url: URL of wikipedia page
         :return: Summary String
         """
         
-        wiki_url = 'https://{language}.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&format=json&formatversion=2&titles={title}'.format(language = language, title = title)
+        wiki_url = (
+            'https://{language}.wikipedia.org/w/api.php'
+            '?action=query'
+            '&prop=extracts'
+            '&exintro'
+            '&explaintext'
+            '&format=json'
+            '&formatversion=2'
+            '&titles={title}'
+        ).format(language = language, title = title)
         
         data = self.get_with_limit(wiki_url)
         return data.get('query', {}).get('pages', [{}])[0].get('extract', '')
 
     @classmethod
-    def title_from_url(cls, url):
+    def wikipedia_title_from_url(cls, url):
         """
         Gets the wikipedia page title from url. This may not work for URLs with
         certain special characters
@@ -1177,7 +1235,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         return title, language
 
     @classmethod
-    def entity_from_url(cls, url):
+    def wikidata_entity_from_url(cls, url):
         """
         Gets the wikidata entity id from the url. This may not work for URLs with
         certain special characters
