@@ -371,6 +371,13 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Stats server
     STATS_HOST = 'telegraf'
     STATS_PORT = 8092
+    
+    # Cloudflare details for invalidating cache on update
+    CLOUDFLARE_ZONE_ID = ''
+    CLOUDFLARE_AUTH_EMAIL = ''
+    CLOUDFLARE_AUTH_KEY = ''
+    INVALIDATE_USERNAME = 'replaceme'
+    INVALIDATE_PASSWORD = 'replaceme'
 
     # Testing mode
     TESTING = False

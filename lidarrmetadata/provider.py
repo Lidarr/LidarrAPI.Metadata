@@ -4,6 +4,8 @@ import abc
 import collections
 import contextlib
 import datetime
+import time
+import pytz
 import imp
 import logging
 import pkg_resources
@@ -300,6 +302,20 @@ class DataVintageMixin(MixinBase):
     def data_vintage(self):
         pass
 
+class InvalidateCacheMixin(MixinBase):
+    """
+    Invalidates cache for updated items
+    """
+    
+    @abc.abstractmethod
+    def invalidate_cache(self, prefix):
+        """
+        Invalidates any internal cache as appropriate and returns entities that need invalidating at API level
+        :param prefix: URL prefix for the instance we are clearing cache for
+        :return: Dict {"artists":[ids], "albums":[ids]} of artists/albums that need to be updated
+        """
+        pass
+    
 class ProviderMeta(abc.ABCMeta):
     def __new__(mcls, name, bases, namespace):
         """
@@ -332,7 +348,10 @@ class ProviderUnavailableException(Exception):
     pass
 
 
-class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
+class FanArtTvProvider(Provider, 
+                       AlbumArtworkMixin, 
+                       ArtistArtworkMixin,
+                       InvalidateCacheMixin):
     def __init__(self,
                  api_key,
                  base_url='webservice.fanart.tv/v3/music/',
@@ -354,10 +373,14 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
         self.use_https = use_https
         
-    def get_artist_images(self, artist_id):
+        ## dummy value for initialization, will be picked up from redis later on
+        self._last_cache_invalidation = time.time() - 60 * 60 * 24
+
+    def get_artist_images(self, artist_id, ignore_cache = False):
+        
         cached, expired = util.FANART_CACHE.get(artist_id) or (None, True)
 
-        if cached and not expired:
+        if cached and not expired and not ignore_cache:
             return self.parse_artist_images(cached)
         
         try:
@@ -420,6 +443,66 @@ class FanArtTvProvider(Provider, AlbumArtworkMixin, ArtistArtworkMixin):
             logger.error('Fanart request to {} rate limited'.format(mbid))
             self._count_request('ratelimit')
             raise ProviderUnavailableException('Fanart provider rate limited')
+        
+    def invalidate_cache(self, prefix):
+        logger.debug('Invalidating fanart cache')
+        
+        result = {'artists': [], 'albums': []}
+        
+        last_invalidation_key = prefix + 'FanartProviderLastCacheInvalidation'
+        self._last_cache_invalidation = util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
+        
+        # Since we don't have a fanart personal key we can only see things with a 7 day lag
+        all_updates = self.get_fanart_updates(self._last_cache_invalidation - 60 * 60 * 24 * 7)
+        invisible_updates = self.get_fanart_updates(time.time() - 60 * 60 * 24 * 7)
+        
+        # Remove the updates we can't see
+        artist_ids = self.diff_fanart_updates(all_updates, invisible_updates)
+        logger.info('invalidating given fanart updates:\n{}'.format('\n'.join(artist_ids)))
+
+        # This only invalidates the artists and not the albums but better than nothing
+        for id in artist_ids:
+            cached, expired = util.FANART_CACHE.get(id) or (None, True)
+            if cached:
+                # bodge - set timeout to one second from now
+                util.FANART_CACHE.set(id, cached, timeout=1)
+                
+        util.CACHE.set(last_invalidation_key, int(time.time()), timeout=0)
+        
+        result['artists'] = artist_ids
+        return result
+    
+    def get_fanart_updates(self, time):
+        url = self.build_url('latest') + '&date={}'.format(int(time))
+        logger.debug(url)
+        
+        try:
+            response = requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT / 1000 * 5)
+            try:
+                if len(response.content):
+                    return response.json()
+                else:
+                    return []
+            except Exception as e:
+                logger.error('Error decoding {}'.format(response))
+                return []
+        except HTTPError as error:
+            logger.error('HTTPError: {e}'.format(e=error))
+            return []
+        except requests.exceptions.Timeout as error:
+            logger.error('Timeout: {e}'.format(e=error))
+            return []
+        
+    def diff_fanart_updates(self, long, short):
+        """
+        Unpicks the fanart api lag so we can see which have been updated
+        """
+        
+        long_ids = collections.Counter([x['id'] for x in long])
+        short_ids = collections.Counter([x['id'] for x in short])
+
+        long_ids.subtract(short_ids)
+        return set(long_ids.elements())
 
     def build_url(self, mbid):
         """
@@ -678,6 +761,7 @@ class SolrSearchProvider(Provider,
     
 class MusicbrainzDbProvider(Provider,
                             DataVintageMixin,
+                            InvalidateCacheMixin,
                             AlbumArtworkMixin,
                             ArtistByIdMixin,
                             ArtistLinkMixin,
@@ -726,9 +810,36 @@ class MusicbrainzDbProvider(Provider,
         self._db_user = db_user
         self._db_password = db_password
         
+        ## dummy value for initialization, will be picked up from redis later on
+        self._last_cache_invalidation = datetime.datetime.now(pytz.utc) - datetime.timedelta(hours = 2)
+        
     def data_vintage(self):
         return self.query_from_file('../sql/data_vintage.sql')[0]['vintage']
+    
+    def invalidate_cache(self, prefix):
 
+        last_invalidation_key = prefix + 'MBProviderLastCacheInvalidation'
+        self._last_cache_invalidation = util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
+
+        result = {'artists': [], 'albums': []}
+        
+        vintage = self.data_vintage()
+        if vintage > self._last_cache_invalidation:
+            logger.debug('Invalidating musicbrainz cache')
+
+            result['artists'] = self._invalidate_queries_by_entity_id('updated_artists.sql')
+            result['albums'] = self._invalidate_queries_by_entity_id('updated_albums.sql')
+
+            util.CACHE.set(last_invalidation_key, vintage, timeout=0)
+        else:
+            logger.debug('Musicbrainz invalidation not required')
+            
+        return result
+    
+    def _invalidate_queries_by_entity_id(self, changed_query):
+        entities = self.query_from_file(changed_query, {'date': self._last_cache_invalidation})
+        return [entity['gid'] for entity in entities]
+        
     def get_artist_by_id(self, artist_id):
         results = self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])
         if results:
