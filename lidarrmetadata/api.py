@@ -511,7 +511,7 @@ def invalidate_cache():
     
     ## this is used as a prefix in various places to make sure
     ## we keep cache for different metadata versions separate
-    base_url = request.url_root
+    base_url = app.config['CLOUDFLARE_URL_BASE']
     
     ## Use a cache key to make sure we don't trigger this in parallel
     invalidation_in_progress_key = base_url + 'CacheInvalidationInProgress'
