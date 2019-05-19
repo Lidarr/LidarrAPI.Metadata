@@ -416,6 +416,12 @@ def search_album():
         else:
             results = [get_release_group_info(item['Id']) for item in album_ids]
             albums = [result[0] for result in results]
+            
+            # Current versions of lidarr will fail trying to parse the tracks contained in releases
+            # because it's not expecting it to be present and passes null for ArtistMetadata dict
+            for album in albums:
+                album['Releases'] = []
+            
             validity = min([result[1] for result in results] or [0])
         
     else:
