@@ -311,7 +311,7 @@ def get_release_group_info(mbid):
             release['Tracks'] = [t for t in tracks if t['ReleaseId'] == release['Id']]
 
         artist_ids = track_providers[0].get_release_group_artist_ids(mbid)
-        artists = [get_artist_info(gid)[0] for gid in artist_ids]
+        artists = [get_artist_info(gid)[0] for gid in set(artist_ids).union([release_group['ArtistId']])]
         release_group['Artists'] = artists
     else:
         # 500 error if we don't have a track provider since it's essential
