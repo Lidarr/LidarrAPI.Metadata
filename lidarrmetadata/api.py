@@ -511,7 +511,7 @@ def invalidate_cache():
     
     ## this is used as a prefix in various places to make sure
     ## we keep cache for different metadata versions separate
-    base_url = app.config['CLOUDFLARE_URL_BASE']
+    base_url = app.config['CLOUDFLARE_URL_BASE'] + '/' +  app.config['APPLICATION_ROOT'].lstrip('/').rstrip('/')
     
     ## Use a cache key to make sure we don't trigger this in parallel
     invalidation_in_progress_key = base_url + 'CacheInvalidationInProgress'
@@ -540,18 +540,18 @@ def invalidate_cache():
             util.CACHE.delete_memoized(get_artist_info, artist)
             util.CACHE.delete_memoized(get_artist_albums, artist)
 
-            key = '{url}artist/{artist}'.format(url=base_url, artist=artist)
+            key = '{url}/artist/{artist}'.format(url=base_url, artist=artist)
             invalidated.append(key)
 
         for album in albums:
             util.CACHE.delete_memoized(get_release_group_info, album)
 
-            key = '{url}album/{album}'.format(url=base_url, album=album)
+            key = '{url}/album/{album}'.format(url=base_url, album=album)
             invalidated.append(key)
 
         # cloudflare only accepts 500 files at a time
         for i in xrange(0, len(invalidated), 500):
-            invalidate_cloudflare(invalidated[i:i+500])
+            invalidate_cloudflare(invalidated[i:i+500], retries = 2)
     
     finally:
         util.CACHE.delete(invalidation_in_progress_key)
@@ -562,7 +562,7 @@ def invalidate_cache():
     
     return jsonify(invalidated)
 
-def invalidate_cloudflare(files):
+def invalidate_cloudflare(files, retries = 2):
 
     zoneid = app.config['CLOUDFLARE_ZONE_ID']
     if not zoneid:
@@ -574,10 +574,11 @@ def invalidate_cloudflare(files):
                'Content-Type': 'application/json'}
     data = {'files': files}
     
-    logger.info('Invalidating the following urls with cloudflare:\n{}'.format(data))
-
     r = requests.post(url, headers=headers, json=data)
     logger.info(r.text)
+    
+    if not r.json()['success'] and retries > 0:
+        invalidate_cloudflare(files, retries - 1)
     
 if __name__ == '__main__':
     app.run(debug=True, port=config.get_config().HTTP_PORT)
