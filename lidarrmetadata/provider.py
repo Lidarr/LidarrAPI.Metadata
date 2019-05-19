@@ -1253,6 +1253,9 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
                 return cached
             else:
                 raise
+        except ValueError:
+            logger.error('Could not get summary from {}'.format(url))
+            return ''
             
     def wikidata_get_summary_from_url(self, url):
         data = self.wikidata_get_entity_data_from_url(url)
