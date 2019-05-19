@@ -1262,10 +1262,12 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             return description
         
         # otherwise fall back to most common language available
-        language = next(x for x in self.language_preference if sites.get('{}wiki'.format(x), ''))
-        title = sites['{}wiki'.format(language)]
+        language = next((x for x in self.language_preference if sites.get('{}wiki'.format(x), '')), None)
         
-        return self.wikipedia_get_summary_from_title(title, language)
+        if language:
+            title = sites['{}wiki'.format(language)]
+            return self.wikipedia_get_summary_from_title(title, language)
+        return ''
     
     def wikidata_get_entity_data_from_url(self, url):
         entity = self.wikidata_entity_from_url(url)
