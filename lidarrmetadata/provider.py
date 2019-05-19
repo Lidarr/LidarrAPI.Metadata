@@ -388,7 +388,7 @@ class FanArtTvProvider(Provider,
 
             util.FANART_CACHE.set(artist_id, results)
             for id, album_result in results.get('albums', {}).items():
-                util.FANART_CACHE.set(artist_id, album_result)
+                util.FANART_CACHE.set(id, album_result)
                     
             return self.parse_artist_images(results)
 
