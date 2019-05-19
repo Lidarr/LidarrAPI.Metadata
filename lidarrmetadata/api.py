@@ -247,10 +247,10 @@ def get_overview(links):
 
     if overview_providers:
         wikidata_links = filter(
-            lambda link: 'wikidata' in link.get('target', ''),
+            lambda link: 'wikidata' in link.get('type', ''),
             links)
         wikipedia_links = filter(
-            lambda link: 'wikipedia' in link.get('target', ''),
+            lambda link: 'wikipedia' in link.get('type', ''),
             links)
 
         if wikidata_links:
