@@ -994,7 +994,7 @@ class MusicbrainzDbProvider(Provider,
 
         releases = self.query_from_file('release_by_release_group_id.sql', [rgid])
         if not releases:
-            return {}
+            return []
 
         return [{'Id': release['gid'],
                  'Title': release['name'],
