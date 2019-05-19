@@ -662,7 +662,10 @@ class SolrSearchProvider(Provider,
 
         # Note that when using a dismax query we shouldn't apply lucene escaping
         # See https://github.com/metabrainz/musicbrainz-server/blob/master/lib/MusicBrainz/Server/Data/WebService.pm
-        url = u'{server}/artist/select?wt=mbjson&q={query}'.format(server=self._search_server, query=name)
+        url = u'{server}/artist/select?wt=mbjson&q={query}'.format(
+            server=self._search_server,
+            query=url_quote(name.encode('utf-8'))
+        )
         
         if limit:
             url += u'&rows={}'.format(limit)
@@ -679,10 +682,15 @@ class SolrSearchProvider(Provider,
     def search_artist_name_with_albums(self, artist, albums, handler, limit=None):
         
         album_query = u" ".join(albums)
-        query = u"({album_query}) AND (artist:{artist} OR artistname:{artist} OR creditname:{artist})".format(album_query=album_query, artist=artist)
+        query = u"({album_query}) AND (artist:{artist} OR artistname:{artist} OR creditname:{artist})".format(
+            album_query=url_quote(self.escape_lucene_query(album_query).encode('utf-8')),
+            artist=url_quote(self.escape_lucene_query(artist).encode('utf-8'))
+        )
         
-        url = u'{server}/release-group/advanced?wt=mbjson&q={query}'.format(server=self._search_server,
-                                                                            query=self.escape_lucene_query(query))
+        url = u'{server}/release-group/advanced?wt=mbjson&q={query}'.format(
+            server=self._search_server,
+            query=query
+        )
         
         if limit:
             url += u'&rows={}'.format(limit)
@@ -703,7 +711,10 @@ class SolrSearchProvider(Provider,
 
         # Note that when using a dismax query we shouldn't apply lucene escaping
         # See https://github.com/metabrainz/musicbrainz-server/blob/master/lib/MusicBrainz/Server/Data/WebService.pm
-        url = u'{server}/release-group/select?wt=mbjson&q={query}'.format(server=self._search_server, query=name)
+        url = u'{server}/release-group/select?wt=mbjson&q={query}'.format(
+            server=self._search_server,
+            query=url_quote(name.encode('utf-8'))
+        )
         
         if limit:
             url += u'&rows={}'.format(limit)
