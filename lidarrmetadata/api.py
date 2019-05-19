@@ -400,6 +400,7 @@ def search_album():
     query = get_search_query()
 
     artist_name = request.args.get('artist', '')
+    basic = request.args.get('basic', False)
 
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
@@ -408,9 +409,14 @@ def search_album():
     
     if search_providers:
         album_ids = search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
-        results = [get_release_group_info(item['Id']) for item in album_ids]
-        albums = [result[0] for result in results]
-        validity = min([result[1] for result in results] or [0])
+        
+        if basic:
+            albums = album_ids
+            validity = 1
+        else:
+            results = [get_release_group_info(item['Id']) for item in album_ids]
+            albums = [result[0] for result in results]
+            validity = min([result[1] for result in results] or [0])
         
     else:
         return jsonify(error="No album search providers"), 500
@@ -453,6 +459,8 @@ def search_artist():
 
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
+    
+    basic = request.args.get('basic', False)
 
     search_providers = provider.get_providers_implementing(
         provider.ArtistNameSearchMixin)
@@ -464,9 +472,13 @@ def search_artist():
     artist_ids = filter(lambda a: a['Id'] not in config.get_config().BLACKLISTED_ARTISTS,
                         search_providers[0].search_artist_name(query, limit=limit, albums=albums))
 
-    results = [get_artist_info(item['Id']) for item in artist_ids]
-    artists = [result[0] for result in results]
-    validity = min([result[1] for result in results] or [0])
+    if basic:
+        artists = artist_ids
+        validity = 1
+    else:
+        results = [get_artist_info(item['Id']) for item in artist_ids]
+        artists = [result[0] for result in results]
+        validity = min([result[1] for result in results] or [0])
     
     return add_cache_control_header(jsonify(artists), validity)
 
