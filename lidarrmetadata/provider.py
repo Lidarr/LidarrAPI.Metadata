@@ -460,13 +460,20 @@ class FanArtTvProvider(Provider,
         artist_ids = self.diff_fanart_updates(all_updates, invisible_updates)
         logger.info('Invalidating artists given fanart updates:\n{}'.format('\n'.join(artist_ids)))
 
-        # This only invalidates the artists and not the albums but better than nothing
+        # Mark artists as expired
         for id in artist_ids:
             cached, expired = util.FANART_CACHE.get(id) or (None, True)
             if cached:
                 # bodge - set timeout to one second from now
                 util.FANART_CACHE.set(id, cached, timeout=1)
                 
+        # If there's only a few fanart updates then grab them now
+        if len(artist_ids) <= 20:
+            for id in artist_ids:
+                self.get_artist_images(id, ignore_cache = True)
+        else:
+            logger.info('Too many fanart updates, only marking expired')
+
         util.CACHE.set(last_invalidation_key, int(time.time()), timeout=0)
         
         result['artists'] = artist_ids
