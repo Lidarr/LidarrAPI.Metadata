@@ -440,7 +440,7 @@ class FanArtTvProvider(Provider,
             self._count_request('timeout')
             raise ProviderUnavailableException('Fanart provider timed out')
         except limit.RateLimitedError:
-            logger.error('Fanart request to {} rate limited'.format(mbid))
+            logger.debug('Fanart request to {} rate limited'.format(mbid))
             self._count_request('ratelimit')
             raise ProviderUnavailableException('Fanart provider rate limited')
         
@@ -458,7 +458,7 @@ class FanArtTvProvider(Provider,
         
         # Remove the updates we can't see
         artist_ids = self.diff_fanart_updates(all_updates, invisible_updates)
-        logger.info('invalidating given fanart updates:\n{}'.format('\n'.join(artist_ids)))
+        logger.info('Invalidating artists given fanart updates:\n{}'.format('\n'.join(artist_ids)))
 
         # This only invalidates the artists and not the albums but better than nothing
         for id in artist_ids:
@@ -641,7 +641,7 @@ class SolrSearchProvider(Provider,
             self._count_request('timeout')
             return {}
         except limit.RateLimitedError:
-            logger.error('Musicbrainz search request rate limited')
+            logger.debug('Musicbrainz search request rate limited')
             self._count_request('ratelimit')
             return {}
         
@@ -829,6 +829,9 @@ class MusicbrainzDbProvider(Provider,
 
             result['artists'] = self._invalidate_queries_by_entity_id('updated_artists.sql')
             result['albums'] = self._invalidate_queries_by_entity_id('updated_albums.sql')
+            
+            logger.info('Invalidating these artists given musicbrainz updates:\n{}'.format('\n'.join(result['artists'])))
+            logger.info('Invalidating these albums given musicbrainz updates:\n{}'.format('\n'.join(result['albums'])))
 
             util.CACHE.set(last_invalidation_key, vintage, timeout=0)
         else:
@@ -1224,7 +1227,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             raise ProviderUnavailableException('Wikipedia provider timed out')
         except limit.RateLimitedError as error:
             self._count_request('ratelimit')
-            logger.error(u'Wikipedia Request to {url} rate limited'.format(url=url))
+            logger.debug(u'Wikipedia Request to {url} rate limited'.format(url=url))
             raise ProviderUnavailableException('Wikipedia provider rate limited')
         
     def get_artist_overview(self, url):
