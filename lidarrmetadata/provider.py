@@ -636,8 +636,11 @@ class SolrSearchProvider(Provider,
                 if response.status_code == 200:
                     return response
                 else:
-                    logger.error(u'Non-200 response code for search: {}\n\t{}'.format(response.status_code,
-                                                                                      response))
+                    logger.error(u'Non-200 response code for {url}: {code}\n\t{details}'.format(
+                        url=url,
+                        code=response.status_code,
+                        details=response.text
+                    ))
                     return {}
 
         except HTTPError as error:
