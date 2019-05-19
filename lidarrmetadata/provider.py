@@ -451,10 +451,11 @@ class FanArtTvProvider(Provider,
         
         last_invalidation_key = prefix + 'FanartProviderLastCacheInvalidation'
         self._last_cache_invalidation = util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
+        current_cache_invalidation = int(time.time())
         
-        # Since we don't have a fanart personal key we can only see things with a 7 day lag
-        all_updates = self.get_fanart_updates(self._last_cache_invalidation - 60 * 60 * 24 * 7)
-        invisible_updates = self.get_fanart_updates(time.time() - 60 * 60 * 24 * 7)
+        # Since we don't have a fanart personal key we can only see things with a lag
+        all_updates = self.get_fanart_updates(self._last_cache_invalidation - CONFIG.FANART_API_DELAY_SECONDS)
+        invisible_updates = self.get_fanart_updates(current_cache_invalidation - CONFIG.FANART_API_DELAY_SECONDS)
         
         # Remove the updates we can't see
         artist_ids = self.diff_fanart_updates(all_updates, invisible_updates)
@@ -474,7 +475,7 @@ class FanArtTvProvider(Provider,
         else:
             logger.info('Too many fanart updates, only marking expired')
 
-        util.CACHE.set(last_invalidation_key, int(time.time()), timeout=0)
+        util.CACHE.set(last_invalidation_key, current_cache_invalidation, timeout=0)
         
         result['artists'] = artist_ids
         return result

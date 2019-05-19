@@ -339,6 +339,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
     # Fanart.tv API credentials
     FANART_KEY = ''
+    # The API for standard keys is supposed to be delayed by 7 days but
+    # in practise it appears the lag is slightly more
+    FANART_API_DELAY_SECONDS = 8 * 24 * 60 * 60
 
     # Port to use
     HTTP_PORT = 5001
