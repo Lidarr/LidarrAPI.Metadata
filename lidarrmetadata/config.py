@@ -287,7 +287,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # The BAD value is used if some providers were unavailable but
     # there was enough information to return a useful response
     # (e.g. we are missing overviews or images)
-    CACHE_TTL_GOOD = 60 * 60 * 24
+    CACHE_TTL_GOOD = 60 * 60 * 24 * 7
     CACHE_TTL_BAD = 60 * 30
     
     REDIS_CACHE_CONFIG = {
@@ -310,6 +310,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     
     FANART_CACHE_CONFIG = dict(PERSISTENT_CACHE_CONFIG)
     FANART_CACHE_CONFIG['CACHE_TABLE'] = 'fanart'
+    FANART_CACHE_CONFIG['CACHE_DEFAULT_TIMEOUT'] = 60 * 60 * 24 * 30
     
     WIKI_CACHE_CONFIG = dict(PERSISTENT_CACHE_CONFIG)
     WIKI_CACHE_CONFIG['CACHE_TABLE'] = 'wikipedia'
