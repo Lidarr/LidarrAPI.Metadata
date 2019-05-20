@@ -439,6 +439,9 @@ class FanArtTvProvider(Provider,
             logger.error('Timeout: {e}'.format(e=error))
             self._count_request('timeout')
             raise ProviderUnavailableException('Fanart provider timed out')
+        except requests.exceptions.ConnectionError as error:
+            logger.error('ConnectionError: {e}'.format(e=error))
+            raise ProviderUnavailableException('Could not connect to fanart')
         except limit.RateLimitedError:
             logger.debug('Fanart request to {} rate limited'.format(mbid))
             self._count_request('ratelimit')
@@ -500,6 +503,10 @@ class FanArtTvProvider(Provider,
         except requests.exceptions.Timeout as error:
             logger.error('Timeout: {e}'.format(e=error))
             return []
+        except requests.exceptions.ConnectionError as error:
+            logger.error('ConnectionError: {e}'.format(e=error))
+            return []
+
         
     def diff_fanart_updates(self, long, short):
         """
@@ -1247,6 +1254,9 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             logger.error('Timeout: {e}'.format(e=error))
             self._count_request('timeout')
             raise ProviderUnavailableException('Wikipedia provider timed out')
+        except requests.exceptions.ConnectionError as error:
+            logger.error('ConnectionError: {e}'.format(e=error))
+            raise ProviderUnavailableException('Could not connect to wikipedia')
         except limit.RateLimitedError as error:
             self._count_request('ratelimit')
             logger.debug(u'Wikipedia Request to {url} rate limited'.format(url=url))
