@@ -432,6 +432,9 @@ class FanArtTvProvider(Provider,
                 except Exception as e:
                     logger.error('Error decoding {}'.format(response))
                     raise ProviderUnavailableException('Error decoding fanart response')
+        except ConnectionError as error:
+            logger.error('ConnectionError: {e}'.format(e=error))
+            raise ProviderUnavailableException('Could not connect to fanart')
         except HTTPError as error:
             logger.error('HTTPError: {e}'.format(e=error))
             raise ProviderUnavailableException('Fanart provider returned error')
@@ -497,6 +500,9 @@ class FanArtTvProvider(Provider,
             except Exception as e:
                 logger.error('Error decoding {}'.format(response))
                 return []
+        except ConnectionError as error:
+            logger.error('ConnectionError: {e}'.format(e=error))
+            return []
         except HTTPError as error:
             logger.error('HTTPError: {e}'.format(e=error))
             return []
@@ -1247,6 +1253,9 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         except KeyError as error:
             logger.error(u'KeyError {e}'.format(e=error))
             return None
+        except ConnectionError as error:
+            logger.error('ConnectionError: {e}'.format(e=error))
+            raise ProviderUnavailableException('Could not connect to wikipedia')
         except HTTPError as error:
             logger.error(u'HTTPError {e}'.format(e=error))
             raise ProviderUnavailableException('Wikipedia provider returned error')
