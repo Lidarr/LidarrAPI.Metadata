@@ -924,6 +924,9 @@ class MusicbrainzDbProvider(Provider,
         
     async def get_artist_by_id(self, artist_id):
         results = await self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])
+        
+        logger.debug("got artist")
+        
         if results:
             results = results[0]
         else:
@@ -941,6 +944,8 @@ class MusicbrainzDbProvider(Provider,
     async def get_album_images(self, album_id):
         filename = '../sql/caa_by_mbid.sql'
         results = await self.query_from_file(filename, [album_id])
+        
+        logger.debug("got album images")
 
         type_mapping = {'Front': 'Cover', 'Medium': 'Disc'}
 
@@ -957,6 +962,9 @@ class MusicbrainzDbProvider(Provider,
 
     async def get_release_group_by_id(self, rgid):
         release_groups = await self.query_from_file('release_group_by_id.sql', [rgid])
+        
+        logger.debug("got release group")
+        
         if release_groups:
             release_group = release_groups[0]
         else:
@@ -990,6 +998,9 @@ class MusicbrainzDbProvider(Provider,
     async def get_releases_by_rgid(self, rgid):
 
         releases = await self.query_from_file('release_by_release_group_id.sql', [rgid])
+        
+        logger.debug("got releases")
+                
         if not releases:
             return []
 
@@ -1005,10 +1016,14 @@ class MusicbrainzDbProvider(Provider,
                 for release in releases]
 
     async def get_release_group_artist_ids(self, rgid):
-        return [x['gid'] for x in await self.query_from_file('artist_by_release_group.sql', [rgid])]
+        result = await self.query_from_file('artist_by_release_group.sql', [rgid])
+        logger.debug("got track artist ids")
+        return [x['gid'] for x in result]
 
     async def get_release_group_tracks(self, rgid):
         results = await self.query_from_file('track_release_group.sql', [rgid])
+        
+        logger.debug("got rg tracks")
 
         return [{'Id': result['gid'],
                  'RecordingId': result['recording_id'],
@@ -1024,6 +1039,8 @@ class MusicbrainzDbProvider(Provider,
     async def get_release_groups_by_artist(self, artist_id):
         results = await self.query_from_file('release_group_search_artist_mbid.sql',
                                        [artist_id])
+        
+        logger.debug("got artist release groups")
 
         return [{'Id': result['gid'],
                  'Title': result['album'],
@@ -1035,6 +1052,7 @@ class MusicbrainzDbProvider(Provider,
     async def get_artist_links(self, artist_id):
         results = await self.query_from_file('links_artist_mbid.sql',
                                        [artist_id])
+        logger.debug("got artist links")
         return [{'target': result['url'],
                  'type': self.parse_url_source(result['url'])}
                 for result in results]
@@ -1042,6 +1060,7 @@ class MusicbrainzDbProvider(Provider,
     async def get_release_group_links(self, release_group_id):
         results = await self.query_from_file('links_release_group_mbid.sql',
                                        [release_group_id])
+        logger.debug("got release group links")
         return [{'target': result['url'],
                  'type': self.parse_url_source(result['url'])}
                 for result in results]
