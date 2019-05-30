@@ -413,8 +413,12 @@ class HttpProvider(Provider):
         except (aiohttp.ClientError, aiohttp.http_exceptions.HttpProcessingError) as error:
             logger.error(f'aiohttp exception for {url} [{getattr(error, "status", None)}]: {getattr(error, "message", None)}')
             raise ProviderUnavailableException(f'{self._name} aiohttp exception')
+        except asyncio.CancelledError:
+            logger.debug(f'Task cancelled {url}')
+            raise
         except Exception as error:
             logger.error(f'Non-aiohttp exceptions occured: {getattr(error, "__dict__", {})}')
+            logger.error(repr(error))
             # raise ProviderUnavailableException(f'{self._name} non-aiohttp exception')
             raise
 
