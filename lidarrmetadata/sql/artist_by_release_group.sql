@@ -7,4 +7,4 @@ FROM artist
   JOIN release on medium.release = release.id
   JOIN release_group on release.release_group = release_group.id
 
-WHERE release_group.gid = %s AND artist_credit_name.position = 0
+WHERE release_group.gid = $1 AND artist_credit_name.position = 0
