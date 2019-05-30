@@ -13,6 +13,11 @@ import re
 import six
 from urllib3.exceptions import HTTPError
 
+import asyncio
+import aiohttp
+import asyncpg
+import json
+
 import dateutil.parser
 import psycopg2
 import psycopg2.extensions
@@ -32,7 +37,7 @@ else:
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 logger.info('Have provider logger')
 
 # always get strings from database in unicode
@@ -315,6 +320,19 @@ class InvalidateCacheMixin(MixinBase):
         :return: Dict {"artists":[ids], "albums":[ids]} of artists/albums that need to be updated
         """
         pass
+    
+class AsyncInit(MixinBase):
+    """
+    Hook to initialize async items
+    """
+    
+    @abc.abstractmethod
+    async def _init(self, prefix):
+        """
+        Run at initialization using await
+        """
+        pass
+
     
 class ProviderMeta(abc.ABCMeta):
     def __new__(mcls, name, bases, namespace):
@@ -795,19 +813,17 @@ class SolrSearchProvider(Provider,
         return result
     
 class MusicbrainzDbProvider(Provider,
+                            AsyncInit,
                             DataVintageMixin,
                             InvalidateCacheMixin,
                             AlbumArtworkMixin,
                             ArtistByIdMixin,
                             ArtistLinkMixin,
-                            ArtistNameSearchMixin,
                             ReleaseGroupByArtistMixin,
                             ReleaseGroupByIdMixin,
                             ReleasesByReleaseGroupIdMixin,
                             ReleaseGroupLinkMixin,
-                            AlbumNameSearchMixin,
-                            TracksByReleaseGroupMixin,
-                            TrackSearchMixin):
+                            TracksByReleaseGroupMixin):
     """
     Provider for directly querying musicbrainz database
     """
@@ -844,14 +860,32 @@ class MusicbrainzDbProvider(Provider,
         self._db_name = db_name
         self._db_user = db_user
         self._db_password = db_password
+        self._pool = None
         
         ## dummy value for initialization, will be picked up from redis later on
         self._last_cache_invalidation = datetime.datetime.now(pytz.utc) - datetime.timedelta(hours = 2)
         
-    def data_vintage(self):
-        return self.query_from_file('../sql/data_vintage.sql')[0]['vintage']
+    async def uuid_as_str(self, con):
+        await con.set_type_codec(
+            'uuid', encoder=str, decoder=str,
+            schema='pg_catalog', format='text'
+        )
+        
+    async def _init(self):
+        logger.debug("Initializing MB DB pool")
+        self._pool = await asyncpg.create_pool(host = self._db_host,
+                                               port = self._db_port,
+                                               user = self._db_user,
+                                               password = self._db_password,
+                                               database = self._db_name,
+                                               init = self.uuid_as_str)
+        logger.debug("Done")
+        
+    async def data_vintage(self):
+        data = await self.query_from_file('../sql/data_vintage.sql')
+        return data[0]['vintage']
     
-    def invalidate_cache(self, prefix):
+    async def invalidate_cache(self, prefix):
 
         last_invalidation_key = prefix + 'MBProviderLastCacheInvalidation'
         self._last_cache_invalidation = util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
@@ -862,8 +896,8 @@ class MusicbrainzDbProvider(Provider,
         if vintage > self._last_cache_invalidation:
             logger.debug('Invalidating musicbrainz cache')
 
-            result['artists'] = self._invalidate_queries_by_entity_id('updated_artists.sql')
-            result['albums'] = self._invalidate_queries_by_entity_id('updated_albums.sql')
+            result['artists'] = await self._invalidate_queries_by_entity_id('updated_artists.sql')
+            result['albums'] = await self._invalidate_queries_by_entity_id('updated_albums.sql')
             
             logger.info('Invalidating these artists given musicbrainz updates:\n{}'.format('\n'.join(result['artists'])))
             logger.info('Invalidating these albums given musicbrainz updates:\n{}'.format('\n'.join(result['albums'])))
@@ -874,12 +908,12 @@ class MusicbrainzDbProvider(Provider,
             
         return result
     
-    def _invalidate_queries_by_entity_id(self, changed_query):
-        entities = self.query_from_file(changed_query, {'date': self._last_cache_invalidation})
+    async def _invalidate_queries_by_entity_id(self, changed_query):
+        entities = await self.query_from_file(changed_query, {'date': self._last_cache_invalidation})
         return [entity['gid'] for entity in entities]
         
-    def get_artist_by_id(self, artist_id):
-        results = self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])
+    async def get_artist_by_id(self, artist_id):
+        results = await self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])
         if results:
             results = results[0]
         else:
@@ -894,9 +928,9 @@ class MusicbrainzDbProvider(Provider,
                            'Value': results['rating'] / 10 if results[
                                                                   'rating'] is not None else None}}
 
-    def get_album_images(self, album_id):
+    async def get_album_images(self, album_id):
         filename = '../sql/caa_by_mbid.sql'
-        results = self.query_from_file(filename, [album_id])
+        results = await self.query_from_file(filename, [album_id])
 
         type_mapping = {'Front': 'Cover', 'Medium': 'Disc'}
 
@@ -911,81 +945,8 @@ class MusicbrainzDbProvider(Provider,
     def _build_caa_url(release_id, image_id):
         return 'https://coverartarchive.org/release/{}/{}.jpg'.format(release_id, image_id)
 
-    def search_artist_name(self, name, limit=None, albums=None):
-        name = self.mb_encode(name)
-        
-        filename = 'artist_search_name_with_album.sql' if albums else 'artist_search_name.sql'
-
-        args = {'artist': name}
-        if albums:
-            with self._cursor() as cursor:
-                args['album_query'] = sql.SQL(' | ').join([sql.Literal(album) for album in albums]).as_string(cursor)
-
-        filename = pkg_resources.resource_filename('lidarrmetadata.sql', filename)
-        with open(filename, 'r') as infile:
-            query = infile.read()
-
-        if limit:
-            with self._cursor() as cursor:
-                if limit:
-                    query += cursor.mogrify(' LIMIT %s', [limit])
-
-        results = self.map_query(query, **args)
-
-        return [{'Id': result['gid'],
-                 'ArtistName': result['name'],
-                 'Type': result['type'] or 'Artist',
-                 'Disambiguation': result['comment'],
-                 'Rating': {'Count': result['rating_count'] or 0, 'Value': result['rating'] / 10 if result['rating'] is not None else None}}
-                for result in results]
-
-    def search_album_name(self, name, limit=None, artist_name=''):
-        name = self.mb_encode(name)
-
-        filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'album_search_name.sql')
-        with open(filename, 'r') as infile:
-            query = infile.read()
-
-        if artist_name or limit:
-            with self._cursor() as cursor:
-
-                if artist_name:
-                    query_parts = query.split()
-
-                    # Add artist name clause to where
-                    new_parts = []
-                    for part in query_parts:
-                        if part.startswith('WHERE'):
-                            part += cursor.mogrify(
-                                ' to_tsvector(\'mb_simple\', artist.name) @@ plainto_tsquery(\'mb_simple\', %s) AND ',
-                                [artist_name])
-
-                        new_parts.append(part)
-                    query_parts = new_parts or query_parts
-
-                    query = '\n'.join(query_parts)
-
-                if limit:
-                    query += cursor.mogrify(' LIMIT %s', [limit])
-
-        results = self.map_query(query, [name, name, name])
-
-        return [{'Id': result['gid'],
-                 'Disambiguation': result['comment'],
-                 'Title': result['album'],
-                 'Type': result['primary_type'],
-                 'SecondaryTypes': result['secondary_types'],
-                 'ReleaseDate': datetime.datetime(result['year'] or 1,
-                                                  result['month'] or 1,
-                                                  result['day'] or 1),
-                 'ArtistId': result['artist_id'],
-                 'Rating': {'Count': result['rating_count'] or 0,
-                       'Value': result['rating'] / 10 if result['rating'] is not None else None}
-                 }
-                for result in results]
-
-    def get_release_group_by_id(self, rgid):
-        release_groups = self.query_from_file('release_group_by_id.sql', [rgid])
+    async def get_release_group_by_id(self, rgid):
+        release_groups = await self.query_from_file('release_group_by_id.sql', [rgid])
         if release_groups:
             release_group = release_groups[0]
         else:
@@ -1009,15 +970,23 @@ class MusicbrainzDbProvider(Provider,
         if not date_json:
             return None
         
+        print(repr(date_json))
+        print(type(date_json))
+        
+        logger.debug("date")
+        logger.debug(date_json)
+        date_json = [json.loads(dt) for dt in date_json]
+        logger.debug(date_json)
+        
         defined = [datetime.datetime(dt['year'], dt['month'], dt['day']) for dt in date_json if dt['year'] and dt['month'] and dt['day']]
         if defined:
             return min(defined)
 
         return min([datetime.datetime(dt['year'] or 1, dt['month'] or 1, dt['day'] or 1) for dt in date_json])
 
-    def get_releases_by_rgid(self, rgid):
+    async def get_releases_by_rgid(self, rgid):
 
-        releases = self.query_from_file('release_by_release_group_id.sql', [rgid])
+        releases = await self.query_from_file('release_by_release_group_id.sql', [rgid])
         if not releases:
             return []
 
@@ -1032,11 +1001,11 @@ class MusicbrainzDbProvider(Provider,
                  'TrackCount': release['track_count']}
                 for release in releases]
 
-    def get_release_group_artist_ids(self, rgid):
-        return [x['gid'] for x in self.query_from_file('artist_by_release_group.sql', [rgid])]
+    async def get_release_group_artist_ids(self, rgid):
+        return [x['gid'] for x in await self.query_from_file('artist_by_release_group.sql', [rgid])]
 
-    def get_release_group_tracks(self, rgid):
-        results = self.query_from_file('track_release_group.sql', [rgid])
+    async def get_release_group_tracks(self, rgid):
+        results = await self.query_from_file('track_release_group.sql', [rgid])
 
         return [{'Id': result['gid'],
                  'RecordingId': result['recording_id'],
@@ -1049,8 +1018,8 @@ class MusicbrainzDbProvider(Provider,
                  'TrackPosition': result['position']}
                 for result in results]
 
-    def get_release_groups_by_artist(self, artist_id):
-        results = self.query_from_file('release_group_search_artist_mbid.sql',
+    async def get_release_groups_by_artist(self, artist_id):
+        results = await self.query_from_file('release_group_search_artist_mbid.sql',
                                        [artist_id])
 
         return [{'Id': result['gid'],
@@ -1060,67 +1029,21 @@ class MusicbrainzDbProvider(Provider,
                  'ReleaseStatuses': result['release_statuses']}
                 for result in results]
 
-    def get_artist_links(self, artist_id):
-        results = self.query_from_file('links_artist_mbid.sql',
+    async def get_artist_links(self, artist_id):
+        results = await self.query_from_file('links_artist_mbid.sql',
                                        [artist_id])
         return [{'target': result['url'],
                  'type': self.parse_url_source(result['url'])}
                 for result in results]
 
-    def get_release_group_links(self, release_group_id):
-        results = self.query_from_file('links_release_group_mbid.sql',
+    async def get_release_group_links(self, release_group_id):
+        results = await self.query_from_file('links_release_group_mbid.sql',
                                        [release_group_id])
         return [{'target': result['url'],
                  'type': self.parse_url_source(result['url'])}
                 for result in results]
 
-    def search_track(self, query, artist_name=None, album_name=None, limit=10):
-        filename = pkg_resources.resource_filename('lidarrmetadata.sql', 'track_search.sql')
-        with open(filename, 'r') as infile:
-            sql_query = infile.read()
-
-        with self._cursor() as cursor:
-
-            query_parts = sql_query.split()
-
-            # Add artist name clause to where
-            if artist_name or album_name:
-                new_query = []
-                for part in query_parts:
-                    if part.startswith('WHERE'):
-                        # This makes no sense, but extra queries are added after WHERE instead of at end of line
-                        if artist_name:
-                            part += cursor.mogrify(
-                                ' to_tsvector(\'mb_simple\', artist.name) @@ plainto_tsquery(\'mb_simple\', %s) AND ',
-                                [artist_name])
-                        if album_name:
-                            part += cursor.mogrify(
-                                ' to_tsvector(\'mb_simple\', release_group.name) @@ plainto_tsquery(\'mb_simple\', %s)) AND ',
-                                [album_name])
-                    new_query.append(part)
-
-                query_parts = new_query
-
-            sql_query = '\n'.join(query_parts)
-
-            if limit:
-                sql_query += cursor.mogrify(' LIMIT %s', [limit])
-
-        results = self.map_query(sql_query, [query, query, query])
-
-        return [{'TrackName': result['track_name'],
-                 'DurationMs': result['track_duration'],
-                 'ArtistName': result['artist_name'],
-                 'ArtistId': result['artist_gid'],
-                 'AlbumTitle': result['rg_title'],
-                 'AlbumId': result['rg_gid'],
-                 'Rating': {
-                     'Count': result['rating_count'] or 0,
-                     'Value': result['rating'] / 10 if result['rating'] is not None else None
-                 }}
-                for result in results]
-
-    def query_from_file(self, sql_file, *args, **kwargs):
+    async def query_from_file(self, sql_file, *args, **kwargs):
         """
         Executes query from sql file
         :param sql_file: Filename of sql file
@@ -1131,9 +1054,9 @@ class MusicbrainzDbProvider(Provider,
         filename = pkg_resources.resource_filename('lidarrmetadata.sql', sql_file)
 
         with open(filename, 'r') as sql:
-            return self.map_query(sql.read(), *args, **kwargs)
+            return await self.map_query(sql.read(), *args, **kwargs)
 
-    def map_query(self, sql, *args, **kwargs):
+    async def map_query(self, sql, *args, **kwargs):
         """
         Maps a SQL query to a list of dicts of column name: value
         :param args: Args to pass to cursor.execute
@@ -1141,35 +1064,21 @@ class MusicbrainzDbProvider(Provider,
         :return: List of dict with column: value
         """
         
+        logger.debug(f"running query:\n{sql}")
         cursor_args = args[0] if args else kwargs
-
-        with self._cursor() as cursor:
-            cursor.execute(sql, cursor_args)
-            columns = collections.OrderedDict(
-                (column.name, None) for column in cursor.description)
-            results = cursor.fetchall()
-
-        results = [{column: result[i] for i, column in enumerate(columns.keys())}
-                   for
-                   result in results]
+        logger.debug(f"args:\n:{cursor_args}")
+        
+        async with self._pool.acquire() as connection:
+            data = await connection.fetch(sql, *cursor_args)
+            
+        logger.debug(data)
+            
+        results = [dict(row.items()) for row in data]
 
         # Decode strings
-        results = util.map_iterable_values(results, self.mb_decode, str)
+        # results = util.map_iterable_values(results, self.mb_decode, str)
 
         return results
-
-    @contextlib.contextmanager
-    def _cursor(self):
-        connection = psycopg2.connect(host=self._db_host,
-                                      port=self._db_port,
-                                      dbname=self._db_name,
-                                      user=self._db_user,
-                                      password=self._db_password,
-                                      connect_timeout=5)
-        cursor = connection.cursor()
-        yield cursor
-        cursor.close()
-        connection.close()
 
     @classmethod
     def mb_decode(cls, s):
@@ -1204,8 +1113,56 @@ class MusicbrainzDbProvider(Provider,
         except IndexError:
             return domain
 
+class HttpProvider(Provider):
+    """
+    Generic provider which makes external HTTP queries
+    """
+    
+    def __init__(self, name):
+        super(HttpProvider, self).__init__()
+        
+        self._name = name
+        self._limiter = _get_rate_limiter(key='wikipedia')
+        self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
+                                                CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
+        # self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
+        
+        logger.debug('Initialised aiohttp provider')
+        
+    def _count_request(self, result_type):
+        if self._stats:
+            self._stats.metric('external', {result_type: 1}, tags={'provider': 'wikipedia'})
 
-class WikipediaProvider(Provider, ArtistOverviewMixin):
+    def _record_response_result(self, response):
+        if self._stats:
+            self._stats.metric('external',
+                               {
+                                   'response_time': response.elapsed.microseconds / 1000,
+                                   'response_status_code': response.status_code
+                               },
+                               tags={'provider': 'solr_search'})
+            
+    async def get_with_limit(self, url):
+        try:
+            ## TODO make this persistent
+            async with aiohttp.ClientSession() as session:
+                resp = await session.request(method='GET', url=url)
+                resp.raise_for_status()
+                logger.info("Got response [%s] for URL: %s", resp.status, url)
+                json = await resp.json()
+                return json
+        except ValueError as error:
+            logger.error(f'Response from {self._name} not valid json: {error}')
+            raise ProviderUnavailableException(f'{self._name} returned invalid json')
+        except (aiohttp.ClientError, aiohttp.http_exceptions.HttpProcessingError) as error:
+            logger.error(f'aiohttp exception for {url} [{getattr(error, "status", None)}]: {getattr(error, "message", None)}')
+            raise ProviderUnavailableException(f'{self._name} aiohttp exception')
+        except Exception as error:
+            logger.error(f'Non-aiohttp exceptions occured: {getattr(error, "__dict__", {})}')
+            # raise ProviderUnavailableException(f'{self._name} non-aiohttp exception')
+            raise
+
+class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
     """
     Provider for querying wikipedia
     """
@@ -1217,11 +1174,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         """
         Class initialization
         """
-        super(WikipediaProvider, self).__init__()
-        self._limiter = _get_rate_limiter(key='wikipedia')
-
-        self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
-                                                CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
+        super(WikipediaProvider, self).__init__('wikipedia')
 
         # https://github.com/metabrainz/musicbrainz-server/blob/v-2019-05-13-schema-change/lib/MusicBrainz/Server/Data/WikipediaExtract.pm#L61
         self.language_preference = (
@@ -1230,55 +1183,17 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             'hu', 'id', 'lt', 'lv', 'no', 'ro', 'sk', 'sl', 'tr', 'uk',
             'vi', 'zh'
         )
-
-    def _count_request(self, result_type):
-        if self._stats:
-            self._stats.metric('external', {result_type: 1}, tags={'provider': 'wikipedia'})
-            
-    def _log_response_time(self, response):
-        if self._stats:
-            self._stats.metric('external', {'response_time', response.elapsed.microseconds / 1000},
-                               tags={'provider': 'wikipedia'})
-            
-    def get_with_limit(self, url):
-        try:
-            with self._limiter.limited():
-                self._count_request('request')
-                response = requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT / 1000)
-                self._log_response_time(response)
-                return response.json()
-        except ValueError as error:
-            logger.error(u'Page parse error: {e}'.format(e=error))
-            return None
-        except KeyError as error:
-            logger.error(u'KeyError {e}'.format(e=error))
-            return None
-        except ConnectionError as error:
-            logger.error('ConnectionError: {e}'.format(e=error))
-            raise ProviderUnavailableException('Could not connect to wikipedia')
-        except HTTPError as error:
-            logger.error(u'HTTPError {e}'.format(e=error))
-            raise ProviderUnavailableException('Wikipedia provider returned error')
-        except requests.exceptions.Timeout as error:
-            logger.error('Timeout: {e}'.format(e=error))
-            self._count_request('timeout')
-            raise ProviderUnavailableException('Wikipedia provider timed out')
-        except requests.exceptions.ConnectionError as error:
-            logger.error('ConnectionError: {e}'.format(e=error))
-            raise ProviderUnavailableException('Could not connect to wikipedia')
-        except limit.RateLimitedError as error:
-            self._count_request('ratelimit')
-            logger.debug(u'Wikipedia Request to {url} rate limited'.format(url=url))
-            raise ProviderUnavailableException('Wikipedia provider rate limited')
         
-    def get_artist_overview(self, url):
+    async def get_artist_overview(self, url):
         cached, expired = util.WIKI_CACHE.get(url) or (None, True)
         
         if cached and not expired:
             return cached
         
+        logger.debug("getting overview")
+        
         try:
-            summary = self.wikidata_get_summary_from_url(url) if 'wikidata' in url else self.wikipedia_get_summary_from_url(url)
+            summary = await self.wikidata_get_summary_from_url(url) if 'wikidata' in url else await self.wikipedia_get_summary_from_url(url)
             util.WIKI_CACHE.set(url, summary)
             return summary
         
@@ -1291,17 +1206,17 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             logger.error('Could not get summary from {}'.format(url))
             return ''
             
-    def wikidata_get_summary_from_url(self, url):
-        data = self.wikidata_get_entity_data_from_url(url)
-        return self.wikidata_get_summary_from_entity_data(data)
+    async def wikidata_get_summary_from_url(self, url):
+        data = await self.wikidata_get_entity_data_from_url(url)
+        return await self.wikidata_get_summary_from_entity_data(data)
             
-    def wikidata_get_summary_from_entity_data(self, data):
+    async def wikidata_get_summary_from_entity_data(self, data):
         
         sites = { item['site']: url_quote(item['title'].encode('utf-8')) for item in data.get('sitelinks', {}).values() }
 
         # return english wiki if possible
         if 'enwiki' in sites:
-            return self.wikipedia_get_summary_from_title(sites['enwiki'], 'en')
+            return await self.wikipedia_get_summary_from_title(sites['enwiki'], 'en')
         
         # if not, return english entity description
         description = data.get('descriptions', {}).get('en', {}).get('value', '')
@@ -1313,10 +1228,10 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
         
         if language:
             title = sites['{}wiki'.format(language)]
-            return self.wikipedia_get_summary_from_title(title, language)
+            return await self.wikipedia_get_summary_from_title(title, language)
         return ''
     
-    def wikidata_get_entity_data_from_url(self, url):
+    async def wikidata_get_entity_data_from_url(self, url):
         entity = self.wikidata_entity_from_url(url)
         wikidata_url = (
             'https://www.wikidata.org/w/api.php'
@@ -1326,13 +1241,14 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             '&format=json'
         ).format(entity)
         
+        data = await self.get_with_limit(wikidata_url)
         return (
-            self.get_with_limit(wikidata_url)
+            data
             .get('entities', {})
             .get(entity, {})
         )
     
-    def wikidata_get_entity_data_from_language_title(self, title, language):
+    async def wikidata_get_entity_data_from_language_title(self, title, language):
         title = title.split("#", 1)[0]
         wikidata_url = (
             'https://www.wikidata.org/w/api.php'
@@ -1342,10 +1258,11 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             '&props=sitelinks|descriptions'
             '&format=json'
         ).format(language=language, title=title)
-        entities = self.get_with_limit(wikidata_url).get('entities', {})
+        data = await self.get_with_limit(wikidata_url)
+        entities = data.get('entities', {})
         return entities[next(iter(entities))]
     
-    def wikipedia_get_summary_from_url(self, url):
+    async def wikipedia_get_summary_from_url(self, url):
         url_title, url_language = self.wikipedia_title_from_url(url)
         
         # if English link, just use that
@@ -1353,10 +1270,10 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             return self.wikipedia_get_summary_from_title(url_title, url_language)
         
         # Otherwise go via wikidata to try to get something in English or best other language
-        data = self.wikidata_get_entity_data_from_language_title(url_title, url_language)
+        data = await self.wikidata_get_entity_data_from_language_title(url_title, url_language)
         return self.wikidata_get_summary_from_entity_data(data)
         
-    def wikipedia_get_summary_from_title(self, title, language):
+    async def wikipedia_get_summary_from_title(self, title, language):
         """
         Gets summary of a wikipedia page
         :param url: URL of wikipedia page
@@ -1374,7 +1291,7 @@ class WikipediaProvider(Provider, ArtistOverviewMixin):
             '&titles={title}'
         ).format(language = language, title = title)
         
-        data = self.get_with_limit(wiki_url)
+        data = await self.get_with_limit(wiki_url)
         return data.get('query', {}).get('pages', [{}])[0].get('extract', '')
 
     @classmethod

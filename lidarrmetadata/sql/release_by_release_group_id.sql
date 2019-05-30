@@ -41,4 +41,4 @@ SELECT
 FROM release
   JOIN release_status ON release_status.id = release.status
   JOIN release_group ON release_group.id = release.release_group
-WHERE release_group.gid = %s
+WHERE release_group.gid = $1

@@ -23,7 +23,7 @@ FROM release_group
   LEFT JOIN artist_credit_name ON artist_credit_name.artist_credit = release_group.artist_credit
   LEFT JOIN artist ON artist_credit_name.artist = artist.id
 
-WHERE release_group.gid = %s
+WHERE release_group.gid = $1
 ORDER BY
   year,
   month,
