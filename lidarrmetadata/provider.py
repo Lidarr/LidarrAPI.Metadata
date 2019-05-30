@@ -365,8 +365,56 @@ class ProviderUnavailableException(Exception):
     """ Thown on error for providers we can cope without """
     pass
 
+class HttpProvider(Provider):
+    """
+    Generic provider which makes external HTTP queries
+    """
+    
+    def __init__(self, name):
+        super(HttpProvider, self).__init__()
+        
+        self._name = name
+        self._limiter = _get_rate_limiter(key='wikipedia')
+        self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
+                                                CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
+        # self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
+        
+        logger.debug('Initialised aiohttp provider')
+        
+    def _count_request(self, result_type):
+        if self._stats:
+            self._stats.metric('external', {result_type: 1}, tags={'provider': 'wikipedia'})
 
-class FanArtTvProvider(Provider, 
+    def _record_response_result(self, response):
+        if self._stats:
+            self._stats.metric('external',
+                               {
+                                   'response_time': response.elapsed.microseconds / 1000,
+                                   'response_status_code': response.status_code
+                               },
+                               tags={'provider': 'solr_search'})
+            
+    async def get_with_limit(self, url):
+        try:
+            ## TODO make this persistent
+            async with aiohttp.ClientSession() as session:
+                resp = await session.request(method='GET', url=url)
+                resp.raise_for_status()
+                logger.info("Got response [%s] for URL: %s", resp.status, url)
+                json = await resp.json()
+                return json
+        except ValueError as error:
+            logger.error(f'Response from {self._name} not valid json: {error}')
+            raise ProviderUnavailableException(f'{self._name} returned invalid json')
+        except (aiohttp.ClientError, aiohttp.http_exceptions.HttpProcessingError) as error:
+            logger.error(f'aiohttp exception for {url} [{getattr(error, "status", None)}]: {getattr(error, "message", None)}')
+            raise ProviderUnavailableException(f'{self._name} aiohttp exception')
+        except Exception as error:
+            logger.error(f'Non-aiohttp exceptions occured: {getattr(error, "__dict__", {})}')
+            # raise ProviderUnavailableException(f'{self._name} non-aiohttp exception')
+            raise
+
+class FanArtTvProvider(HttpProvider, 
                        AlbumArtworkMixin, 
                        ArtistArtworkMixin,
                        InvalidateCacheMixin):
@@ -382,19 +430,16 @@ class FanArtTvProvider(Provider,
                          webservice.fanart.tv/v3/music
         :param use_https: Whether or not to use https. Defaults to True.
         """
-        super(FanArtTvProvider, self).__init__()
+        super(FanArtTvProvider, self).__init__('fanart')
 
         self._api_key = api_key
         self._base_url = base_url
-        self._limiter = _get_rate_limiter(key='fanart')
-        self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
-                                                CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
         self.use_https = use_https
         
         ## dummy value for initialization, will be picked up from redis later on
         self._last_cache_invalidation = time.time() - 60 * 60 * 24
 
-    def get_artist_images(self, artist_id, ignore_cache = False):
+    async def get_artist_images(self, artist_id, ignore_cache = False):
         
         cached, expired = util.FANART_CACHE.get(artist_id) or (None, True)
 
@@ -402,7 +447,7 @@ class FanArtTvProvider(Provider,
             return self.parse_artist_images(cached)
         
         try:
-            results = self.get_by_mbid(artist_id)
+            results = await self.get_by_mbid(artist_id)
 
             util.FANART_CACHE.set(artist_id, results)
             for id, album_result in results.get('albums', {}).items():
@@ -416,14 +461,14 @@ class FanArtTvProvider(Provider,
             else:
                 raise
 
-    def get_album_images(self, album_id):
+    async def get_album_images(self, album_id):
         cached, expired = util.FANART_CACHE.get(album_id) or (None, True)
 
         if cached and not expired:
             return self.parse_album_images(cached)
         
         try:
-            results = self.get_by_mbid(album_id)
+            results = await self.get_by_mbid(album_id)
             results = results.get('albums', results).get(album_id, results)            
             util.FANART_CACHE.set(album_id, results)
 
@@ -433,40 +478,14 @@ class FanArtTvProvider(Provider,
             else:
                 raise
 
-    def get_by_mbid(self, mbid):
+    async def get_by_mbid(self, mbid):
         """
         Gets the fanart.tv response for resource with Musicbrainz id mbid
         :param mbid: Musicbrainz ID
         :return: fanart.tv response for mbid
         """
         url = self.build_url(mbid)
-        try:
-            with self._limiter.limited():
-                self._count_request('request')
-                response = requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT / 1000)
-                self._log_response_time(response)
-                try:
-                    return response.json()
-                except Exception as e:
-                    logger.error('Error decoding {}'.format(response))
-                    raise ProviderUnavailableException('Error decoding fanart response')
-        except ConnectionError as error:
-            logger.error('ConnectionError: {e}'.format(e=error))
-            raise ProviderUnavailableException('Could not connect to fanart')
-        except HTTPError as error:
-            logger.error('HTTPError: {e}'.format(e=error))
-            raise ProviderUnavailableException('Fanart provider returned error')
-        except requests.exceptions.Timeout as error:
-            logger.error('Timeout: {e}'.format(e=error))
-            self._count_request('timeout')
-            raise ProviderUnavailableException('Fanart provider timed out')
-        except requests.exceptions.ConnectionError as error:
-            logger.error('ConnectionError: {e}'.format(e=error))
-            raise ProviderUnavailableException('Could not connect to fanart')
-        except limit.RateLimitedError:
-            logger.debug('Fanart request to {} rate limited'.format(mbid))
-            self._count_request('ratelimit')
-            raise ProviderUnavailableException('Fanart provider rate limited')
+        return await self.get_with_limit(url)
         
     def invalidate_cache(self, prefix):
         logger.debug('Invalidating fanart cache')
@@ -556,15 +575,6 @@ class FanArtTvProvider(Provider,
         url += mbid
         url += '/?api_key={api_key}'.format(api_key=self._api_key)
         return url
-
-    def _count_request(self, result_type):
-        if self._stats:
-            self._stats.metric('external', {result_type: 1}, tags={'provider': 'fanart'})
-            
-    def _log_response_time(self, response):
-        if self._stats:
-            self._stats.metric('external', {'response_time', response.elapsed.microseconds / 1000},
-                               tags={'provider': 'fanart'})
 
     @staticmethod
     def parse_album_images(response):
@@ -970,14 +980,7 @@ class MusicbrainzDbProvider(Provider,
         if not date_json:
             return None
         
-        print(repr(date_json))
-        print(type(date_json))
-        
-        logger.debug("date")
-        logger.debug(date_json)
         date_json = [json.loads(dt) for dt in date_json]
-        logger.debug(date_json)
-        
         defined = [datetime.datetime(dt['year'], dt['month'], dt['day']) for dt in date_json if dt['year'] and dt['month'] and dt['day']]
         if defined:
             return min(defined)
@@ -1064,14 +1067,14 @@ class MusicbrainzDbProvider(Provider,
         :return: List of dict with column: value
         """
         
-        logger.debug(f"running query:\n{sql}")
+        # logger.debug(f"running query:\n{sql}")
         cursor_args = args[0] if args else kwargs
-        logger.debug(f"args:\n:{cursor_args}")
+        # logger.debug(f"args:\n:{cursor_args}")
         
         async with self._pool.acquire() as connection:
             data = await connection.fetch(sql, *cursor_args)
             
-        logger.debug(data)
+        # logger.debug(data)
             
         results = [dict(row.items()) for row in data]
 
@@ -1112,55 +1115,6 @@ class MusicbrainzDbProvider(Provider,
             return split_domain[-2] if split_domain[-2] != 'co' else split_domain[-3]
         except IndexError:
             return domain
-
-class HttpProvider(Provider):
-    """
-    Generic provider which makes external HTTP queries
-    """
-    
-    def __init__(self, name):
-        super(HttpProvider, self).__init__()
-        
-        self._name = name
-        self._limiter = _get_rate_limiter(key='wikipedia')
-        self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
-                                                CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
-        # self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
-        
-        logger.debug('Initialised aiohttp provider')
-        
-    def _count_request(self, result_type):
-        if self._stats:
-            self._stats.metric('external', {result_type: 1}, tags={'provider': 'wikipedia'})
-
-    def _record_response_result(self, response):
-        if self._stats:
-            self._stats.metric('external',
-                               {
-                                   'response_time': response.elapsed.microseconds / 1000,
-                                   'response_status_code': response.status_code
-                               },
-                               tags={'provider': 'solr_search'})
-            
-    async def get_with_limit(self, url):
-        try:
-            ## TODO make this persistent
-            async with aiohttp.ClientSession() as session:
-                resp = await session.request(method='GET', url=url)
-                resp.raise_for_status()
-                logger.info("Got response [%s] for URL: %s", resp.status, url)
-                json = await resp.json()
-                return json
-        except ValueError as error:
-            logger.error(f'Response from {self._name} not valid json: {error}')
-            raise ProviderUnavailableException(f'{self._name} returned invalid json')
-        except (aiohttp.ClientError, aiohttp.http_exceptions.HttpProcessingError) as error:
-            logger.error(f'aiohttp exception for {url} [{getattr(error, "status", None)}]: {getattr(error, "message", None)}')
-            raise ProviderUnavailableException(f'{self._name} aiohttp exception')
-        except Exception as error:
-            logger.error(f'Non-aiohttp exceptions occured: {getattr(error, "__dict__", {})}')
-            # raise ProviderUnavailableException(f'{self._name} non-aiohttp exception')
-            raise
 
 class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
     """
