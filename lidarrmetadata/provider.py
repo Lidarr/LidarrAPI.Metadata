@@ -885,7 +885,8 @@ class MusicbrainzDbProvider(Provider,
                                                user = self._db_user,
                                                password = self._db_password,
                                                database = self._db_name,
-                                               init = self.uuid_as_str)
+                                               init = self.uuid_as_str,
+                                               statement_cache_size=0)
         logger.debug("Done")
         
     async def data_vintage(self):

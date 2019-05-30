@@ -108,7 +108,8 @@ class PostgresBackend:
                                                        user = self._db_user,
                                                        password = self._db_password,
                                                        database = self._db_name,
-                                                       loop = self._loop)
+                                                       loop = self._loop,
+                                                       statement_cache_size=0)
                 
                 # Make sure table is created
                 async with self._pool.acquire() as _conn:
