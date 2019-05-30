@@ -4,28 +4,29 @@ Code for getting and parsing music charts (Billboard, itunes, etc)
 
 import billboard
 import pylast
-import requests
+import aiohttp
 from aiocache import cached
 
 from lidarrmetadata import config
 from lidarrmetadata import provider
 from lidarrmetadata import util
 
-
 async def _parse_itunes_chart(URL, count):
-    response = requests.get(URL)
-    results = filter(lambda r: r.get('kind', '') == 'album', response.json()['feed']['results'])
-    search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
-    search_results = []
-    for result in results:
-        search_result = await search_provider.search_album_name(result['name'], artist_name=result['artistName'], limit=1)
-        if search_result:
-            search_result = search_result[0]
-            search_results.append(await _parse_album_search_result(search_result))
+    async with aiohttp.ClientSession() as session:
+        async with session.get(URL, timeout=aiohttp.ClientTimeout(total=5)) as response:
+            json = await response.json()
+            results = filter(lambda r: r.get('kind', '') == 'album', json['feed']['results'])
+            search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
+            search_results = []
+            for result in results:
+                search_result = await search_provider.search_album_name(result['name'], artist_name=result['artistName'], limit=1)
+                if search_result:
+                    search_result = search_result[0]
+                    search_results.append(await _parse_album_search_result(search_result))
 
-            if len(search_results) == count:
-                break
-    return search_results
+                    if len(search_results) == count:
+                        break
+            return search_results
 
 @cached(ttl = 60 * 60 * 24 * 7, alias='default')
 async def get_apple_music_top_albums_chart(count=10):
