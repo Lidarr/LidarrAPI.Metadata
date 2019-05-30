@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import datetime
 from datetime import timedelta
@@ -125,12 +126,14 @@ async def update_albums(count = 100, max_ttl = 60 * 60):
         # If there weren't any to update sleep, otherwise continue
         if not keys:
             await asyncio.sleep(60)
-        
-async def crawl():
+            
+async def init():
     async_providers = provider.get_providers_implementing(provider.AsyncInit)
     for prov in async_providers:
         await prov._init()
         
+async def crawl():
+    await init()
     await asyncio.gather(
         update_wikipedia(max_ttl = 60 * 60),
         update_fanart(max_ttl = 60 * 60),
@@ -138,10 +141,23 @@ async def crawl():
         update_albums(max_ttl = 60 * 60)
     )
     
+async def initialize():
+    await init()
+    await asyncio.gather(
+        initialize_artists(),
+        initialize_albums()
+    )
+    
 def main():
-    asyncio.run(crawl())
+    
+    parser = argparse.ArgumentParser(prog="lidarr-metadata-crawler")
+    parser.add_argument("--initialize", action="store_true")
+    
+    args = parser.parse_args()
+    if args.initialize:
+        asyncio.run(initialize())
+    else:
+        asyncio.run(crawl())
     
 if __name__ == "__main__":
     main()
-        
-        

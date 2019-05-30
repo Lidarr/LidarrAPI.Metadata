@@ -1,0 +1,37 @@
+version: "3"
+
+services:
+  # crawler:
+  #   image: lm-crawler-test
+  #   restart: always
+    
+  #   depends_on:
+  #     - redis
+  #     - db
+
+  #   networks:
+  #     - lidarrmetadata
+
+  #   environment:
+  #     - APPLICATION_ROOT=/api/testing
+
+  server:
+    image: lm-server-test
+    restart: always
+    
+    ports:
+      - "5001:5001"
+    
+    depends_on:
+      - redis
+      - db
+
+    networks:
+      - lidarrmetadata
+
+    environment:
+      - APPLICATION_ROOT=/api/testing
+      # - CACHE_CONFIG__default__endpoint=redis
+      # - POSTGRES_CACHE_HOST=db
+      # - PROVIDERS__MUSICBRAINZDBPROVIDER__1__DB_HOST=db
+    
