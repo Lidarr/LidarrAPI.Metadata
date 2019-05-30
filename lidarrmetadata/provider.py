@@ -1,5 +1,3 @@
-from __future__ import division
-
 import abc
 import collections
 import contextlib
@@ -12,8 +10,8 @@ import logging
 import pkg_resources
 import re
 import six
-from urllib3.exceptions import HTTPError
 from timeit import default_timer as timer
+from urllib.parse import quote as url_quote
 
 import asyncio
 import aiohttp
@@ -21,30 +19,16 @@ import asyncpg
 import json
 
 import dateutil.parser
-import psycopg2
-import psycopg2.extensions
-from psycopg2 import sql
-import pylast
-import requests
 
 from lidarrmetadata.config import get_config
 from lidarrmetadata import limit
 from lidarrmetadata import stats
 from lidarrmetadata import util
 
-if six.PY2:
-    from urllib import quote as url_quote
-else:
-    from urllib.parse import quote as url_quote
-
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.DEBUG)
 logger.info('Have provider logger')
-
-# always get strings from database in unicode
-psycopg2.extensions.register_type(psycopg2.extensions.UNICODE)
-psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 CONFIG = get_config()
 
@@ -627,32 +611,6 @@ class FanArtTvProvider(HttpProvider,
         return [{'CoverType': key, 'Url': value['url'].replace('https', 'http')}
                 for key, value in images.items() if value]
 
-
-class LastFmProvider(Provider,
-                     ArtistNameSearchMixin,
-                     ArtistOverviewMixin,
-                     AlbumArtworkMixin):
-    """
-    Provider that uses LastFM API
-    """
-
-    def __init__(self, api_key, api_secret):
-        """
-        Class initialization
-        :param api_key: LastFM API key
-        :param api_secret: LastFM API secret
-        """
-        super(LastFmProvider, self).__init__()
-
-        self._client = pylast.LastFMNetwork(api_key=api_key,
-                                            api_secret=api_secret)
-
-    def search_artist(self, name):
-        results = self._client.search_for_artist(name).get_next_page()
-        return [{'Id': result.get_mbid(),
-                 'Overview': result.get_bio_summary()}
-                for result in results]
-    
 class SolrSearchProvider(HttpProvider,
                          ArtistNameSearchMixin,
                          AlbumNameSearchMixin):
