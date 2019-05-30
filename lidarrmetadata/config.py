@@ -280,9 +280,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     ]
     
     # Host definitions used elsewhere
-    REDIS_HOST = 'localhost'
+    REDIS_HOST = 'redis'
     REDIS_PORT = 6379
-    POSTGRES_CACHE_HOST = 'localhost'
+    POSTGRES_CACHE_HOST = 'db'
     POSTGRES_CACHE_PORT = 5432
 
     # TTL set in Cache-Control headers.  Use 0 to disable caching.
@@ -348,7 +348,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
     # External request parameters
     # Class of limiter
-    EXTERNAL_LIMIT_CLASS = 'RedisRateLimiter'
+    EXTERNAL_LIMIT_CLASS = 'NullRateLimiter'
     # Size of rate limit queue
     EXTERNAL_LIMIT_QUEUE_SIZE = 60
     # Rate limit time delta in ms
