@@ -282,8 +282,8 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Host definitions used elsewhere
     REDIS_HOST = 'localhost'
     REDIS_PORT = 6379
-    POSTGRES_HOST = 'localhost'
-    POSTGRES_PORT = 5432
+    POSTGRES_CACHE_HOST = 'localhost'
+    POSTGRES_CACHE_PORT = 5432
 
     # TTL set in Cache-Control headers.  Use 0 to disable caching.
     # The GOOD value is used if we got info from all providers
@@ -308,27 +308,35 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
             'namespace': 'lm3.7',
             'serializer': {
                 'class': 'lidarrmetadata.cache.CompressionSerializer'
-            }
+            },
         },
         'fanart': {
             'cache': 'lidarrmetadata.cache.PostgresCache',
-            'endpoint': POSTGRES_HOST,
+            'endpoint': POSTGRES_CACHE_HOST,
+            'port': POSTGRES_CACHE_PORT,
             'db_table': 'fanart',
+            'timeout': 0,
         },
         'wikipedia': {
             'cache': 'lidarrmetadata.cache.PostgresCache',
-            'endpoint': POSTGRES_HOST,
+            'endpoint': POSTGRES_CACHE_HOST,
+            'port': POSTGRES_CACHE_PORT,
             'db_table': 'wikipedia',
+            'timeout': 0,
         },
         'artist': {
             'cache': 'lidarrmetadata.cache.PostgresCache',
-            'endpoint': POSTGRES_HOST,
+            'endpoint': POSTGRES_CACHE_HOST,
+            'port': POSTGRES_CACHE_PORT,
             'db_table': 'artist',
+            'timeout': 0,
         },
         'album': {
             'cache': 'lidarrmetadata.cache.PostgresCache',
-            'endpoint': POSTGRES_HOST,
+            'endpoint': POSTGRES_CACHE_HOST,
+            'port': POSTGRES_CACHE_PORT,
             'db_table': 'album',
+            'timeout': 0,
         }
     }
     
@@ -414,10 +422,22 @@ class TestConfig(DefaultConfig):
             'cache': 'lidarrmetadata.cache.NullCache',
             'serializer': {
                 'class': 'lidarrmetadata.cache.ExpirySerializer'
+            },
+        },
+        'wikipedia': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.ExpirySerializer'
+            }
+        },
+        'artist': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.ExpirySerializer'
             }
 
         },
-        'wikipedia': {
+        'album': {
             'cache': 'lidarrmetadata.cache.NullCache',
             'serializer': {
                 'class': 'lidarrmetadata.cache.ExpirySerializer'

@@ -27,7 +27,7 @@ from lidarrmetadata import util
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logger.info('Have provider logger')
 
 CONFIG = get_config()
@@ -96,6 +96,14 @@ class ArtistByIdMixin(MixinBase):
         """
         pass
 
+class ArtistIdListMixin(MixinBase):
+    """
+    Returns a list of all artist ids we should cache
+    """
+    
+    @abc.abstractmethod
+    def get_all_artist_ids(self):
+        pass
 
 class ArtistNameSearchMixin(MixinBase):
     """
@@ -140,6 +148,15 @@ class ReleaseGroupByIdMixin(MixinBase):
         :param rgid: Release group ID
         :return: Release Group corresponding to rgid
         """
+        pass
+
+class ReleaseGroupIdListMixin(MixinBase):
+    """
+    Returns a list of all artist ids we should cache
+    """
+    
+    @abc.abstractmethod
+    def get_all_release_group_ids(self):
         pass
 
 
@@ -321,6 +338,18 @@ class AsyncInit(MixinBase):
         """
         pass
 
+class AsyncDel(MixinBase):
+    """
+    Hook to finalize async items
+    """
+    
+    @abc.abstractmethod
+    async def _del(self, prefix):
+        """
+        Run at initialization using await
+        """
+        pass
+
     
 class ProviderMeta(abc.ABCMeta):
     def __new__(mcls, name, bases, namespace):
@@ -354,22 +383,33 @@ class ProviderUnavailableException(Exception):
     pass
 
 class HttpProvider(Provider,
-                   AsyncInit):
+                   AsyncInit,
+                   AsyncDel):
     """
     Generic provider which makes external HTTP queries
     """
     
-    def __init__(self, name):
+    def __init__(self, name, session = None, limiter = None):
         super(HttpProvider, self).__init__()
         
         self._name = name
-        self._limiter = _get_rate_limiter(key=name)
         self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
         
+        self._session = session
+            
+        if limiter:
+            self._limiter = limiter
+        else:
+            self._limiter = _get_rate_limiter(key=name)
+        
     async def _init(self):
         # Doesn't require await but needs to happen after the event loop is created otherwise all http requests error
-        self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
+        if not self._session:
+            self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
+            
+    async def _del(self):
+        await self._session.close()
         
     def _count_request(self, result_type):
         if self._stats:
@@ -392,7 +432,7 @@ class HttpProvider(Provider,
                 async with self._session.get(url, **kwargs) as resp:
                     end = timer()
                     elapsed = int((end - start) * 1000)
-                    logger.info(f"Got response [{resp.status}] for URL: {url} in {elapsed}ms ")
+                    logger.debug(f"Got response [{resp.status}] for URL: {url} in {elapsed}ms ")
                     self._record_response_result(resp, elapsed)
                     
                     if raise_on_http_error:
@@ -409,8 +449,8 @@ class HttpProvider(Provider,
         except asyncio.CancelledError:
             logger.debug(f'Task cancelled {url}')
             raise
-        except asyncio.TimeoutError as error:
-            logger.error(f'Timeout: {error}')
+        except asyncio.TimeoutError:
+            logger.error(f'Timeout for {url}')
             self._count_request('timeout')
             raise ProviderUnavailableException(f'{self._name} timeout')
         except limit.RateLimitedError:
@@ -429,7 +469,9 @@ class FanArtTvProvider(HttpProvider,
     def __init__(self,
                  api_key,
                  base_url='webservice.fanart.tv/v3/music/',
-                 use_https=True):
+                 use_https=True,
+                 session=None,
+                 limiter=None):
         """
         Class initialization
 
@@ -438,7 +480,7 @@ class FanArtTvProvider(HttpProvider,
                          webservice.fanart.tv/v3/music
         :param use_https: Whether or not to use https. Defaults to True.
         """
-        super(FanArtTvProvider, self).__init__('fanart')
+        super(FanArtTvProvider, self).__init__('fanart', session, limiter)
 
         self._api_key = api_key
         self._base_url = base_url
@@ -447,42 +489,39 @@ class FanArtTvProvider(HttpProvider,
         ## dummy value for initialization, will be picked up from redis later on
         self._last_cache_invalidation = time.time() - 60 * 60 * 24
 
-    async def get_artist_images(self, artist_id, ignore_cache = False):
+    async def get_artist_images(self, artist_id):
         
-        cached, expires = await util.FANART_CACHE.get(artist_id)
-
-        if cached and expires > utcnow():
-            return self.parse_artist_images(cached), expires
+        return await self.get_images(artist_id, self.parse_artist_images)
         
-        try:
-            results = await self.get_by_mbid(artist_id)
-            ttl = CONFIG.CACHE_TTL['fanart']
-            await util.FANART_CACHE.set(artist_id, results, ttl=ttl)
-            for id, album_result in results.get('albums', {}).items():
-                await util.FANART_CACHE.set(id, album_result, ttl=ttl)
-                    
-            return self.parse_artist_images(results), utcnow() + timedelta(seconds=ttl)
-
-        except ProviderUnavailableException:
-            return (cached or []), utcnow() + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
-
     async def get_album_images(self, album_id):
-        cached, expires = await util.FANART_CACHE.get(album_id)
+        
+        return await self.get_images(album_id, self.parse_album_images)
+        
+    async def get_images(self, mbid, handler):
 
-        if cached and expires > utcnow():
-            return self.parse_album_images(cached), expires
+        now = utcnow()
+        cached, expires = await util.FANART_CACHE.get(mbid)
+
+        if cached is not None and expires > now:
+            return handler(cached), expires
         
         try:
-            results = await self.get_by_mbid(album_id)
-            results = results.get('albums', results).get(album_id, results)            
-            ttl = CONFIG.CACHE_TTL['fanart']
-            await util.FANART_CACHE.set(album_id, results, ttl=ttl)
+            results = await self.get_by_mbid(mbid)
+            results, ttl = await self.cache_results(mbid, results)
             
-            return self.parse_album_images(results), utcnow() + timedelta(seconds=ttl)
+            return handler(results), now + timedelta(seconds=ttl)
 
         except ProviderUnavailableException:
-            return (cached or []), utcnow() + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
+            return (cached or []), now + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
+        
+    async def refresh_images(self, mbid):
+        try:
+            results = await self.get_by_mbid(mbid)
+            await self.cache_results(mbid, results)
 
+        except ProviderUnavailableException:
+            logger.debug("Fanart unavailable")
+        
     async def get_by_mbid(self, mbid):
         """
         Gets the fanart.tv response for resource with Musicbrainz id mbid
@@ -495,6 +534,31 @@ class FanArtTvProvider(HttpProvider,
             return {}
         else:
             return response
+        
+    async def cache_results(self, mbid, results):
+        ttl = CONFIG.CACHE_TTL['fanart']
+
+        if results.get('mbid_id', None) == mbid:
+            # This was a successful artist request, so cache albums also
+            await util.FANART_CACHE.set(mbid, results, ttl=ttl)
+            for id, album_result in results.get('albums', {}).items():
+                await util.FANART_CACHE.set(id, album_result, ttl=ttl)
+
+        else:
+            # This was an album request or an unsuccessful artist request
+            
+            results = results.get('albums', {}).get(mbid, {})
+
+            # There seems to be a bug in the fanart api whereby querying by album id sometimes returns not found
+            # Don't overwrite a good cached value with not found.
+            if not results:
+                cached, expires = await util.FANART_CACHE.get(mbid)
+                if cached:
+                    results = cached
+                
+            await util.FANART_CACHE.set(mbid, results, ttl=ttl)
+
+        return results, ttl
         
     async def invalidate_cache(self, prefix):
         logger.debug('Invalidating fanart cache')
@@ -515,18 +579,8 @@ class FanArtTvProvider(HttpProvider,
 
         # Mark artists as expired
         for id in artist_ids:
-            cached, expires = await util.FANART_CACHE.get(id)
-            if cached:
-                # bodge - set timeout to one second from now
-                await util.FANART_CACHE.set(id, cached, ttl=1)
+            await util.FANART_CACHE.expire(id, ttl=-1)
                 
-        # If there's only a few fanart updates then grab them now
-        if len(artist_ids) <= 20:
-            for id in artist_ids:
-                self.get_artist_images(id, ignore_cache = True)
-        else:
-            logger.info('Too many fanart updates, only marking expired')
-
         await util.CACHE.set(last_invalidation_key, current_cache_invalidation)
         
         result['artists'] = artist_ids
@@ -759,10 +813,12 @@ class MusicbrainzDbProvider(Provider,
                             DataVintageMixin,
                             InvalidateCacheMixin,
                             AlbumArtworkMixin,
+                            ArtistIdListMixin,
                             ArtistByIdMixin,
                             ArtistLinkMixin,
                             ReleaseGroupByArtistMixin,
                             ReleaseGroupByIdMixin,
+                            ReleaseGroupIdListMixin,
                             ReleasesByReleaseGroupIdMixin,
                             ReleaseGroupLinkMixin,
                             TracksByReleaseGroupMixin):
@@ -818,7 +874,7 @@ class MusicbrainzDbProvider(Provider,
         logger.debug("Done")
         
     async def data_vintage(self):
-        data = await self.query_from_file('../sql/data_vintage.sql')
+        data = await self.query_from_file('data_vintage.sql')
         return data[0]['vintage']
     
     async def invalidate_cache(self, prefix):
@@ -849,7 +905,7 @@ class MusicbrainzDbProvider(Provider,
         return [entity['gid'] for entity in entities]
         
     async def get_artist_by_id(self, artist_id):
-        results = await self.query_from_file('../sql/artist_search_mbid.sql', [artist_id])
+        results = await self.query_from_file('artist_search_mbid.sql', [artist_id])
         
         logger.debug("got artist")
         
@@ -866,6 +922,10 @@ class MusicbrainzDbProvider(Provider,
                 'Rating': {'Count': results['rating_count'] or 0,
                            'Value': results['rating'] / 10 if results[
                                                                   'rating'] is not None else None}}
+    
+    async def get_all_artist_ids(self):
+        results = await self.query_from_file('all_artist_ids.sql')
+        return [item['gid'] for item in results]
 
     async def get_album_images(self, album_id):
         filename = '../sql/caa_by_mbid.sql'
@@ -909,6 +969,10 @@ class MusicbrainzDbProvider(Provider,
             'Rating': {'Count': release_group['rating_count'] or 0,
                        'Value': release_group['rating'] / 10 if release_group['rating'] is not None else None}
         }
+    
+    async def get_all_release_group_ids(self):
+        results = await self.query_from_file('all_release_group_ids.sql')
+        return [item['gid'] for item in results]
 
     def get_earliest_good_date(self, date_json):
         if not date_json:
@@ -974,6 +1038,7 @@ class MusicbrainzDbProvider(Provider,
                  'SecondaryTypes': result['secondary_types'],
                  'ReleaseStatuses': result['release_statuses']}
                 for result in results]
+    
 
     async def get_artist_links(self, artist_id):
         results = await self.query_from_file('links_artist_mbid.sql',
@@ -1068,11 +1133,11 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
     WIKIPEDIA_REGEX = re.compile(r'https?://(?P<language>\w+)\.wikipedia\.org/wiki/(?P<title>.+)')
     WIKIDATA_REGEX = re.compile(r'https?://www.wikidata.org/(wiki|entity)/(?P<entity>.+)')
 
-    def __init__(self):
+    def __init__(self, session=None, limiter=None):
         """
         Class initialization
         """
-        super(WikipediaProvider, self).__init__('wikipedia')
+        super(WikipediaProvider, self).__init__('wikipedia', session, limiter)
 
         # https://github.com/metabrainz/musicbrainz-server/blob/v-2019-05-13-schema-change/lib/MusicBrainz/Server/Data/WikipediaExtract.pm#L61
         self.language_preference = (
@@ -1082,11 +1147,13 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
             'vi', 'zh'
         )
         
-    async def get_artist_overview(self, url):
-        cached, expires = await util.WIKI_CACHE.get(url) or (None, True)
+    async def get_artist_overview(self, url, ignore_cache=False):
         
-        if cached and expires > utcnow():
-            return cached, expires
+        if not ignore_cache:
+            cached, expires = await util.WIKI_CACHE.get(url) or (None, True)
+
+            if cached and expires > utcnow():
+                return cached, expires
         
         logger.debug("getting overview")
         

@@ -16,7 +16,7 @@ from aiocache.base import BaseCache
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logger.info('Have cache logger')
 
 try:
@@ -151,25 +151,40 @@ class PostgresBackend:
 
     @conn
     async def _set(self, key, value, ttl=None, _cas_token=None, _conn=None):
-        # if ttl is not None:
-        #     expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds = ttl)
-        #     await _conn.execute(
-        #         f"INSERT INTO {self._db_table} (key, expires, value) "
-        #         "VALUES ($1, $2, $3) "
-        #         "ON CONFLICT(key) DO UPDATE "
-        #         "SET expires = EXCLUDED.expires, "
-        #         "value = EXCLUDED.value;",
-        #         key, expiry, value
-        #     )
-        # else:
-        #     await _conn.execute(
-        #         f"INSERT INTO {self._db_table} (key, expires, value) "
-        #         "VALUES ($1, NULL, $2) "
-        #         "ON CONFLICT(key) DO UPDATE "
-        #         "SET expires = EXCLUDED.expires, "
-        #         "value = EXCLUDED.value;",
-        #         key, value
-        #     )
+        if ttl is not None:
+            expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds = ttl)
+            await _conn.execute(
+                f"INSERT INTO {self._db_table} (key, expires, value) "
+                "VALUES ($1, $2, $3) "
+                "ON CONFLICT(key) DO UPDATE "
+                "SET expires = EXCLUDED.expires, "
+                "value = EXCLUDED.value;",
+                key, expiry, value
+            )
+        else:
+            await _conn.execute(
+                f"INSERT INTO {self._db_table} (key, expires, value) "
+                "VALUES ($1, NULL, $2) "
+                "ON CONFLICT(key) DO UPDATE "
+                "SET expires = EXCLUDED.expires, "
+                "value = EXCLUDED.value;",
+                key, value
+            )
+        return True
+    
+    @conn
+    async def _multi_set(self, pairs, ttl=None, _conn=None):
+        if ttl is not None:
+            expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds = ttl)
+        else:
+            expiry = None
+        
+        records = [(key, expiry, value) for key, value in pairs]
+        logger.debug(records[1:10])
+        
+        result = await _conn.copy_records_to_table(self._db_table, records=records)
+        logger.debug(result)
+        
         return True
 
     @conn
@@ -179,6 +194,22 @@ class PostgresBackend:
             key
         )
         return True
+    
+    @conn
+    async def _clear(self, namespace=None, _conn=None):
+        await _conn.execute(f"DELETE FROM {self._db_table};")
+        return True
+    
+    @conn
+    async  def _get_stale(self, count, expires_before, _conn=None):
+        results = await _conn.fetch(
+            f"SELECT key FROM {self._db_table} "
+            "WHERE expires < $1 "
+            "ORDER by expires "
+            "LIMIT $2;",
+            expires_before, count
+        )
+        return [item['key'] for item in results] if results else []
 
 class PostgresCache(PostgresBackend, BaseCache):
     """
@@ -190,6 +221,9 @@ class PostgresCache(PostgresBackend, BaseCache):
     def __init__(self, serializer=None, **kwargs):
         super().__init__(**kwargs)
         self.serializer = serializer or ExpirySerializer()
+        
+    async def get_stale(self, count, expires_before, _conn=None):
+        return await self._get_stale(count, expires_before, _conn=_conn)
 
 class NullCache(BaseCache):
     """
@@ -207,3 +241,6 @@ class NullCache(BaseCache):
     
     async def _set(self, key, value, ttl=None, _cas_token=None, _conn=None):
         return True
+    
+    async def get_stale(self, count, expires_before, _conn=None):
+        return []
