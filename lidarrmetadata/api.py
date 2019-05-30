@@ -246,17 +246,17 @@ def get_overview(links):
     overview_providers = provider.get_providers_implementing(provider.ArtistOverviewMixin)    
 
     if overview_providers:
-        wikidata_links = filter(
+        wikidata_link = next(filter(
             lambda link: 'wikidata' in link.get('type', ''),
-            links)
-        wikipedia_links = filter(
+            links), None)
+        wikipedia_link = next(filter(
             lambda link: 'wikipedia' in link.get('type', ''),
-            links)
+            links), None)
 
-        if wikidata_links:
-            return overview_providers[0].get_artist_overview(wikidata_links[0]['target'])
-        elif wikipedia_links:
-            return overview_providers[0].get_artist_overview(wikipedia_links[0]['target'])
+        if wikidata_link:
+            return overview_providers[0].get_artist_overview(wikidata_link['target'])
+        elif wikipedia_link:
+            return overview_providers[0].get_artist_overview(wikipedia_link['target'])
         
     return ''
 
