@@ -219,11 +219,22 @@ async def get_overview(links):
 async def get_artist_info(mbid):
     
     cache_key = f"get_artist_info:{mbid}"
+
+    # Fast redis cache
     cached = await util.CACHE.get(cache_key)
     if cached:
         return cached
 
     now = provider.utcnow()
+    
+    # Slower postgres cache
+    cached, expiry = await util.ARTIST_CACHE.get(mbid)
+    if cached:
+        # Set redis cache
+        await util.CACHE.set(cache_key, (cached, expiry), ttl=(expiry - now).total_seconds())
+        return cached, expiry
+    
+    # Calcalute from scratch
     expiry = now + timedelta(seconds = app.config['CACHE_TTL']['cloudflare'])
     
     # TODO A lot of repetitive code here. See if we can refactor
@@ -259,6 +270,8 @@ async def get_artist_info(mbid):
     expiry = min(expiry, overview_expiry, image_expiry)
     ttl = (expiry - now).total_seconds()
     
+    # Set both postgres and redis cache
+    await util.ARTIST_CACHE.set(mbid, artist, ttl=ttl)
     await util.CACHE.set(cache_key, (artist, expiry), ttl=ttl)
         
     return artist, expiry
@@ -301,9 +314,20 @@ async def get_release_group_artists(mbid):
 async def get_release_group_info_basic(mbid):
     
     cache_key = f"get_release_group_info:{mbid}"
+    
+    # Fast redis cache
     cached = await util.CACHE.get(cache_key)
     if cached:
         return cached
+    
+    now = provider.utcnow()
+    
+    # Slower postgres cache
+    cached, expiry = await util.ALBUM_CACHE.get(mbid)
+    if cached:
+        # Set redis cache
+        await util.CACHE.set(cache_key, (cached, expiry), ttl=(expiry - now).total_seconds())
+        return cached, expiry
     
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
@@ -323,7 +347,6 @@ async def get_release_group_info_basic(mbid):
     if not track_providers:
         return (jsonify(error='No track provider available'), 500), None
 
-    now = provider.utcnow()
     expiry = now + timedelta(seconds = app.config['CACHE_TTL']['cloudflare'])
 
     # Overviews and art are next slowest so set these going
@@ -367,6 +390,7 @@ async def get_release_group_info_basic(mbid):
     expiry = min(expiry, overview_expiry, images_expiry)
     ttl = (expiry - now).total_seconds()
         
+    await util.ALBUM_CACHE.set(mbid, release_group, ttl=ttl)
     await util.CACHE.set(cache_key, (release_group, expiry), ttl=ttl)
 
     return release_group, expiry

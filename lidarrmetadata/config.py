@@ -278,18 +278,22 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
         '125ec42a-7229-4250-afc5-e057484327fe',  # [unknown]
         '89ad4ac3-39f7-470e-963a-56509c546377',  # Various Artists
     ]
+    
+    # Host definitions used elsewhere
+    REDIS_HOST = 'localhost'
+    REDIS_PORT = 6379
+    POSTGRES_HOST = 'localhost'
+    POSTGRES_PORT = 5432
 
     # TTL set in Cache-Control headers.  Use 0 to disable caching.
     # The GOOD value is used if we got info from all providers
     # The BAD value is used if some providers were unavailable but
     # there was enough information to return a useful response
     # (e.g. we are missing overviews or images)
-    CACHE_TTL_GOOD = 60 * 60 * 24 * 7
-    CACHE_TTL_BAD = 60 * 30
     DAYS = 60 * 60 * 24
     
     CACHE_TTL = {
-        'cloudflare': DAYS * 7,
+        'cloudflare': DAYS * 30,
         'provider_error': 60 * 30,
         'redis': DAYS * 7,
         'fanart': DAYS * 30,
@@ -299,8 +303,8 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     CACHE_CONFIG = {
         'default': {
             'cache': 'aiocache.RedisCache',
-            'endpoint': 'localhost',
-            'port': 6379,
+            'endpoint': REDIS_HOST,
+            'port': REDIS_PORT,
             'namespace': 'lm3.7',
             'serializer': {
                 'class': 'lidarrmetadata.cache.CompressionSerializer'
@@ -308,13 +312,23 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
         },
         'fanart': {
             'cache': 'lidarrmetadata.cache.PostgresCache',
-            'endpoint': 'localhost',
+            'endpoint': POSTGRES_HOST,
             'db_table': 'fanart',
         },
         'wikipedia': {
             'cache': 'lidarrmetadata.cache.PostgresCache',
-            'endpoint': 'localhost',
+            'endpoint': POSTGRES_HOST,
             'db_table': 'wikipedia',
+        },
+        'artist': {
+            'cache': 'lidarrmetadata.cache.PostgresCache',
+            'endpoint': POSTGRES_HOST,
+            'db_table': 'artist',
+        },
+        'album': {
+            'cache': 'lidarrmetadata.cache.PostgresCache',
+            'endpoint': POSTGRES_HOST,
+            'db_table': 'album',
         }
     }
     
@@ -337,9 +351,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Redis db if using RedisRateLimiter
     EXTERNAL_LIMIT_REDIS_DB = 10
     # Redis host if using RedisRateLimiter
-    EXTERNAL_LIMIT_REDIS_HOST = 'redis'
+    EXTERNAL_LIMIT_REDIS_HOST = REDIS_HOST
     # Redis port if using RedisRateLimiter
-    EXTERNAL_LIMIT_REDIS_PORT = 6379
+    EXTERNAL_LIMIT_REDIS_PORT = REDIS_PORT
 
     # Fanart.tv API credentials
     FANART_KEY = ''
@@ -361,7 +375,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     PROVIDERS = {
         'FANARTTVPROVIDER': ([FANART_KEY], {}),
         'SOLRSEARCHPROVIDER': ([], {'SEARCH_SERVER': 'http://solr:8983/solr'}),
-        'MUSICBRAINZDBPROVIDER': ([], {'DB_HOST': 'db'}),
+        'MUSICBRAINZDBPROVIDER': ([], {'DB_HOST': POSTGRES_HOST, 'DB_PORT': POSTGRES_PORT}),
         'WIKIPEDIAPROVIDER': ([], {})
     }
 
@@ -369,8 +383,8 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     SENTRY_DSN = None
 
     # Redis connection info for sentry event processor. No redis connection info will fall back to a local processor
-    SENTRY_REDIS_HOST = 'redis'
-    SENTRY_REDIS_PORT = 6379
+    SENTRY_REDIS_HOST = REDIS_HOST
+    SENTRY_REDIS_PORT = REDIS_PORT
 
     # Sentry rate limit TTL in seconds
     SENTRY_TTL = 1

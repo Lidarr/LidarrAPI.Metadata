@@ -19,6 +19,8 @@ caches.set_config(config.get_config().CACHE_CONFIG)
 CACHE = caches.get('default')
 FANART_CACHE = caches.get('fanart')
 WIKI_CACHE = caches.get('wikipedia')
+ARTIST_CACHE = caches.get('artist')
+ALBUM_CACHE = caches.get('album')
 
 def first_key_item(dictionary, key, default=None):
     """
