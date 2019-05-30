@@ -46,12 +46,12 @@ setup(
         'redis',
         'requests',
         'urllib3<1.25',
-        'werkzeug>=0.7.0',
+        'uvicorn'
     ],
 
     extras_require={
-        'deploy': ['hypercorn[uvloop]'],
-        'test': ['mockredispy', 'pytest', 'tox']
+        'deploy': ['gunicorn'],
+        'test': ['mockredispy', 'pytest', 'pytest-asyncio', 'tox']
     },
 
     package_data={
@@ -64,6 +64,7 @@ setup(
     entry_points={
         'console_scripts': [
             'lidarr-metadata-server=lidarrmetadata.server:main',
+            'lidarr-metadata-crawler=lidarrmetadata.crawler:main'
         ],
     },
 )

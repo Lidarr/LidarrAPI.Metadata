@@ -4,11 +4,10 @@ import functools
 import asyncio
 
 from quart import Quart, abort, make_response, request, jsonify
-from psycopg2 import OperationalError
+
 import redis
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
-from werkzeug.exceptions import HTTPException
 import datetime
 from datetime import timedelta
 import time
@@ -23,7 +22,7 @@ from lidarrmetadata import util
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logger.info('Have api logger')
 
 app = Quart(__name__)
@@ -101,11 +100,8 @@ def page_not_found_error(e):
 
 @app.errorhandler(500)
 def handle_error(e):
-    # TODO Could re-queue these requests?
-    if isinstance(e, OperationalError):
-        return jsonify(error='Musicbrainz not ready'), 503
     # TODO Bypass caching instead when caching reworked
-    elif isinstance(e, redis.ConnectionError):
+    if isinstance(e, redis.ConnectionError):
         return jsonify(error='Could not connect to redis'), 503
     elif isinstance(e, redis.BusyLoadingError):
         return jsonify(error='Redis not ready'), 503
@@ -216,26 +212,46 @@ async def get_overview(links):
         
     return '', provider.utcnow() + timedelta(days=365)
 
+# Decorator to cache in redis and postgres
+def double_cache(postgres_cache):
+    def decorator(function):
+        @functools.wraps(function)
+        async def wrapper(*args, **kwargs):
+            
+            mbid = args[0]
+            cache_key = f"{function.__name__}:{mbid}"
+            
+            # Fast redis cache
+            cached = await util.CACHE.get(cache_key)
+            if cached:
+                return cached
+            
+            now = provider.utcnow()
+
+            # Slower postgres cache
+            cached, expiry = await postgres_cache.get(mbid)
+            if cached:
+                # Set redis cache
+                await util.CACHE.set(cache_key, (cached, expiry), ttl=(expiry - now).total_seconds())
+                return cached, expiry
+            
+            result, expiry = await function(*args, **kwargs)
+            ttl = (expiry - now).total_seconds()
+            
+            # Set both postgres and redis cache
+            await postgres_cache.set(mbid, result, ttl=ttl)
+            await util.CACHE.set(cache_key, (result, expiry), ttl=ttl)
+            
+            return result, expiry
+
+        wrapper.__cache__ = postgres_cache
+        return wrapper
+    return decorator
+
+@double_cache(util.ARTIST_CACHE)
 async def get_artist_info(mbid):
     
-    cache_key = f"get_artist_info:{mbid}"
-
-    # Fast redis cache
-    cached = await util.CACHE.get(cache_key)
-    if cached:
-        return cached
-
-    now = provider.utcnow()
-    
-    # Slower postgres cache
-    cached, expiry = await util.ARTIST_CACHE.get(mbid)
-    if cached:
-        # Set redis cache
-        await util.CACHE.set(cache_key, (cached, expiry), ttl=(expiry - now).total_seconds())
-        return cached, expiry
-    
-    # Calcalute from scratch
-    expiry = now + timedelta(seconds = app.config['CACHE_TTL']['cloudflare'])
+    expiry = provider.utcnow() + timedelta(seconds = app.config['CACHE_TTL']['cloudflare'])
     
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(provider.ArtistByIdMixin)
@@ -268,11 +284,6 @@ async def get_artist_info(mbid):
         image_expiry = expiry
     
     expiry = min(expiry, overview_expiry, image_expiry)
-    ttl = (expiry - now).total_seconds()
-    
-    # Set both postgres and redis cache
-    await util.ARTIST_CACHE.set(mbid, artist, ttl=ttl)
-    await util.CACHE.set(cache_key, (artist, expiry), ttl=ttl)
         
     return artist, expiry
 
@@ -311,23 +322,8 @@ async def get_release_group_artists(mbid):
     
     return artists, expiry
 
+@double_cache(util.ALBUM_CACHE)
 async def get_release_group_info_basic(mbid):
-    
-    cache_key = f"get_release_group_info:{mbid}"
-    
-    # Fast redis cache
-    cached = await util.CACHE.get(cache_key)
-    if cached:
-        return cached
-    
-    now = provider.utcnow()
-    
-    # Slower postgres cache
-    cached, expiry = await util.ALBUM_CACHE.get(mbid)
-    if cached:
-        # Set redis cache
-        await util.CACHE.set(cache_key, (cached, expiry), ttl=(expiry - now).total_seconds())
-        return cached, expiry
     
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
@@ -347,7 +343,7 @@ async def get_release_group_info_basic(mbid):
     if not track_providers:
         return (jsonify(error='No track provider available'), 500), None
 
-    expiry = now + timedelta(seconds = app.config['CACHE_TTL']['cloudflare'])
+    expiry = provider.utcnow() + timedelta(seconds = app.config['CACHE_TTL']['cloudflare'])
 
     # Overviews and art are next slowest so set these going
     links_overview_task = asyncio.create_task(get_release_group_links_and_overview(mbid))
@@ -388,10 +384,6 @@ async def get_release_group_info_basic(mbid):
         release_group['Images'] = []
         
     expiry = min(expiry, overview_expiry, images_expiry)
-    ttl = (expiry - now).total_seconds()
-        
-    await util.ALBUM_CACHE.set(mbid, release_group, ttl=ttl)
-    await util.CACHE.set(cache_key, (release_group, expiry), ttl=ttl)
 
     return release_group, expiry
 
@@ -636,19 +628,20 @@ async def invalidate_cache():
 
         for artist in artists:
             util.CACHE.delete(f"get_artist_info:{artist}")
+            util.ARTIST_CACHE.expire(artist, ttl=-1)
 
             key = '{url}/artist/{artist}'.format(url=base_url, artist=artist)
             invalidated.append(key)
 
         for album in albums:
-            util.CACHE.delete(f"get_release_group_info:{album}")
+            util.CACHE.delete(f"get_release_group_info_basic:{album}")
+            util.ALBUM_CACHE.expire(album, ttl=-1)
 
             key = '{url}/album/{album}'.format(url=base_url, album=album)
             invalidated.append(key)
 
-        # cloudflare only accepts 500 files at a time
-        for i in xrange(0, len(invalidated), 500):
-            await invalidate_cloudflare(invalidated[i:i+500], retries = 2)
+        await invalidate_cloudflare(invalidated)
+        
     
     finally:
         util.CACHE.delete(invalidation_in_progress_key)
@@ -659,8 +652,8 @@ async def invalidate_cache():
     
     return jsonify(invalidated)
 
-async def invalidate_cloudflare(files, retries = 2):
-
+async def invalidate_cloudflare(files):
+    
     zoneid = app.config['CLOUDFLARE_ZONE_ID']
     if not zoneid:
         return
@@ -669,21 +662,34 @@ async def invalidate_cloudflare(files, retries = 2):
     headers = {'X-Auth-Email': app.config['CLOUDFLARE_AUTH_EMAIL'],
                'X-Auth-Key': app.config['CLOUDFLARE_AUTH_KEY'],
                'Content-Type': 'application/json'}
-    data = {'files': files}
     
     async with aiohttp.ClientSession() as session:
-        async with session.post(url, json=data) as r:
-            logger.info(await r.text())
-            json = await r.json()
+        # cloudflare only accepts 500 files at a time
+        for i in xrange(0, len(files), 500):
+            data = {'files': files[i:i+500]}
+            retries = 2
+            
+            while retries > 0:
+                async with session.post(url, headers=headers, json=data) as r:
+                    logger.info(await r.text())
+                    json = await r.json()
 
-            if not json['success'] and retries > 0:
-                invalidate_cloudflare(files, retries - 1)
+                    if json.get('success', False):
+                        break
+                    
+                    retries -= 1
 
 @app.before_serving
 async def run_async_init():
     async_providers = provider.get_providers_implementing(provider.AsyncInit)
     for prov in async_providers:
         await prov._init()
+        
+@app.after_serving
+async def run_async_del():
+    async_providers = provider.get_providers_implementing(provider.AsyncDel)
+    for prov in async_providers:
+        await prov._del()
         
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=config.get_config().HTTP_PORT, use_reloader=True)

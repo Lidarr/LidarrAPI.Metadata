@@ -5,8 +5,9 @@ import gunicorn.app.base
 
 from gunicorn.six import iteritems
 
-from api import app
-from config import get_config
+import lidarrmetadata
+from lidarrmetadata.api import app
+from lidarrmetadata.config import get_config
 
 
 class StandaloneApplication(gunicorn.app.base.BaseApplication):
@@ -39,7 +40,7 @@ def main():
         'bind': '0.0.0.0:{port}'.format(port=config.HTTP_PORT),
         'log_level': 'debug',
         'workers': (multiprocessing.cpu_count() * 2) + 1,
-        'worker_class': 'gevent'
+        'worker_class': 'uvicorn.workers.UvicornWorker'
     }
 
     StandaloneApplication(app, options).run()
