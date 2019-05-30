@@ -217,8 +217,8 @@ async def get_artist_links_and_overview(mbid):
     validity = app.config['CACHE_TTL_GOOD']
     
     try:
-        # overview = await get_overview(links)
-        overview = ''
+        overview = await get_overview(links)
+        # overview = ''
     except ProviderUnavailableException:
         overview = ''
         validity = app.config['CACHE_TTL_BAD']
@@ -251,27 +251,27 @@ async def get_artist_info(mbid):
     if not artist_providers:
         # 500 error if we don't have an artist provider since it's essential
         return (jsonify(error='No artist provider available'), 500), 0
-    
-    link_overview_task = asyncio.create_task(get_artist_links_and_overview(mbid))        
-    artist_task = asyncio.create_task(artist_providers[0].get_artist_by_id(mbid))
 
-    # if artist_art_providers:
-    #     images_task = asyncio.create_task(artist_art_providers[0].get_artist_images(mbid))
+    # overviews are the slowest thing so set those going first, followed by images
+    link_overview_task = asyncio.create_task(get_artist_links_and_overview(mbid))
+    if artist_art_providers:
+        images_task = asyncio.create_task(artist_art_providers[0].get_artist_images(mbid))
 
-    artist = await artist_task
+    # The actual artist is fast
+    artist = await artist_providers[0].get_artist_by_id(mbid)
     if not artist:
         return (jsonify(error='Artist not found'), 404), 0
     
     validity = app.config['CACHE_TTL_GOOD']
     
-    # try:
-    #     artist['Images'] = await images_task
-    # except ProviderUnavailableException:
-    #     artist['Images'] = []
-    #     validity = min(validity, app.config['CACHE_TTL_BAD'])
-    # else:
-    #     artist['Images'] = []
-        
+    try:
+        artist['Images'] = await images_task
+    except ProviderUnavailableException:
+        artist['Images'] = []
+        validity = min(validity, app.config['CACHE_TTL_BAD'])
+    else:
+        artist['Images'] = []
+    
     overview_data, overview_validity = await link_overview_task
     artist.update(overview_data)
     validity = min(validity, overview_validity)
@@ -302,8 +302,8 @@ async def get_release_group_links_and_overview(mbid):
     validity = app.config['CACHE_TTL_GOOD']
     
     try:
-        # overview = await get_overview(links)
-        overview = ''
+        overview = await get_overview(links)
+        # overview = ''
     except ProviderUnavailableException:
         overview = ''
         validity = app.config['CACHE_TTL_BAD']
@@ -328,27 +328,26 @@ async def get_release_group_info(mbid):
     
     if not track_providers:
         return (jsonify(error='No track provider available'), 500), 0
+    
+    # Do artist ids first since we want to get cracking on artist details
+    artist_ids = await asyncio.create_task(track_providers[0].get_release_group_artist_ids(mbid))
+    artists_task = asyncio.gather(*[get_artist_info(gid) for gid in artist_ids])
 
-    # These are slowest so start first
+    # Overviews are next slowest so set these going
     links_overview_task = asyncio.create_task(get_release_group_links_and_overview(mbid))
-    # art_task_1 = asyncio.create_task(album_art_providers[0].get_album_images(mbid))
-    # art_task_2 = asyncio.create_task(album_art_providers[1].get_album_images(mbid))
+    art_task_1 = asyncio.create_task(album_art_providers[0].get_album_images(mbid))
+    art_task_2 = asyncio.create_task(album_art_providers[1].get_album_images(mbid))
     
     # These just query database and are fast
     release_group_task = asyncio.create_task(release_group_providers[0].get_release_group_by_id(mbid))
     releases_task = asyncio.create_task(release_providers[0].get_releases_by_rgid(mbid))
     tracks_task = asyncio.create_task(track_providers[0].get_release_group_tracks(mbid))
-    artist_ids_task = asyncio.create_task(track_providers[0].get_release_group_artist_ids(mbid))
-    
+
     validity = app.config['CACHE_TTL_GOOD']
 
     release_group = await release_group_task
     if not release_group:
         return (jsonify(error='Album not found'), 404), 0
-    
-    artist_ids = await artist_ids_task
-    artist_ids = set(artist_ids).union([release_group['ArtistId']])
-    artists_task = asyncio.gather(*[get_artist_info(gid) for gid in artist_ids])
 
     release_group['Releases'] = await releases_task
 
@@ -363,19 +362,19 @@ async def get_release_group_info(mbid):
     artists = [result[0] for result in await artists_task]
     release_group['Artists'] = artists
 
-    # if album_art_providers:
-    #     try:
-    #         images1 = await art_task_1
-    #         if images1:
-    #             release_group['Images'] = images1
-    #             asyncio.cancel(art_task_2)
-    #         else:
-    #             release_group['Images'] = await art_task_2
-    #     except ProviderUnavailableException:
-    #         release_group['Images'] = []
-    #         validity = app.config['CACHE_TTL_BAD']
-    # else:
-    #     release_group['Images'] = []
+    if album_art_providers:
+        try:
+            images1 = await art_task_1
+            if images1:
+                release_group['Images'] = images1
+                art_task_2.cancel()
+            else:
+                release_group['Images'] = await art_task_2
+        except ProviderUnavailableException:
+            release_group['Images'] = []
+            validity = app.config['CACHE_TTL_BAD']
+    else:
+        release_group['Images'] = []
 
     return release_group, validity
 
