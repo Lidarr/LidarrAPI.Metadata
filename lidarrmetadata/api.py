@@ -10,6 +10,7 @@ import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 from werkzeug.exceptions import HTTPException
 import datetime
+from datetime import timedelta
 import time
 import requests
 import logging
@@ -18,7 +19,6 @@ import lidarrmetadata
 from lidarrmetadata import chart
 from lidarrmetadata import config
 from lidarrmetadata import provider
-from lidarrmetadata.provider import ProviderUnavailableException
 from lidarrmetadata import util
 
 logger = logging.getLogger(__name__)
@@ -52,22 +52,23 @@ for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
     provider_key = list(filter(lambda k: k.upper() == provider_name,
                                provider.PROVIDER_CLASSES.keys()))[0]
     lower_kwargs = {k.lower(): v for k, v in kwargs.items()}
-    logger.debug(f"initalizig {provider_key}")
     provider.PROVIDER_CLASSES[provider_key](*args, **lower_kwargs)
 
 # Allow all endpoints to be cached by default
-# @app.after_request
-def add_cache_control_header(response, ttl = app.config['CACHE_TTL_GOOD']):
+@app.after_request
+def add_cache_control_header(response, expiry = provider.utcnow() + timedelta(seconds=app.config['CACHE_TTL']['cloudflare'])):
     if response.status_code not in set([200, 400, 403, 404]):
         response.cache_control.no_cache = True
-    elif not response.cache_control:
-        if ttl > 0:
+    # This is a bodge to figure out if we have already set any cache control headers
+    elif not response.cache_control or not response.cache_control._directives:
+        if expiry:
+            now = provider.utcnow()
             response.cache_control.public = True
             # We want to allow caching on cloudflare (which we can invalidate)
             # but disallow caching for local users (which we cannot invalidate)
-            response.cache_control.s_maxage = ttl
+            response.cache_control.s_maxage = (expiry - now).total_seconds()
             response.cache_control.max_age = 0
-            response.expires = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+            response.expires = now - timedelta(days=1)
         else:
             response.cache_control.no_cache = True
     return response
@@ -158,7 +159,7 @@ async def get_artist_info_route(mbid):
     artist_task = asyncio.create_task(get_artist_info(mbid))
     albums_task = asyncio.create_task(get_artist_albums(mbid))
 
-    artist, validity = await artist_task
+    artist, expiry = await artist_task
     if not isinstance(artist, dict):
         # i.e. we have returned an error response
         return artist
@@ -187,22 +188,15 @@ async def get_artist_info_route(mbid):
 
     artist['Albums'] = albums
 
-    return add_cache_control_header(jsonify(artist), validity)
+    return add_cache_control_header(jsonify(artist), expiry)
 
 async def get_artist_links_and_overview(mbid):
     link_providers = provider.get_providers_implementing(provider.ArtistLinkMixin)    
     links = await link_providers[0].get_artist_links(mbid)
 
-    validity = app.config['CACHE_TTL_GOOD']
+    overview, expiry = await get_overview(links)
     
-    try:
-        overview = await get_overview(links)
-        # overview = ''
-    except ProviderUnavailableException:
-        overview = ''
-        validity = app.config['CACHE_TTL_BAD']
-    
-    return {'Links': links, 'Overview': overview}, validity
+    return {'Links': links, 'Overview': overview}, expiry
 
 async def get_overview(links):
     overview_providers = provider.get_providers_implementing(provider.ArtistOverviewMixin)    
@@ -220,7 +214,7 @@ async def get_overview(links):
         elif wikipedia_link:
             return await overview_providers[0].get_artist_overview(wikipedia_link['target'])
         
-    return ''
+    return '', provider.utcnow() + timedelta(days=365)
 
 async def get_artist_info(mbid):
     
@@ -228,6 +222,9 @@ async def get_artist_info(mbid):
     cached = await util.CACHE.get(cache_key)
     if cached:
         return cached
+
+    now = provider.utcnow()
+    expiry = now + timedelta(seconds = app.config['CACHE_TTL']['cloudflare'])
     
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(provider.ArtistByIdMixin)
@@ -235,7 +232,7 @@ async def get_artist_info(mbid):
     
     if not artist_providers:
         # 500 error if we don't have an artist provider since it's essential
-        return (jsonify(error='No artist provider available'), 500), 0
+        return (jsonify(error='No artist provider available'), 500), None
 
     # overviews are the slowest thing so set those going first, followed by images
     link_overview_task = asyncio.create_task(get_artist_links_and_overview(mbid))
@@ -245,28 +242,26 @@ async def get_artist_info(mbid):
     logger.debug("All artist tasks created")
     
     # Await the overwiew and let the rest finish in meantime
-    overview_data, overview_validity = await link_overview_task
+    overview_data, overview_expiry = await link_overview_task
     
     artist = await artist_providers[0].get_artist_by_id(mbid)
     if not artist:
-        return (jsonify(error='Artist not found'), 404), 0
-    
-    validity = app.config['CACHE_TTL_GOOD']
-    
-    try:
-        artist['Images'] = await images_task
-    except ProviderUnavailableException:
-        artist['Images'] = []
-        validity = min(validity, app.config['CACHE_TTL_BAD'])
-    else:
-        artist['Images'] = []
+        return (jsonify(error='Artist not found'), 404), None
 
     artist.update(overview_data)
-    validity = min(validity, overview_validity)
     
-    await util.CACHE.set(cache_key, (artist, validity), ttl=validity)
+    if artist_art_providers:
+        images, image_expiry = await images_task
+        artist['Images'] = images
+    else:
+        image_expiry = expiry
+    
+    expiry = min(expiry, overview_expiry, image_expiry)
+    ttl = (expiry - now).total_seconds()
+    
+    await util.CACHE.set(cache_key, (artist, expiry), ttl=ttl)
         
-    return artist, validity
+    return artist, expiry
 
 async def get_artist_albums(mbid):
     release_group_providers = provider.get_providers_implementing(
@@ -278,10 +273,10 @@ async def get_artist_albums(mbid):
 
 @app.route('/album/<mbid>', methods=['GET'])
 async def get_release_group_info_route(mbid):
-    output, validity = await get_release_group_info(mbid)
+    output, expiry = await get_release_group_info(mbid)
     
     if isinstance(output, dict):
-        output = add_cache_control_header(jsonify(output), validity)
+        output = add_cache_control_header(jsonify(output), expiry)
 
     return output
 
@@ -289,18 +284,21 @@ async def get_release_group_links_and_overview(mbid):
     link_providers = provider.get_providers_implementing(provider.ReleaseGroupLinkMixin)    
     links = await link_providers[0].get_release_group_links(mbid)
 
-    validity = app.config['CACHE_TTL_GOOD']
+    overview, expiry = await get_overview(links)
     
-    try:
-        overview = await get_overview(links)
-        # overview = ''
-    except ProviderUnavailableException:
-        overview = ''
-        validity = app.config['CACHE_TTL_BAD']
-    
-    return {'Links': links, 'Overview': overview}, validity
+    return {'Links': links, 'Overview': overview}, expiry
 
-async def get_release_group_info(mbid):
+async def get_release_group_artists(mbid):
+    track_providers = provider.get_providers_implementing(provider.TracksByReleaseGroupMixin)
+    # Do artist ids first since we want to get cracking on artist details
+    artist_ids = await track_providers[0].get_release_group_artist_ids(mbid)
+    results = await asyncio.gather(*[get_artist_info(gid) for gid in artist_ids])
+    artists = [result[0] for result in results]
+    expiry = min([result[1] for result in results])
+    
+    return artists, expiry
+
+async def get_release_group_info_basic(mbid):
     
     cache_key = f"get_release_group_info:{mbid}"
     cached = await util.CACHE.get(cache_key)
@@ -309,25 +307,24 @@ async def get_release_group_info(mbid):
     
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
-        return (uuid_validation_response, 0)
-
+        return (uuid_validation_response, None)
+    
     release_group_providers = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)
     release_providers = provider.get_providers_implementing(provider.ReleasesByReleaseGroupIdMixin)
     album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)[::-1]
     track_providers = provider.get_providers_implementing(provider.TracksByReleaseGroupMixin)
     
     if not release_group_providers:
-        return (jsonify(error='No album provider available'), 500), 0
+        return (jsonify(error='No album provider available'), 500), None
 
     if not release_providers:
-        return(jsonify(error='No release provider available'), 500), 0        
+        return(jsonify(error='No release provider available'), 500), None        
     
     if not track_providers:
-        return (jsonify(error='No track provider available'), 500), 0
-    
-    # Do artist ids first since we want to get cracking on artist details
-    artist_ids = await track_providers[0].get_release_group_artist_ids(mbid)
-    artists_task = asyncio.gather(*[get_artist_info(gid) for gid in artist_ids])
+        return (jsonify(error='No track provider available'), 500), None
+
+    now = provider.utcnow()
+    expiry = now + timedelta(seconds = app.config['CACHE_TTL']['cloudflare'])
 
     # Overviews and art are next slowest so set these going
     links_overview_task = asyncio.create_task(get_release_group_links_and_overview(mbid))
@@ -342,43 +339,48 @@ async def get_release_group_info(mbid):
     logger.debug("All release group tasks created")
 
     # Wait on this since it's slowest and the rest will get finished in the meantime
-    overview_data, overview_validity = await links_overview_task
-
-    validity = app.config['CACHE_TTL_GOOD']
+    overview_data, overview_expiry = await links_overview_task
 
     release_group = await release_group_task
     if not release_group:
-        return (jsonify(error='Album not found'), 404), 0
+        return (jsonify(error='Album not found'), 404), None
 
+    release_group.update(overview_data)
+    
     release_group['Releases'] = await releases_task
 
     tracks = await tracks_task
     for release in release_group['Releases']:
         release['Tracks'] = [t for t in tracks if t['ReleaseId'] == release['Id']]
 
-    release_group.update(overview_data)
-    validity = min(validity, overview_validity)
-        
-    artists = [result[0] for result in await artists_task]
-    release_group['Artists'] = artists
-
     if album_art_providers:
-        try:
-            images1 = await art_task_1
-            if images1:
-                release_group['Images'] = images1
-                art_task_2.cancel()
-            else:
-                release_group['Images'] = await art_task_2
-        except ProviderUnavailableException:
-            release_group['Images'] = []
-            validity = app.config['CACHE_TTL_BAD']
+        images1 = await art_task_1
+        if images1:
+            release_group['Images'] = images1
+            images_expiry = expiry
+            art_task_2.cancel()
+        else:
+            release_group['Images'], images_expiry = await art_task_2
     else:
         release_group['Images'] = []
         
-    await util.CACHE.set(cache_key, (release_group, validity), ttl=validity)
+    expiry = min(expiry, overview_expiry, images_expiry)
+    ttl = (expiry - now).total_seconds()
+        
+    await util.CACHE.set(cache_key, (release_group, expiry), ttl=ttl)
 
-    return release_group, validity
+    return release_group, expiry
+
+async def get_release_group_info(mbid):
+
+    artists_task = asyncio.create_task(get_release_group_artists(mbid))
+    release_group_task = asyncio.create_task(get_release_group_info_basic(mbid))
+    
+    release_group, rg_expiry = await release_group_task
+    artists, artist_expiry = await artists_task
+    
+    release_group['Artists'] = artists
+    return release_group, min(rg_expiry, artist_expiry)
 
 @app.route('/chart/<name>/<type_>/<selection>')
 async def chart_route(name, type_, selection):

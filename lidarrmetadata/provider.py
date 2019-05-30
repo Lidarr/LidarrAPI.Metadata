@@ -4,6 +4,7 @@ import abc
 import collections
 import contextlib
 import datetime
+from datetime import timedelta
 import time
 import pytz
 import imp
@@ -50,6 +51,8 @@ CONFIG = get_config()
 # Provider class dictionary
 PROVIDER_CLASSES = {}
 
+def utcnow():
+    return datetime.datetime.now(datetime.timezone.utc)
 
 def get_providers_implementing(cls):
     """
@@ -395,15 +398,14 @@ class HttpProvider(Provider):
                                },
                                tags={'provider': 'solr_search'})
             
-    async def get_with_limit(self, url):
+    async def get_with_limit(self, url, raise_for_status=True):
         try:
             ## TODO make this persistent
             async with aiohttp.ClientSession() as session:
                 start = timer()
-                resp = await session.request(method='GET', url=url)
+                resp = await session.request(method='GET', url=url, raise_for_status=raise_for_status)
                 end = timer()
                 elapsed = int((end - start) * 1000)
-                resp.raise_for_status()
                 logger.info(f"Got response [{resp.status}] for URL: {url} in {elapsed}ms ")
                 json = await resp.json()
                 return json
@@ -451,40 +453,37 @@ class FanArtTvProvider(HttpProvider,
         
         cached, expires = await util.FANART_CACHE.get(artist_id)
 
-        if cached and expires > datetime.datetime.now(datetime.timezone.utc):
-            return self.parse_artist_images(cached)
+        if cached and expires > utcnow():
+            return self.parse_artist_images(cached), expires
         
         try:
             results = await self.get_by_mbid(artist_id)
-
-            await util.FANART_CACHE.set(artist_id, results, ttl=CONFIG.CACHE_TTL['fanart'])
+            ttl = CONFIG.CACHE_TTL['fanart']
+            await util.FANART_CACHE.set(artist_id, results, ttl=ttl)
             for id, album_result in results.get('albums', {}).items():
-                await util.FANART_CACHE.set(id, album_result, ttl=CONFIG.CACHE_TTL['fanart'])
+                await util.FANART_CACHE.set(id, album_result, ttl=ttl)
                     
-            return self.parse_artist_images(results)
+            return self.parse_artist_images(results), utcnow() + timedelta(seconds=ttl)
 
         except ProviderUnavailableException:
-            if cached:
-                return self.parse_artist_images(cached)
-            else:
-                raise
+            return (cached or []), utcnow() + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
 
     async def get_album_images(self, album_id):
         cached, expires = await util.FANART_CACHE.get(album_id)
 
-        if cached and expires > datetime.datetime.now(datetime.timezone.utc):
-            return self.parse_album_images(cached)
+        if cached and expires > utcnow():
+            return self.parse_album_images(cached), expires
         
         try:
             results = await self.get_by_mbid(album_id)
             results = results.get('albums', results).get(album_id, results)            
-            await util.FANART_CACHE.set(album_id, results, ttl=CONFIG.CACHE_TTL['fanart'])
+            ttl = CONFIG.CACHE_TTL['fanart']
+            await util.FANART_CACHE.set(album_id, results, ttl=ttl)
+            
+            return self.parse_album_images(results), utcnow() + timedelta(seconds=ttl)
 
         except ProviderUnavailableException:
-            if cached:
-                return self.parse_album_images(cached)
-            else:
-                raise
+            return (cached or []), utcnow() + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
 
     async def get_by_mbid(self, mbid):
         """
@@ -493,7 +492,11 @@ class FanArtTvProvider(HttpProvider,
         :return: fanart.tv response for mbid
         """
         url = self.build_url(mbid)
-        return await self.get_with_limit(url)
+        response = await self.get_with_limit(url, raise_for_status=False)
+        if response.get('status', None):
+            return {}
+        else:
+            return response
         
     async def invalidate_cache(self, prefix):
         logger.debug('Invalidating fanart cache')
@@ -1161,24 +1164,23 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
     async def get_artist_overview(self, url):
         cached, expires = await util.WIKI_CACHE.get(url) or (None, True)
         
-        if cached and expires > datetime.datetime.now(datetime.timezone.utc):
-            return cached
+        if cached and expires > utcnow():
+            return cached, expires
         
         logger.debug("getting overview")
         
         try:
             summary = await self.wikidata_get_summary_from_url(url) if 'wikidata' in url else await self.wikipedia_get_summary_from_url(url)
-            await util.WIKI_CACHE.set(url, summary, ttl=CONFIG.CACHE_TTL['wikipedia'])
-            return summary
+            ttl = CONFIG.CACHE_TTL['wikipedia']
+            await util.WIKI_CACHE.set(url, summary, ttl=ttl)
+            return summary, utcnow() + timedelta(seconds = ttl)
         
         except ProviderUnavailableException:
-            if cached:
-                return cached
-            else:
-                raise
+            return (cached or '', utcnow() + timedelta(seconds = CONFIG.CACHE_TTL['provider_error']))
+
         except ValueError:
             logger.error('Could not get summary from {}'.format(url))
-            return ''
+            return '', utcnow() + timedelta(seconds = CONFIG.CACHE_TTL['provider_error'])
             
     async def wikidata_get_summary_from_url(self, url):
         data = await self.wikidata_get_entity_data_from_url(url)
