@@ -400,12 +400,12 @@ class HttpProvider(Provider,
                                },
                                tags={'provider': self._name})
             
-    async def get_with_limit(self, url, raise_on_http_error=True):
+    async def get_with_limit(self, url, raise_on_http_error=True, **kwargs):
         try:
             with self._limiter.limited():
                 self._count_request('request')
                 start = timer()
-                async with self._session.get(url) as resp:
+                async with self._session.get(url, **kwargs) as resp:
                     end = timer()
                     elapsed = int((end - start) * 1000)
                     logger.info(f"Got response [{resp.status}] for URL: {url} in {elapsed}ms ")
@@ -425,6 +425,13 @@ class HttpProvider(Provider,
         except asyncio.CancelledError:
             logger.debug(f'Task cancelled {url}')
             raise
+        except asyncio.TimeoutError as error:
+            logger.error(f'Timeout: {error}')
+            self._count_request('timeout')
+            raise ProviderUnavailableException(f'{self._name} timeout')
+        except limit.RateLimitedError:
+            logger.debug(f'{self._name} request rate limited')
+            self._count_request('ratelimit')
         except Exception as error:
             logger.error(f'Non-aiohttp exceptions occured: {getattr(error, "__dict__", {})}')
             logger.error(repr(error))
@@ -646,7 +653,7 @@ class LastFmProvider(Provider,
                  'Overview': result.get_bio_summary()}
                 for result in results]
     
-class SolrSearchProvider(Provider,
+class SolrSearchProvider(HttpProvider,
                          ArtistNameSearchMixin,
                          AlbumNameSearchMixin):
     
@@ -663,59 +670,14 @@ class SolrSearchProvider(Provider,
 
         :param search_server: URL for the search server.  Note that using HTTPS adds around 100ms to search time.
         """
-        super(SolrSearchProvider, self).__init__()
+        super(SolrSearchProvider, self).__init__('solr_search')
 
         self._search_server = search_server
-        self._limiter = _get_rate_limiter(key='solr_search')
         
-        self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
-                                                CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
-
+    async def get_with_limit(self, url):
+        return await super().get_with_limit(url, timeout=aiohttp.ClientTimeout(total=5))
             
-    def _count_request(self, result_type):
-        if self._stats:
-            self._stats.metric('external', {result_type: 1}, tags={'provider': 'solr_search'})
-
-    def _record_response_result(self, response):
-        if self._stats:
-            self._stats.metric('external',
-                               {
-                                   'response_time': response.elapsed.microseconds / 1000,
-                                   'response_status_code': response.status_code
-                               },
-                               tags={'provider': 'solr_search'})
-        
-    def get_with_limit(self, url):
-        
-        try:
-            with self._limiter.limited():
-                self._count_request('request')
-                response = requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT)
-                self._record_response_result(response)
-
-                if response.status_code == 200:
-                    return response
-                else:
-                    logger.error(u'Non-200 response code for {url}: {code}\n\t{details}'.format(
-                        url=url,
-                        code=response.status_code,
-                        details=response.text
-                    ))
-                    return {}
-
-        except HTTPError as error:
-            logger.error('HTTPError: {e}'.format(e=error))
-            return {}
-        except requests.exceptions.Timeout as error:
-            logger.error('Timeout: {e}'.format(e=error))
-            self._count_request('timeout')
-            return {}
-        except limit.RateLimitedError:
-            logger.debug('Musicbrainz search request rate limited')
-            self._count_request('ratelimit')
-            return {}
-        
-    def search_artist_name(self, name, limit=None, albums=None):
+    async def search_artist_name(self, name, limit=None, albums=None):
         
         if albums:
             return self.search_artist_name_with_albums(name, albums, self.parse_artist_search_with_albums, limit)
@@ -730,16 +692,14 @@ class SolrSearchProvider(Provider,
         if limit:
             url += u'&rows={}'.format(limit)
         
-        response = self.get_with_limit(url)
+        response = await self.get_with_limit(url)
         
         if not response:
             return {}
         
-        logger.debug(u'Search for {query} completed in {time}ms'.format(query=name, time=response.elapsed.microseconds / 1000))
-        
-        return self.parse_artist_search(response.json())
+        return self.parse_artist_search(response)
     
-    def search_artist_name_with_albums(self, artist, albums, handler, limit=None):
+    async def search_artist_name_with_albums(self, artist, albums, handler, limit=None):
         
         album_query = u" ".join(albums)
         query = u"({album_query}) AND (artist:{artist} OR artistname:{artist} OR creditname:{artist})".format(
@@ -755,19 +715,17 @@ class SolrSearchProvider(Provider,
         if limit:
             url += u'&rows={}'.format(limit)
             
-        response = self.get_with_limit(url)
+        response = await self.get_with_limit(url)
         
         if not response:
             return {}
 
-        logger.debug(u'Search for {query} completed in {time}ms'.format(query=query, time=response.elapsed.microseconds / 1000))
-        
-        return handler(response.json())
+        return handler(response)
     
-    def search_album_name(self, name, limit=None, artist_name=''):
+    async def search_album_name(self, name, limit=None, artist_name=''):
         
         if artist_name:
-            return self.search_artist_name_with_albums(artist_name, [name], self.parse_album_search, limit)
+            return await self.search_artist_name_with_albums(artist_name, [name], self.parse_album_search, limit)
 
         # Note that when using a dismax query we shouldn't apply lucene escaping
         # See https://github.com/metabrainz/musicbrainz-server/blob/master/lib/MusicBrainz/Server/Data/WebService.pm
@@ -779,14 +737,12 @@ class SolrSearchProvider(Provider,
         if limit:
             url += u'&rows={}'.format(limit)
         
-        response = self.get_with_limit(url)
+        response = await self.get_with_limit(url)
         
         if not response:
             return {}
         
-        logger.debug(u'Search for {query} completed in {time}ms'.format(query=name, time=response.elapsed.microseconds / 1000))
-        
-        return self.parse_album_search(response.json())
+        return self.parse_album_search(response)
 
     
     @staticmethod

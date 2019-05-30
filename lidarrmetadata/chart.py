@@ -18,7 +18,7 @@ async def _parse_itunes_chart(URL, count):
     search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
     search_results = []
     for result in results:
-        search_result = search_provider.search_album_name(result['name'], artist_name=result['artistName'], limit=1)
+        search_result = await search_provider.search_album_name(result['name'], artist_name=result['artistName'], limit=1)
         if search_result:
             search_result = search_result[0]
             search_results.append(await _parse_album_search_result(search_result))
@@ -80,7 +80,7 @@ async def get_billboard_100_artists_chart(count=10):
 
     search_results = []
     for result in results:
-        artist_search = search_provider.search_artist_name(result.artist, limit=1)
+        artist_search = await search_provider.search_artist_name(result.artist, limit=1)
         if artist_search:
             search_results.append({'ArtistName': result.artist, 'ArtistId': artist_search[0]['Id']})
 
@@ -174,7 +174,7 @@ async def get_lastfm_artist_chart(count=10, user=None):
         artist = {'ArtistName': lastfm_artist.name, 'ArtistId': lastfm_artist.get_mbid()}
 
         if not all(artist.values()):
-            results = search_provider.search_artist_name(artist['ArtistName'], limit=1)
+            results = await search_provider.search_artist_name(artist['ArtistName'], limit=1)
             if results:
                 results = results[0]
                 artist = {'ArtistName': results['ArtistName'], 'ArtistId': results['Id']}

@@ -449,7 +449,7 @@ async def search_album():
     search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
     
     if search_providers:
-        album_ids = search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
+        album_ids = await search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
         
         if basic:
             albums = album_ids
@@ -518,7 +518,7 @@ async def search_artist():
 
     # TODO Prefer certain providers?
     artist_ids = filter(lambda a: a['Id'] not in config.get_config().BLACKLISTED_ARTISTS,
-                        search_providers[0].search_artist_name(query, limit=limit, albums=albums))
+                        await search_providers[0].search_artist_name(query, limit=limit, albums=albums))
 
     if basic:
         artists = artist_ids
