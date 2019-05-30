@@ -12,8 +12,8 @@ from werkzeug.exceptions import HTTPException
 import datetime
 from datetime import timedelta
 import time
-import requests
 import logging
+import aiohttp
 
 import lidarrmetadata
 from lidarrmetadata import chart
@@ -611,21 +611,20 @@ async def invalidate_cache():
             albums = albums.union(result['albums'])
 
         for artist in artists:
-            # util.CACHE.delete_memoized(get_artist_info, artist)
-            # util.CACHE.delete_memoized(get_artist_albums, artist)
+            util.CACHE.delete(f"get_artist_info:{artist}")
 
             key = '{url}/artist/{artist}'.format(url=base_url, artist=artist)
             invalidated.append(key)
 
         for album in albums:
-            # util.CACHE.delete_memoized(get_release_group_info, album)
+            util.CACHE.delete(f"get_release_group_info:{album}")
 
             key = '{url}/album/{album}'.format(url=base_url, album=album)
             invalidated.append(key)
 
         # cloudflare only accepts 500 files at a time
         for i in xrange(0, len(invalidated), 500):
-            invalidate_cloudflare(invalidated[i:i+500], retries = 2)
+            await invalidate_cloudflare(invalidated[i:i+500], retries = 2)
     
     finally:
         util.CACHE.delete(invalidation_in_progress_key)
@@ -636,24 +635,26 @@ async def invalidate_cache():
     
     return jsonify(invalidated)
 
-def invalidate_cloudflare(files, retries = 2):
+async def invalidate_cloudflare(files, retries = 2):
 
     zoneid = app.config['CLOUDFLARE_ZONE_ID']
     if not zoneid:
         return
     
-    url = 'https://api.cloudflare.com/client/v4/zones/{}/purge_cache'.format(zoneid)
+    url = f'https://api.cloudflare.com/client/v4/zones/{zoneid}/purge_cache'
     headers = {'X-Auth-Email': app.config['CLOUDFLARE_AUTH_EMAIL'],
                'X-Auth-Key': app.config['CLOUDFLARE_AUTH_KEY'],
                'Content-Type': 'application/json'}
     data = {'files': files}
     
-    r = requests.post(url, headers=headers, json=data)
-    logger.info(r.text)
-    
-    if not r.json()['success'] and retries > 0:
-        invalidate_cloudflare(files, retries - 1)
-        
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=data) as r:
+            logger.info(await r.text())
+            json = await r.json()
+
+            if not json['success'] and retries > 0:
+                invalidate_cloudflare(files, retries - 1)
+
 @app.before_serving
 async def run_async_init():
     async_providers = provider.get_providers_implementing(provider.AsyncInit)
