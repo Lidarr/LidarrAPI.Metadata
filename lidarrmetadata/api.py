@@ -1,8 +1,10 @@
+import quart.flask_patch
+
 import os
 import uuid
 import functools
 
-from flask import Flask, abort, make_response, request, jsonify
+from quart import Quart, abort, make_response, request, jsonify
 from flask_httpauth import HTTPBasicAuth
 from psycopg2 import OperationalError
 import redis
@@ -25,7 +27,7 @@ logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
 logger.info('Have api logger')
 
-app = Flask(__name__)
+app = Quart(__name__)
 app.config.from_object(config.get_config())
 
 auth = HTTPBasicAuth()
@@ -58,11 +60,11 @@ if app.config['USE_CACHE']:
     util.WIKI_CACHE.config = config.get_config().WIKI_CACHE_CONFIG
     util.WIKI_CACHE.init_app(app)
 
-if not app.config['PRODUCTION']:
-    # Run api doc server if not running in production
-    from flasgger import Swagger
+# if not app.config['PRODUCTION']:
+#     # Run api doc server if not running in production
+#     from flasgger import Swagger
 
-    swagger = Swagger(app)
+#     swagger = Swagger(app)
 
 # Set up providers
 for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
@@ -147,7 +149,7 @@ def validate_mbid(mbid, check_blacklist=True):
 
 @app.route('/')
 @no_cache
-def default_route():
+async def default_route():
     """
     Default route with API information
     :return:
@@ -165,7 +167,7 @@ def default_route():
 
 
 @app.route('/artist/<mbid>', methods=['GET'])
-def get_artist_info_route(mbid):
+async def get_artist_info_route(mbid):
     uuid_validation_response = validate_mbid(mbid, True)
     if uuid_validation_response:
         return uuid_validation_response
@@ -270,7 +272,7 @@ def get_artist_albums(mbid):
         return None
 
 @app.route('/album/<mbid>', methods=['GET'])
-def get_release_group_info_route(mbid):
+async def get_release_group_info_route(mbid):
     output, validity = get_release_group_info(mbid)
     
     if isinstance(output, dict):
@@ -343,7 +345,7 @@ def get_release_group_info(mbid):
     return release_group, validity
 
 @app.route('/chart/<name>/<type_>/<selection>')
-def chart_route(name, type_, selection):
+async def chart_route(name, type_, selection):
     """
     Gets chart
     :param name: Name of chart. 404 if name invalid
@@ -377,7 +379,7 @@ def chart_route(name, type_, selection):
 
 
 @app.route('/search/album')
-def search_album():
+async def search_album():
     """Search for a human-readable album
     ---
     parameters:
@@ -430,7 +432,7 @@ def search_album():
     return add_cache_control_header(jsonify(albums), validity)
 
 @app.route('/search/artist', methods=['GET'])
-def search_artist():
+async def search_artist():
     """Search for a human-readable artist
     ---
     parameters:
@@ -489,7 +491,7 @@ def search_artist():
     return add_cache_control_header(jsonify(artists), validity)
 
 @app.route('/search/track')
-def search_track():
+async def search_track():
     query = get_search_query()
 
     artist_name = request.args.get('artist', None)
@@ -508,7 +510,7 @@ def search_track():
 
 
 @app.route('/search')
-def search_route():
+async def search_route():
     type = request.args.get('type', None)
 
     if type == 'artist':

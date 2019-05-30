@@ -33,8 +33,8 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
         'billboard.py>=4.1.0',
-        'flasgger',
         'flask',
+        'quart',
         'flask-caching',
         'Flask-HTTPAuth',
         'psycopg2-binary',
