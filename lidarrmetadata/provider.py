@@ -12,6 +12,7 @@ import pkg_resources
 import re
 import six
 from urllib3.exceptions import HTTPError
+from timeit import default_timer as timer
 
 import asyncio
 import aiohttp
@@ -398,9 +399,12 @@ class HttpProvider(Provider):
         try:
             ## TODO make this persistent
             async with aiohttp.ClientSession() as session:
+                start = timer()
                 resp = await session.request(method='GET', url=url)
+                end = timer()
+                elapsed = int((end - start) * 1000)
                 resp.raise_for_status()
-                logger.info("Got response [%s] for URL: %s", resp.status, url)
+                logger.info(f"Got response [{resp.status}] for URL: {url} in {elapsed}ms ")
                 json = await resp.json()
                 return json
         except ValueError as error:
@@ -838,13 +842,6 @@ class MusicbrainzDbProvider(Provider,
     Provider for directly querying musicbrainz database
     """
 
-    TRANSLATION_TABLE = util.BidirectionalDictionary({
-        u'\u2026': u'...',  # HORIZONTAL ELLIPSIS (U+2026)
-        u'\u0027': u"'",  # APOSTROPHE (U+0027)
-        u'\u2010': u'-',  # HYPHEN (U+2010)
-        u'\u8243': u'\u2033',  # DOUBLE PRIME (U+8243)
-    })
-
     def __init__(self,
                  db_host='localhost',
                  db_port=5432,
@@ -1091,14 +1088,15 @@ class MusicbrainzDbProvider(Provider,
         # logger.debug(f"args:\n:{cursor_args}")
         
         async with self._pool.acquire() as connection:
+            start = timer()
             data = await connection.fetch(sql, *cursor_args)
+            end = timer()
+            elapsed = int((end - start) * 1000)
+            logger.debug(f"Query complete in {elapsed}ms")
             
         # logger.debug(data)
             
         results = [dict(row.items()) for row in data]
-
-        # Decode strings
-        # results = util.map_iterable_values(results, self.mb_decode, str)
 
         return results
 
@@ -1240,7 +1238,7 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
         
         # if English link, just use that
         if url_language == 'en':
-            return self.wikipedia_get_summary_from_title(url_title, url_language)
+            return await self.wikipedia_get_summary_from_title(url_title, url_language)
         
         # Otherwise go via wikidata to try to get something in English or best other language
         data = await self.wikidata_get_entity_data_from_language_title(url_title, url_language)
