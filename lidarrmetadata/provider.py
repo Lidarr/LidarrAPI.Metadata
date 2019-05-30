@@ -445,17 +445,17 @@ class FanArtTvProvider(HttpProvider,
 
     async def get_artist_images(self, artist_id, ignore_cache = False):
         
-        cached, expired = util.FANART_CACHE.get(artist_id) or (None, True)
+        cached, expires = await util.FANART_CACHE.get(artist_id)
 
-        if cached and not expired and not ignore_cache:
+        if cached and expires > datetime.datetime.now(datetime.timezone.utc):
             return self.parse_artist_images(cached)
         
         try:
             results = await self.get_by_mbid(artist_id)
 
-            util.FANART_CACHE.set(artist_id, results)
+            await util.FANART_CACHE.set(artist_id, results, ttl=CONFIG.CACHE_TTL['fanart'])
             for id, album_result in results.get('albums', {}).items():
-                util.FANART_CACHE.set(id, album_result)
+                await util.FANART_CACHE.set(id, album_result, ttl=CONFIG.CACHE_TTL['fanart'])
                     
             return self.parse_artist_images(results)
 
@@ -466,15 +466,15 @@ class FanArtTvProvider(HttpProvider,
                 raise
 
     async def get_album_images(self, album_id):
-        cached, expired = util.FANART_CACHE.get(album_id) or (None, True)
+        cached, expires = await util.FANART_CACHE.get(album_id)
 
-        if cached and not expired:
+        if cached and expires > datetime.datetime.now(datetime.timezone.utc):
             return self.parse_album_images(cached)
         
         try:
             results = await self.get_by_mbid(album_id)
             results = results.get('albums', results).get(album_id, results)            
-            util.FANART_CACHE.set(album_id, results)
+            await util.FANART_CACHE.set(album_id, results, ttl=CONFIG.CACHE_TTL['fanart'])
 
         except ProviderUnavailableException:
             if cached:
@@ -491,13 +491,13 @@ class FanArtTvProvider(HttpProvider,
         url = self.build_url(mbid)
         return await self.get_with_limit(url)
         
-    def invalidate_cache(self, prefix):
+    async def invalidate_cache(self, prefix):
         logger.debug('Invalidating fanart cache')
         
         result = {'artists': [], 'albums': []}
         
         last_invalidation_key = prefix + 'FanartProviderLastCacheInvalidation'
-        self._last_cache_invalidation = util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
+        self._last_cache_invalidation = await util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
         current_cache_invalidation = int(time.time())
         
         # Since we don't have a fanart personal key we can only see things with a lag
@@ -510,10 +510,10 @@ class FanArtTvProvider(HttpProvider,
 
         # Mark artists as expired
         for id in artist_ids:
-            cached, expired = util.FANART_CACHE.get(id) or (None, True)
+            cached, expires = await util.FANART_CACHE.get(id)
             if cached:
                 # bodge - set timeout to one second from now
-                util.FANART_CACHE.set(id, cached, timeout=1)
+                await util.FANART_CACHE.set(id, cached, ttl=1)
                 
         # If there's only a few fanart updates then grab them now
         if len(artist_ids) <= 20:
@@ -522,7 +522,7 @@ class FanArtTvProvider(HttpProvider,
         else:
             logger.info('Too many fanart updates, only marking expired')
 
-        util.CACHE.set(last_invalidation_key, current_cache_invalidation, timeout=0)
+        await util.CACHE.set(last_invalidation_key, current_cache_invalidation)
         
         result['artists'] = artist_ids
         return result
@@ -895,7 +895,7 @@ class MusicbrainzDbProvider(Provider,
     async def invalidate_cache(self, prefix):
 
         last_invalidation_key = prefix + 'MBProviderLastCacheInvalidation'
-        self._last_cache_invalidation = util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
+        self._last_cache_invalidation = await util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
 
         result = {'artists': [], 'albums': []}
         
@@ -909,7 +909,7 @@ class MusicbrainzDbProvider(Provider,
             logger.info('Invalidating these artists given musicbrainz updates:\n{}'.format('\n'.join(result['artists'])))
             logger.info('Invalidating these albums given musicbrainz updates:\n{}'.format('\n'.join(result['albums'])))
 
-            util.CACHE.set(last_invalidation_key, vintage, timeout=0)
+            await util.CACHE.set(last_invalidation_key, vintage)
         else:
             logger.debug('Musicbrainz invalidation not required')
             
@@ -1156,16 +1156,16 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
         )
         
     async def get_artist_overview(self, url):
-        cached, expired = util.WIKI_CACHE.get(url) or (None, True)
+        cached, expires = await util.WIKI_CACHE.get(url) or (None, True)
         
-        if cached and not expired:
+        if cached and expires > datetime.datetime.now(datetime.timezone.utc):
             return cached
         
         logger.debug("getting overview")
         
         try:
             summary = await self.wikidata_get_summary_from_url(url) if 'wikidata' in url else await self.wikipedia_get_summary_from_url(url)
-            util.WIKI_CACHE.set(url, summary)
+            await util.WIKI_CACHE.set(url, summary, ttl=CONFIG.CACHE_TTL['wikipedia'])
             return summary
         
         except ProviderUnavailableException:

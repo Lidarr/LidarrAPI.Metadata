@@ -52,16 +52,6 @@ if app.config['SENTRY_DSN']:
                     integrations=[FlaskIntegration()],
                     before_send=processor.create_event)
 
-if app.config['USE_CACHE']:
-    util.CACHE.config = config.get_config().REDIS_CACHE_CONFIG
-    util.CACHE.init_app(app)
-    
-    util.FANART_CACHE.config = config.get_config().FANART_CACHE_CONFIG
-    util.FANART_CACHE.init_app(app)
-    
-    util.WIKI_CACHE.config = config.get_config().WIKI_CACHE_CONFIG
-    util.WIKI_CACHE.init_app(app)
-
 # if not app.config['PRODUCTION']:
 #     # Run api doc server if not running in production
 #     from flasgger import Swagger
@@ -244,6 +234,12 @@ async def get_overview(links):
     return ''
 
 async def get_artist_info(mbid):
+    
+    cache_key = f"get_artist_info:{mbid}"
+    cached = await util.CACHE.get(cache_key)
+    if cached:
+        return cached
+    
     # TODO A lot of repetitive code here. See if we can refactor
     artist_providers = provider.get_providers_implementing(provider.ArtistByIdMixin)
     artist_art_providers = provider.get_providers_implementing(provider.ArtistArtworkMixin)
@@ -275,6 +271,8 @@ async def get_artist_info(mbid):
     overview_data, overview_validity = await link_overview_task
     artist.update(overview_data)
     validity = min(validity, overview_validity)
+    
+    await util.CACHE.set(cache_key, (artist, validity), ttl=validity)
         
     return artist, validity
 
@@ -311,6 +309,12 @@ async def get_release_group_links_and_overview(mbid):
     return {'Links': links, 'Overview': overview}, validity
 
 async def get_release_group_info(mbid):
+    
+    cache_key = f"get_release_group_info:{mbid}"
+    cached = await util.CACHE.get(cache_key)
+    if cached:
+        return cached
+    
     uuid_validation_response = validate_mbid(mbid)
     if uuid_validation_response:
         return (uuid_validation_response, 0)
@@ -375,6 +379,8 @@ async def get_release_group_info(mbid):
             validity = app.config['CACHE_TTL_BAD']
     else:
         release_group['Images'] = []
+        
+    await util.CACHE.set(cache_key, (release_group, validity), ttl=validity)
 
     return release_group, validity
 
@@ -576,10 +582,7 @@ async def search_route():
     
 #     return jsonify(sorted(ids))
 
-@app.route('/invalidate')
-@auth.login_required
-@no_cache
-def invalidate_cache():
+async def invalidate_cache():
     
     ## this is used as a prefix in various places to make sure
     ## we keep cache for different metadata versions separate
@@ -587,12 +590,12 @@ def invalidate_cache():
     
     ## Use a cache key to make sure we don't trigger this in parallel
     invalidation_in_progress_key = base_url + 'CacheInvalidationInProgress'
-    in_progress = util.CACHE.get(invalidation_in_progress_key)
+    in_progress = await util.CACHE.get(invalidation_in_progress_key)
     if in_progress:
         return jsonify('Invalidation already in progress'), 500
     
     try:
-        util.CACHE.set(invalidation_in_progress_key, True, timeout=60*5)
+        await util.CACHE.set(invalidation_in_progress_key, True, timeout=60*5)
         logger.info('Invalidating cache')
 
         ## clear cache for all providers, aggregating a list of artists/albums
