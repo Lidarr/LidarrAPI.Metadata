@@ -9,6 +9,7 @@ import zlib
 import asyncio
 import asyncpg
 import datetime
+from timeit import default_timer as timer
 
 from aiocache.serializers import BaseSerializer, PickleSerializer
 from aiocache.base import BaseCache
@@ -134,11 +135,14 @@ class PostgresBackend:
     async def _get(self, key, encoding="utf-8", _conn=None):
         try:
             logger.debug(f"getting {key}")
+            start = timer()
             result = await _conn.fetchrow(
                 f"SELECT value, expires FROM {self._db_table} WHERE key = $1;",
                 key
             )
-            logger.debug(f"got {key}")
+            end = timer()
+            elapsed = int((end - start) * 1000)
+            logger.debug(f"got {key} in {elapsed}ms")
             if result is not None:
                 return result
         except KeyError:
@@ -147,25 +151,25 @@ class PostgresBackend:
 
     @conn
     async def _set(self, key, value, ttl=None, _cas_token=None, _conn=None):
-        if ttl is not None:
-            expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds = ttl)
-            await _conn.execute(
-                f"INSERT INTO {self._db_table} (key, expires, value) "
-                "VALUES ($1, $2, $3) "
-                "ON CONFLICT(key) DO UPDATE "
-                "SET expires = EXCLUDED.expires, "
-                "value = EXCLUDED.value;",
-                key, expiry, value
-            )
-        else:
-            await _conn.execute(
-                f"INSERT INTO {self._db_table} (key, expires, value) "
-                "VALUES ($1, NULL, $2) "
-                "ON CONFLICT(key) DO UPDATE "
-                "SET expires = EXCLUDED.expires, "
-                "value = EXCLUDED.value;",
-                key, value
-            )
+        # if ttl is not None:
+        #     expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds = ttl)
+        #     await _conn.execute(
+        #         f"INSERT INTO {self._db_table} (key, expires, value) "
+        #         "VALUES ($1, $2, $3) "
+        #         "ON CONFLICT(key) DO UPDATE "
+        #         "SET expires = EXCLUDED.expires, "
+        #         "value = EXCLUDED.value;",
+        #         key, expiry, value
+        #     )
+        # else:
+        #     await _conn.execute(
+        #         f"INSERT INTO {self._db_table} (key, expires, value) "
+        #         "VALUES ($1, NULL, $2) "
+        #         "ON CONFLICT(key) DO UPDATE "
+        #         "SET expires = EXCLUDED.expires, "
+        #         "value = EXCLUDED.value;",
+        #         key, value
+        #     )
         return True
 
     @conn
