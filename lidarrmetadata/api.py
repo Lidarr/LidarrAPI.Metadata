@@ -1,12 +1,9 @@
-import quart.flask_patch
-
 import os
 import uuid
 import functools
 import asyncio
 
 from quart import Quart, abort, make_response, request, jsonify
-from flask_httpauth import HTTPBasicAuth
 from psycopg2 import OperationalError
 import redis
 import sentry_sdk
@@ -31,14 +28,6 @@ logger.info('Have api logger')
 
 app = Quart(__name__)
 app.config.from_object(config.get_config())
-
-auth = HTTPBasicAuth()
-
-@auth.get_password
-def get_pw(username):
-    if username == app.config['INVALIDATE_USERNAME']:
-        return app.config['INVALIDATE_PASSWORD']
-    return None
 
 if app.config['SENTRY_DSN']:
     if app.config['SENTRY_REDIS_HOST'] is not None:
@@ -252,8 +241,12 @@ async def get_artist_info(mbid):
     link_overview_task = asyncio.create_task(get_artist_links_and_overview(mbid))
     if artist_art_providers:
         images_task = asyncio.create_task(artist_art_providers[0].get_artist_images(mbid))
-
-    # The actual artist is fast
+        
+    logger.debug("All artist tasks created")
+    
+    # Await the overwiew and let the rest finish in meantime
+    overview_data, overview_validity = await link_overview_task
+    
     artist = await artist_providers[0].get_artist_by_id(mbid)
     if not artist:
         return (jsonify(error='Artist not found'), 404), 0
@@ -267,8 +260,7 @@ async def get_artist_info(mbid):
         validity = min(validity, app.config['CACHE_TTL_BAD'])
     else:
         artist['Images'] = []
-    
-    overview_data, overview_validity = await link_overview_task
+
     artist.update(overview_data)
     validity = min(validity, overview_validity)
     
@@ -334,10 +326,10 @@ async def get_release_group_info(mbid):
         return (jsonify(error='No track provider available'), 500), 0
     
     # Do artist ids first since we want to get cracking on artist details
-    artist_ids = await asyncio.create_task(track_providers[0].get_release_group_artist_ids(mbid))
+    artist_ids = await track_providers[0].get_release_group_artist_ids(mbid)
     artists_task = asyncio.gather(*[get_artist_info(gid) for gid in artist_ids])
 
-    # Overviews are next slowest so set these going
+    # Overviews and art are next slowest so set these going
     links_overview_task = asyncio.create_task(get_release_group_links_and_overview(mbid))
     art_task_1 = asyncio.create_task(album_art_providers[0].get_album_images(mbid))
     art_task_2 = asyncio.create_task(album_art_providers[1].get_album_images(mbid))
@@ -346,6 +338,11 @@ async def get_release_group_info(mbid):
     release_group_task = asyncio.create_task(release_group_providers[0].get_release_group_by_id(mbid))
     releases_task = asyncio.create_task(release_providers[0].get_releases_by_rgid(mbid))
     tracks_task = asyncio.create_task(track_providers[0].get_release_group_tracks(mbid))
+    
+    logger.debug("All release group tasks created")
+
+    # Wait on this since it's slowest and the rest will get finished in the meantime
+    overview_data, overview_validity = await links_overview_task
 
     validity = app.config['CACHE_TTL_GOOD']
 
@@ -359,7 +356,6 @@ async def get_release_group_info(mbid):
     for release in release_group['Releases']:
         release['Tracks'] = [t for t in tracks if t['ReleaseId'] == release['Id']]
 
-    overview_data, overview_validity = await links_overview_task
     release_group.update(overview_data)
     validity = min(validity, overview_validity)
         
@@ -415,7 +411,8 @@ async def chart_route(name, type_, selection):
     if key not in charts.keys():
         return jsonify(error='Chart {}/{}/{} not found'.format(*key)), 404
     else:
-        return jsonify(charts[key](count, **chart_kwargs))
+        result = await charts[key](count, **chart_kwargs)
+        return jsonify(result)
 
 
 @app.route('/search/album')
