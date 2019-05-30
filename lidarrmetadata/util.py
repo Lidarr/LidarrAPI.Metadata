@@ -7,32 +7,18 @@ import time
 
 import functools
 import redis
+from aiocache import caches
+from aiocache.backends.redis import RedisCache
 
 from lidarrmetadata import config
 from lidarrmetadata import cache
 
+caches.set_config(config.get_config().CACHE_CONFIG)
+
 # Cache for application
-CACHE = cache.LidarrCache(config=config.get_config().REDIS_CACHE_CONFIG)
-FANART_CACHE = cache.LidarrCache(config=config.get_config().FANART_CACHE_CONFIG)
-WIKI_CACHE = cache.LidarrCache(config=config.get_config().WIKI_CACHE_CONFIG)
-
-def cache_or_call(func, *args, **kwargs):
-    """
-    Gets cache result or calls function with args and kwargs
-    :param func: Function to call
-    :param args: Args to call func with
-    :param kwargs: Kwargs to call func with
-    :return: Result of func(*args, **kwargs)
-    """
-    # This may not work well if args or kwargs contain objects, but we don't need to handle that at the moment
-    key = str((function_hash(func), repr(args), repr(kwargs)))
-    ret = CACHE.get(key)
-    if not ret:
-        ret = func(*args, **kwargs)
-        CACHE.set(key, ret)
-
-    return ret
-
+CACHE = caches.get('default')
+FANART_CACHE = caches.get('fanart')
+WIKI_CACHE = caches.get('wikipedia')
 
 def first_key_item(dictionary, key, default=None):
     """
@@ -48,15 +34,6 @@ def first_key_item(dictionary, key, default=None):
         return value[0]
 
     return value
-
-
-def function_hash(func):
-    """
-    Hashes function to determine uniqueness of function. Used for versioning functions in caches
-    :param func: Function to hash
-    :return: Hash representing function. Unique for bytecode of function
-    """
-    return hash(func.__code__)
 
 
 class SentryProcessor(object):

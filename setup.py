@@ -33,13 +33,11 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
         'aiohttp',
-        'billboard.py>=4.1.0',
-        'flask',
-        'quart',
-        'flask-caching',
-        'Flask-HTTPAuth',
-        'psycopg2-binary',
+        'aiocache',
+        'aioredis',
         'asyncpg',
+        'billboard.py>=4.1.0',
+        'quart',
         'pylast<=1.9.0',
         'pytelegraf',
         'pytz',
@@ -52,7 +50,7 @@ setup(
     ],
 
     extras_require={
-        'deploy': ['gunicorn[gevent]'],
+        'deploy': ['hypercorn[uvloop]'],
         'test': ['mockredispy', 'pytest', 'tox']
     },
 

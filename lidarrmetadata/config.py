@@ -279,9 +279,6 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
         '89ad4ac3-39f7-470e-963a-56509c546377',  # Various Artists
     ]
 
-    # Cache options
-    USE_CACHE = True
-    
     # TTL set in Cache-Control headers.  Use 0 to disable caching.
     # The GOOD value is used if we got info from all providers
     # The BAD value is used if some providers were unavailable but
@@ -289,32 +286,38 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # (e.g. we are missing overviews or images)
     CACHE_TTL_GOOD = 60 * 60 * 24 * 7
     CACHE_TTL_BAD = 60 * 30
+    DAYS = 60 * 60 * 24
     
-    REDIS_CACHE_CONFIG = {
-        'CACHE_TYPE': 'lidarrmetadata.cache.redis_gzip',
-        'CACHE_DEFAULT_TIMEOUT': CACHE_TTL_GOOD,
-        'CACHE_KEY_PREFIX': 'lm:',
-        'CACHE_REDIS_HOST': 'redis'
+    CACHE_TTL = {
+        'cloudflare': DAYS * 7,
+        'provider_error': 60 * 30,
+        'redis': DAYS * 7,
+        'fanart': DAYS * 30,
+        'wikipedia': DAYS * 7
     }
     
-    PERSISTENT_CACHE_CONFIG = {
-        'CACHE_TYPE': 'lidarrmetadata.cache.postgres',
-        'CACHE_DEFAULT_TIMEOUT': 60 * 60 * 24 * 7,
-        'CACHE_KEEP_EXPIRED': True,
-        'CACHE_HOST': 'db',
-        'CACHE_PORT': 5432,
-        'CACHE_USER': 'abc',
-        'CACHE_PASSWORD': 'abc',
-        'CACHE_DATABASE': 'lm_cache_db'
+    CACHE_CONFIG = {
+        'default': {
+            'cache': 'aiocache.RedisCache',
+            'endpoint': 'localhost',
+            'port': 6379,
+            'namespace': 'lm3.7',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.CompressionSerializer'
+            }
+        },
+        'fanart': {
+            'cache': 'lidarrmetadata.cache.PostgresCache',
+            'endpoint': 'localhost',
+            'db_table': 'fanart',
+        },
+        'wikipedia': {
+            'cache': 'lidarrmetadata.cache.PostgresCache',
+            'endpoint': 'localhost',
+            'db_table': 'wikipedia',
+        }
     }
     
-    FANART_CACHE_CONFIG = dict(PERSISTENT_CACHE_CONFIG)
-    FANART_CACHE_CONFIG['CACHE_TABLE'] = 'fanart'
-    FANART_CACHE_CONFIG['CACHE_DEFAULT_TIMEOUT'] = 60 * 60 * 24 * 30
-    
-    WIKI_CACHE_CONFIG = dict(PERSISTENT_CACHE_CONFIG)
-    WIKI_CACHE_CONFIG['CACHE_TABLE'] = 'wikipedia'
-
     # Debug mode
     DEBUG = False
 
@@ -389,11 +392,25 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
 
 class TestConfig(DefaultConfig):
-    REDIS_CACHE_CONFIG = {'CACHE_TYPE': 'null'}
-    FANART_CACHE_CONFIG = {'CACHE_TYPE': 'null'}
-    WIKI_CACHE_CONFIG = {'CACHE_TYPE': 'null'}
-    CACHE_TTL_GOOD = 0
-    CACHE_TTL_BAD = 0
+    CACHE_CONFIG = {
+        'default': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+        },
+        'fanart': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.ExpirySerializer'
+            }
+
+        },
+        'wikipedia': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.ExpirySerializer'
+            }
+        }
+    }
+
     ENABLE_STATS = False
     EXTERNAL_LIMIT_CLASS = 'NullRateLimiter'
     SENTRY_REDIS_HOST = None
