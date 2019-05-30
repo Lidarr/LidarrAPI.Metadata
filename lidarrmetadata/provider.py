@@ -369,7 +369,8 @@ class ProviderUnavailableException(Exception):
     """ Thown on error for providers we can cope without """
     pass
 
-class HttpProvider(Provider):
+class HttpProvider(Provider,
+                   AsyncInit):
     """
     Generic provider which makes external HTTP queries
     """
@@ -378,37 +379,43 @@ class HttpProvider(Provider):
         super(HttpProvider, self).__init__()
         
         self._name = name
-        self._limiter = _get_rate_limiter(key='wikipedia')
+        self._limiter = _get_rate_limiter(key=name)
         self._stats = stats.TelegrafStatsClient(CONFIG.STATS_HOST,
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
-        # self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
         
-        logger.debug('Initialised aiohttp provider')
+    async def _init(self):
+        # Doesn't require await but needs to happen after the event loop is created otherwise all http requests error
+        self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
         
     def _count_request(self, result_type):
         if self._stats:
-            self._stats.metric('external', {result_type: 1}, tags={'provider': 'wikipedia'})
+            self._stats.metric('external', {result_type: 1}, tags={'provider': self._name})
 
-    def _record_response_result(self, response):
+    def _record_response_result(self, response, elapsed):
         if self._stats:
             self._stats.metric('external',
                                {
-                                   'response_time': response.elapsed.microseconds / 1000,
-                                   'response_status_code': response.status_code
+                                   'response_time': elapsed,
+                                   'response_status_code': response.status
                                },
-                               tags={'provider': 'solr_search'})
+                               tags={'provider': self._name})
             
-    async def get_with_limit(self, url, raise_for_status=True):
+    async def get_with_limit(self, url, raise_on_http_error=True):
         try:
-            ## TODO make this persistent
-            async with aiohttp.ClientSession() as session:
+            with self._limiter.limited():
+                self._count_request('request')
                 start = timer()
-                resp = await session.request(method='GET', url=url, raise_for_status=raise_for_status)
-                end = timer()
-                elapsed = int((end - start) * 1000)
-                logger.info(f"Got response [{resp.status}] for URL: {url} in {elapsed}ms ")
-                json = await resp.json()
-                return json
+                async with self._session.get(url) as resp:
+                    end = timer()
+                    elapsed = int((end - start) * 1000)
+                    logger.info(f"Got response [{resp.status}] for URL: {url} in {elapsed}ms ")
+                    self._record_response_result(resp, elapsed)
+                    
+                    if raise_on_http_error:
+                        resp.raise_for_status()
+
+                    json = await resp.json()
+                    return json
         except ValueError as error:
             logger.error(f'Response from {self._name} not valid json: {error}')
             raise ProviderUnavailableException(f'{self._name} returned invalid json')
@@ -492,7 +499,7 @@ class FanArtTvProvider(HttpProvider,
         :return: fanart.tv response for mbid
         """
         url = self.build_url(mbid)
-        response = await self.get_with_limit(url, raise_for_status=False)
+        response = await self.get_with_limit(url, raise_on_http_error=False)
         if response.get('status', None):
             return {}
         else:
