@@ -1093,9 +1093,7 @@ class MusicbrainzDbProvider(Provider,
             data = await connection.fetch(sql, *cursor_args)
             end = timer()
             elapsed = int((end - start) * 1000)
-            logger.debug(f"Query complete in {elapsed}ms")
-            
-        # logger.debug(data)
+            # logger.debug(f"Query complete in {elapsed}ms")
             
         results = [dict(row.items()) for row in data]
 
