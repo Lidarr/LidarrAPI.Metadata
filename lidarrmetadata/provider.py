@@ -1245,7 +1245,7 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
         
         # Otherwise go via wikidata to try to get something in English or best other language
         data = await self.wikidata_get_entity_data_from_language_title(url_title, url_language)
-        return self.wikidata_get_summary_from_entity_data(data)
+        return await self.wikidata_get_summary_from_entity_data(data)
         
     async def wikipedia_get_summary_from_title(self, title, language):
         """
