@@ -204,6 +204,20 @@ class PostgresBackend:
         return True
     
     @conn
+    async def _expire(self, key, ttl, _conn=None):
+        if ttl != 0:
+            expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds = ttl)
+        else:
+            expiry = None
+        
+        await _conn.execute(
+            f"UPDATE {self._db_table} "
+            "SET expires = $2 "
+            "WHERE key = $1",
+            key, expiry
+        )
+    
+    @conn
     async def _clear(self, namespace=None, _conn=None):
         await _conn.execute(f"DELETE FROM {self._db_table};")
         return True

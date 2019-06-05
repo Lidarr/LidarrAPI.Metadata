@@ -399,23 +399,22 @@ class HttpProvider(Provider,
                                    'response_status_code': response.status
                                },
                                tags={'provider': self._name})
-            
-    async def get_with_limit(self, url, raise_on_http_error=True, **kwargs):
-        try:
-            with self._limiter.limited():
-                self._count_request('request')
-                start = timer()
-                async with self._session.get(url, **kwargs) as resp:
-                    end = timer()
-                    elapsed = int((end - start) * 1000)
-                    logger.debug(f"Got response [{resp.status}] for URL: {url} in {elapsed}ms ")
-                    self._record_response_result(resp, elapsed)
-                    
-                    if raise_on_http_error:
-                        resp.raise_for_status()
 
-                    json = await resp.json()
-                    return json
+    async def get(self, url, raise_on_http_error=True, **kwargs):
+        try:
+            self._count_request('request')
+            start = timer()
+            async with self._session.get(url, **kwargs) as resp:
+                end = timer()
+                elapsed = int((end - start) * 1000)
+                logger.debug(f"Got response [{resp.status}] for URL: {url} in {elapsed}ms ")
+                self._record_response_result(resp, elapsed)
+
+                if raise_on_http_error:
+                    resp.raise_for_status()
+
+                json = await resp.json()
+                return json
         except ValueError as error:
             logger.error(f'Response from {self._name} not valid json: {error}')
             raise ProviderUnavailableException(f'{self._name} returned invalid json')
@@ -429,14 +428,19 @@ class HttpProvider(Provider,
             logger.error(f'Timeout for {url}')
             self._count_request('timeout')
             raise ProviderUnavailableException(f'{self._name} timeout')
-        except limit.RateLimitedError:
-            logger.debug(f'{self._name} request rate limited')
-            self._count_request('ratelimit')
         except Exception as error:
             logger.error(f'Non-aiohttp exceptions occured: {getattr(error, "__dict__", {})}')
             logger.error(repr(error))
             # raise ProviderUnavailableException(f'{self._name} non-aiohttp exception')
             raise
+        
+    async def get_with_limit(self, url, raise_on_http_error=True, **kwargs):
+        try:
+            with self._limiter.limited():
+                return await self.get(url, raise_on_http_error, **kwargs)
+        except limit.RateLimitedError:
+            logger.debug(f'{self._name} request rate limited')
+            self._count_request('ratelimit')
 
 class FanArtTvProvider(HttpProvider, 
                        AlbumArtworkMixin, 
@@ -546,8 +550,8 @@ class FanArtTvProvider(HttpProvider,
         current_cache_invalidation = int(time.time())
         
         # Since we don't have a fanart personal key we can only see things with a lag
-        all_updates = self.get_fanart_updates(self._last_cache_invalidation - CONFIG.FANART_API_DELAY_SECONDS)
-        invisible_updates = self.get_fanart_updates(current_cache_invalidation - CONFIG.FANART_API_DELAY_SECONDS)
+        all_updates = await self.get_fanart_updates(self._last_cache_invalidation - CONFIG.FANART_API_DELAY_SECONDS)
+        invisible_updates = await self.get_fanart_updates(current_cache_invalidation - CONFIG.FANART_API_DELAY_SECONDS)
         
         # Remove the updates we can't see
         artist_ids = self.diff_fanart_updates(all_updates, invisible_updates)
@@ -562,35 +566,19 @@ class FanArtTvProvider(HttpProvider,
         result['artists'] = artist_ids
         return result
     
-    def get_fanart_updates(self, time):
+    async def get_fanart_updates(self, time):
         url = self.build_url('latest') + '&date={}'.format(int(time))
         logger.debug(url)
         
         try:
-            response = requests.get(url, timeout=CONFIG.EXTERNAL_TIMEOUT / 1000 * 5)
-            try:
-                if len(response.content):
-                    return response.json()
-                else:
-                    return []
-            except Exception as e:
-                logger.error('Error decoding {}'.format(response))
-                return []
-        except ConnectionError as error:
-            logger.error('ConnectionError: {e}'.format(e=error))
-            return []
-        except HTTPError as error:
-            logger.error('HTTPError: {e}'.format(e=error))
-            return []
-        except requests.exceptions.Timeout as error:
-            logger.error('Timeout: {e}'.format(e=error))
-            return []
-        except requests.exceptions.ConnectionError as error:
-            logger.error('ConnectionError: {e}'.format(e=error))
-            return []
+            return await self.get(url, timeout=aiohttp.ClientTimeout(total=5))
 
+        except Exception as error:
+            logger.error(f'Error getting fanart updates: {error}')
+            return []
         
-    def diff_fanart_updates(self, long, short):
+    @staticmethod
+    def diff_fanart_updates(long, short):
         """
         Unpicks the fanart api lag so we can see which have been updated
         """
@@ -856,7 +844,7 @@ class MusicbrainzDbProvider(Provider,
 
         result = {'artists': [], 'albums': []}
         
-        vintage = self.data_vintage()
+        vintage = await self.data_vintage()
         if vintage > self._last_cache_invalidation:
             logger.debug('Invalidating musicbrainz cache')
 
