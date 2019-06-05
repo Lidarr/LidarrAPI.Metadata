@@ -190,7 +190,7 @@ class PostgresBackend:
     @conn
     async def _delete(self, key, _conn=None):
         await _conn.execute(
-            f"DELETE FROM {self._db_table} WHERE key = %s;",
+            f"DELETE FROM {self._db_table} WHERE key = $1;",
             key
         )
         return True
