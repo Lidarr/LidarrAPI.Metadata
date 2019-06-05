@@ -153,23 +153,18 @@ class PostgresBackend:
     async def _set(self, key, value, ttl=None, _cas_token=None, _conn=None):
         if ttl is not None:
             expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds = ttl)
-            await _conn.execute(
-                f"INSERT INTO {self._db_table} (key, expires, value) "
-                "VALUES ($1, $2, $3) "
-                "ON CONFLICT(key) DO UPDATE "
-                "SET expires = EXCLUDED.expires, "
-                "value = EXCLUDED.value;",
-                key, expiry, value
-            )
         else:
-            await _conn.execute(
-                f"INSERT INTO {self._db_table} (key, expires, value) "
-                "VALUES ($1, NULL, $2) "
-                "ON CONFLICT(key) DO UPDATE "
-                "SET expires = EXCLUDED.expires, "
-                "value = EXCLUDED.value;",
-                key, value
-            )
+            expiry = None
+            
+        await _conn.execute(
+            f"INSERT INTO {self._db_table} (key, expires, value) "
+            "VALUES ($1, $2, $3) "
+            "ON CONFLICT(key) DO UPDATE "
+            "SET expires = EXCLUDED.expires, "
+            "value = EXCLUDED.value;",
+            key, expiry, value
+        )
+
         return True
     
     @conn
@@ -182,9 +177,22 @@ class PostgresBackend:
         records = [(key, expiry, value) for key, value in pairs]
         logger.debug(records[1:10])
         
-        result = await _conn.copy_records_to_table(self._db_table, records=records)
-        logger.debug(result)
-        
+        async with _conn.transaction():
+            await _conn.execute(
+                f"CREATE TEMP TABLE tmp_table ON COMMIT DROP AS SELECT * FROM {self._db_table} WITH NO DATA;"
+            );
+            
+            result = await _conn.copy_records_to_table("tmp_table", records=records)
+            logger.debug(result)
+            
+            await _conn.execute(
+                f"INSERT INTO {self._db_table} (key, expires, value) "
+                "SELECT key, expires, value FROM tmp_table "
+                "ON CONFLICT(key) DO UPDATE "
+                "SET expires = EXCLUDED.expires, "
+                "value = EXCLUDED.value;",
+            )
+            
         return True
 
     @conn
