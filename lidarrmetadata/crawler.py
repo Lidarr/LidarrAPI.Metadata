@@ -132,8 +132,9 @@ async def update_albums(count = 100, max_ttl = 60 * 60):
             results = await get_release_group_info_multi(keys)
             
             missing_albums = set(keys) - set(rg['id'] for rg, _ in results)
-            logger.debug(f"Removing deleted albums:\n{"\n".join(missing_albums)}")
-            await asyncio.gather(*(util.ALBUM_CACHE.delete(id) for id in missing_albums))
+            if missing_albums:
+                logger.debug(f"Removing deleted albums:\n{missing_albums}")
+                await asyncio.gather(*(util.ALBUM_CACHE.delete(id) for id in missing_albums))
             
             await asyncio.gather(*(util.ALBUM_CACHE.set(result['id'], result, ttl=(expiry - provider.utcnow()).total_seconds()) for result, expiry in results))
             
