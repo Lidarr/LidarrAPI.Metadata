@@ -333,7 +333,12 @@ class ReleaseGroupNotFoundException(Exception):
 
 @double_cache(util.ALBUM_CACHE)
 async def get_release_group_info_basic(mbid):
-    return (await get_release_group_info_multi([mbid]))[0]
+    
+    release_groups = await get_release_group_info_multi([mbid])
+    if not release_groups:
+        raise ReleaseGroupNotFoundException(mbids)
+    
+    return release_groups[0]
 
 async def get_release_group_info_multi(mbids):
     
@@ -350,9 +355,6 @@ async def get_release_group_info_multi(mbids):
     # Do the main DB query
     release_groups = await release_group_providers[0].get_release_groups_by_id(mbids)
     release_groups = [{'data': rg, 'expiry': expiry} for rg in release_groups]
-    
-    if not release_groups:
-        raise ReleaseGroupNotFoundException(mbids)
     
     # Start overviews
     overviews_task = asyncio.gather(*[get_overview(rg['data']['links']) for rg in release_groups])
