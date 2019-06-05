@@ -142,10 +142,10 @@ class ReleaseGroupByIdMixin(MixinBase):
     """
 
     @abc.abstractmethod
-    def get_release_group_by_id(self, rgid):
+    def get_release_groups_by_id(self, rgids):
         """
         Gets release group by ID
-        :param rgid: Release group ID
+        :param rgid: List of release group IDs
         :return: Release Group corresponding to rgid
         """
         pass
@@ -171,30 +171,6 @@ class ReleasesByReleaseGroupIdMixin(MixinBase):
         Gets releases by release group ID
         :param rgid: Release group ID
         :return: Releases corresponding to rgid or rid
-        """
-        pass
-
-
-class TracksByReleaseGroupMixin(MixinBase):
-    """
-    Gets tracks by release group
-    """
-
-    @abc.abstractmethod
-    def get_release_group_tracks(self, rgid):
-        """
-        Gets tracks in album
-        :rgid album_id: ID of release group
-        :return: List of tracks in all releases of a release group
-        """
-        pass
-
-    @abc.abstractmethod
-    def get_release_group_artist_ids(self, rgid):
-        """
-        Gets all the artists associated with a release group ID
-        :param rgid: Release group ID
-        :return: All artists credited as lead credit on tracks on releases
         """
         pass
 
@@ -812,16 +788,12 @@ class MusicbrainzDbProvider(Provider,
                             AsyncInit,
                             DataVintageMixin,
                             InvalidateCacheMixin,
-                            AlbumArtworkMixin,
                             ArtistIdListMixin,
                             ArtistByIdMixin,
                             ArtistLinkMixin,
                             ReleaseGroupByArtistMixin,
                             ReleaseGroupByIdMixin,
-                            ReleaseGroupIdListMixin,
-                            ReleasesByReleaseGroupIdMixin,
-                            ReleaseGroupLinkMixin,
-                            TracksByReleaseGroupMixin):
+                            ReleaseGroupIdListMixin):
     """
     Provider for directly querying musicbrainz database
     """
@@ -901,11 +873,11 @@ class MusicbrainzDbProvider(Provider,
         return result
     
     async def _invalidate_queries_by_entity_id(self, changed_query):
-        entities = await self.query_from_file(changed_query, {'date': self._last_cache_invalidation})
+        entities = await self.query_from_file(changed_query, self._last_cache_invalidation)
         return [entity['gid'] for entity in entities]
         
     async def get_artist_by_id(self, artist_id):
-        results = await self.query_from_file('artist_search_mbid.sql', [artist_id])
+        results = await self.query_from_file('artist_search_mbid.sql', artist_id)
         
         logger.debug("got artist")
         
@@ -927,108 +899,54 @@ class MusicbrainzDbProvider(Provider,
         results = await self.query_from_file('all_artist_ids.sql')
         return [item['gid'] for item in results]
 
-    async def get_album_images(self, album_id):
-        filename = '../sql/caa_by_mbid.sql'
-        results = await self.query_from_file(filename, [album_id])
-        
-        logger.debug("got album images")
-
-        type_mapping = {'Front': 'Cover', 'Medium': 'Disc'}
-
-        art = {}
-        for result in results:
-            cover_type = type_mapping.get(result['type'], None)
-            if cover_type is not None and cover_type not in art:
-                art[cover_type] = self._build_caa_url(result['release_gid'], result['image_id'])
-        return [{'CoverType': art_type, 'Url': url} for art_type, url in art.items()]
-
     @staticmethod
     def _build_caa_url(release_id, image_id):
         return 'https://coverartarchive.org/release/{}/{}.jpg'.format(release_id, image_id)
 
-    async def get_release_group_by_id(self, rgid):
-        release_groups = await self.query_from_file('release_group_by_id.sql', [rgid])
+    @staticmethod
+    def _load_release_group(data):
+        # Load the json from postgres
+        release_group = json.loads(data)
         
-        logger.debug("got release group")
+        # parse the links
+        release_group['links'] = [{
+            'target': link,
+            'type': self.parse_url_source(link)
+        } for link in release_group['links']]
         
-        if release_groups:
-            release_group = release_groups[0]
-        else:
-            return {}
+        # parse caa images
+        if release_group['images']:
+            type_mapping = {'Front': 'Cover', 'Medium': 'Disc'}
 
-        return {
-            'Id': release_group['gid'],
-            'Disambiguation': release_group['comment'],
-            'Title': release_group['name'],
-            'Type': release_group['primary_type'],
-            'SecondaryTypes': release_group['secondary_types'],
-            'ReleaseDate': datetime.datetime(release_group['year'] or 1,
-                                             release_group['month'] or 1,
-                                             release_group['day'] or 1),
-            'ArtistId': release_group['artist_id'],
-            'Rating': {'Count': release_group['rating_count'] or 0,
-                       'Value': release_group['rating'] / 10 if release_group['rating'] is not None else None}
-        }
+            art = {}
+            for result in release_group['images']:
+                cover_type = type_mapping.get(result['type'], None)
+                if cover_type is not None and cover_type not in art:
+                    art[cover_type] = self._build_caa_url(result['release_gid'], result['image_id'])
+            release_group['images'] = [{'CoverType': art_type, 'Url': url} for art_type, url in art.items()]
+        else:
+            release_group['images'] = []
+            
+        return release_group
+
+    async def get_release_groups_by_id(self, rgids):
+        release_groups = await self.query_from_file('release_group_by_id.sql', rgids)
+        
+        logger.debug("got release groups")
+        
+        if not release_groups:
+            return [{}]
+        
+        release_groups = [self.load_release_group(item['album']) for item in release_groups]
+
+        return release_groups
     
     async def get_all_release_group_ids(self):
         results = await self.query_from_file('all_release_group_ids.sql')
         return [item['gid'] for item in results]
 
-    def get_earliest_good_date(self, date_json):
-        if not date_json:
-            return None
-        
-        date_json = [json.loads(dt) for dt in date_json]
-        defined = [datetime.datetime(dt['year'], dt['month'], dt['day']) for dt in date_json if dt['year'] and dt['month'] and dt['day']]
-        if defined:
-            return min(defined)
-
-        return min([datetime.datetime(dt['year'] or 1, dt['month'] or 1, dt['day'] or 1) for dt in date_json])
-
-    async def get_releases_by_rgid(self, rgid):
-
-        releases = await self.query_from_file('release_by_release_group_id.sql', [rgid])
-        
-        logger.debug("got releases")
-                
-        if not releases:
-            return []
-
-        return [{'Id': release['gid'],
-                 'Title': release['name'],
-                 'Disambiguation': release['comment'],
-                 'Status': release['status'],
-                 'Label': release['label'],
-                 'Country': release['country'],
-                 'ReleaseDate': self.get_earliest_good_date(release['release_dates']),
-                 'Media': release['media'],
-                 'TrackCount': release['track_count']}
-                for release in releases]
-
-    async def get_release_group_artist_ids(self, rgid):
-        result = await self.query_from_file('artist_by_release_group.sql', [rgid])
-        logger.debug("got track artist ids")
-        return [x['gid'] for x in result]
-
-    async def get_release_group_tracks(self, rgid):
-        results = await self.query_from_file('track_release_group.sql', [rgid])
-        
-        logger.debug("got rg tracks")
-
-        return [{'Id': result['gid'],
-                 'RecordingId': result['recording_id'],
-                 'ReleaseId': result['release_id'],
-                 'ArtistId': result['artist_id'],
-                 'TrackName': result['name'],
-                 'DurationMs': result['length'],
-                 'MediumNumber': result['medium_position'],
-                 'TrackNumber': result['number'],
-                 'TrackPosition': result['position']}
-                for result in results]
-
     async def get_release_groups_by_artist(self, artist_id):
-        results = await self.query_from_file('release_group_search_artist_mbid.sql',
-                                       [artist_id])
+        results = await self.query_from_file('release_group_search_artist_mbid.sql', artist_id)
         
         logger.debug("got artist release groups")
 
@@ -1041,22 +959,13 @@ class MusicbrainzDbProvider(Provider,
     
 
     async def get_artist_links(self, artist_id):
-        results = await self.query_from_file('links_artist_mbid.sql',
-                                       [artist_id])
+        results = await self.query_from_file('links_artist_mbid.sql', artist_id)
         logger.debug("got artist links")
         return [{'target': result['url'],
                  'type': self.parse_url_source(result['url'])}
                 for result in results]
 
-    async def get_release_group_links(self, release_group_id):
-        results = await self.query_from_file('links_release_group_mbid.sql',
-                                       [release_group_id])
-        logger.debug("got release group links")
-        return [{'target': result['url'],
-                 'type': self.parse_url_source(result['url'])}
-                for result in results]
-
-    async def query_from_file(self, sql_file, *args, **kwargs):
+    async def query_from_file(self, sql_file, *args):
         """
         Executes query from sql file
         :param sql_file: Filename of sql file
@@ -1067,9 +976,9 @@ class MusicbrainzDbProvider(Provider,
         filename = pkg_resources.resource_filename('lidarrmetadata.sql', sql_file)
 
         with open(filename, 'r') as sql:
-            return await self.map_query(sql.read(), *args, **kwargs)
+            return await self.map_query(sql.read(), *args)
 
-    async def map_query(self, sql, *args, **kwargs):
+    async def map_query(self, sql, *args):
         """
         Maps a SQL query to a list of dicts of column name: value
         :param args: Args to pass to cursor.execute
@@ -1077,13 +986,9 @@ class MusicbrainzDbProvider(Provider,
         :return: List of dict with column: value
         """
         
-        # logger.debug(f"running query:\n{sql}")
-        cursor_args = args[0] if args else kwargs
-        # logger.debug(f"args:\n:{cursor_args}")
-        
         async with self._pool.acquire() as connection:
             start = timer()
-            data = await connection.fetch(sql, *cursor_args)
+            data = await connection.fetch(sql, *args)
             end = timer()
             elapsed = int((end - start) * 1000)
             # logger.debug(f"Query complete in {elapsed}ms")

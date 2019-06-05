@@ -12,7 +12,7 @@ from lidarrmetadata.config import get_config
 from lidarrmetadata import provider
 from lidarrmetadata import util
 from lidarrmetadata import limit
-from lidarrmetadata.api import get_artist_info, ArtistNotFoundException, get_release_group_info_basic, ReleaseGroupNotFoundException
+from lidarrmetadata.api import get_artist_info, ArtistNotFoundException, get_release_group_info_multi, ReleaseGroupNotFoundException
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -36,7 +36,7 @@ async def update_wikipedia(count = 50, max_ttl = 60 * 60):
 
             start = timer()
             await asyncio.gather(*(wikipedia_provider.get_artist_overview(url, ignore_cache=True) for url in keys))
-            logger.debug(f"Refreshed {len(keys)} wikipedia overviews in {timer() - start}s")
+            logger.debug(f"Refreshed {len(keys)} wikipedia overviews in {timer() - start:.1f}s")
 
             # If there weren't any to update sleep, otherwise continue
             if not keys:
@@ -63,7 +63,7 @@ async def update_fanart(count = 500, max_ttl = 60 * 60):
 
             start = timer()
             await asyncio.gather(*(fanart_provider.refresh_images(mbid) for mbid in keys))
-            logger.debug(f"Refreshed {len(keys)} fanart keys in {timer() - start}s")
+            logger.debug(f"Refreshed {len(keys)} fanart keys in {timer() - start:.1f}s")
 
             # If there weren't any to update sleep, otherwise continue
             if not keys:
@@ -116,7 +116,7 @@ async def update_artists(count = 100, max_ttl = 60 * 60):
 
         start = timer()
         await asyncio.gather(*(update_item(get_artist_info, mbid) for mbid in keys))
-        logger.debug(f"Refreshed {len(keys)} artists in {timer() - start}s")
+        logger.debug(f"Refreshed {len(keys)} artists in {timer() - start:.1f}s")
         
         # If there weren't any to update sleep, otherwise continue
         if not keys:
@@ -127,12 +127,16 @@ async def update_albums(count = 100, max_ttl = 60 * 60):
         keys = await util.ALBUM_CACHE.get_stale(count, provider.utcnow() + timedelta(seconds = max_ttl))
         logger.debug(f"Got {len(keys)} stale albums to refresh")
 
-        start = timer()
-        await asyncio.gather(*(update_item(get_release_group_info_basic, mbid) for mbid in keys))
-        logger.debug(f"Refreshed {len(keys)} albums in {timer() - start}s")
+        if keys:
+            start = timer()
+            results = await get_release_group_info_multi(keys)
+            
+            await asyncio.gather(*(util.ALBUM_CACHE.set(result['id'], result, ttl=(expiry - provider.utcnow()).total_seconds()) for result, expiry in results))
+            
+            logger.debug(f"Refreshed {len(keys)} albums in {timer() - start:.1f}s")
 
-        # If there weren't any to update sleep, otherwise continue
-        if not keys:
+        else:
+            # If there weren't any to update sleep, otherwise continue
             await asyncio.sleep(60)
             
 async def init():
@@ -152,7 +156,7 @@ async def crawl():
 async def initialize():
     await init()
     await asyncio.gather(
-        initialize_artists(),
+        # initialize_artists(),
         initialize_albums()
     )
     
