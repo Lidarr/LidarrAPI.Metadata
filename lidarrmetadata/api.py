@@ -232,7 +232,7 @@ def double_cache(postgres_cache):
 
             # Slower postgres cache
             cached, expiry = await postgres_cache.get(mbid)
-            if cached:
+            if cached and expiry > now:
                 # Set redis cache
                 await util.CACHE.set(cache_key, (cached, expiry), ttl=(expiry - now).total_seconds())
                 return cached, expiry
