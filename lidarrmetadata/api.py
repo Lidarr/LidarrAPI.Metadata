@@ -598,6 +598,7 @@ async def search_route():
     
 #     return jsonify(sorted(ids))
 
+@app.route('/invalidate')
 async def invalidate_cache():
     
     ## this is used as a prefix in various places to make sure
@@ -618,34 +619,29 @@ async def invalidate_cache():
         ## that we need to invalidate the final responses for
         artists = set()
         albums = set()
-        invalidated = []
 
+        ## Get all the artists/albums that need updating
         cache_users = provider.get_providers_implementing(provider.InvalidateCacheMixin)
         for cache_user in cache_users:
-            result = cache_user.invalidate_cache(base_url)
+            result = await cache_user.invalidate_cache(base_url)
 
             artists = artists.union(result['artists'])
             albums = albums.union(result['albums'])
 
-        for artist in artists:
-            util.CACHE.delete(f"get_artist_info:{artist}")
-            util.ARTIST_CACHE.expire(artist, ttl=-1)
+        ## Invalidate all the local caches
+        await asyncio.gather(
+            *(util.CACHE.delete(f"get_artist_info:{artist}") for artist in artists),
+            *(util.CACHE.delete(f"get_release_group_info_basic:{album}") for album in albums),
+            *(util.ARTIST_CACHE.expire(artist, ttl=-1) for artist in artists),
+            *(util.ALBUM_CACHE.expire(album, ttl=-1) for album in albums)
+        )
 
-            key = '{url}/artist/{artist}'.format(url=base_url, artist=artist)
-            invalidated.append(key)
-
-        for album in albums:
-            util.CACHE.delete(f"get_release_group_info_basic:{album}")
-            util.ALBUM_CACHE.expire(album, ttl=-1)
-
-            key = '{url}/album/{album}'.format(url=base_url, album=album)
-            invalidated.append(key)
-
+        ## Invalidate cloudflare cache
+        invalidated = [f'{base_url}/artist/{artist}' for artist in artists] + [f'{base_url}/album/{album}' for album in albums]
         await invalidate_cloudflare(invalidated)
-        
     
     finally:
-        util.CACHE.delete(invalidation_in_progress_key)
+        await util.CACHE.delete(invalidation_in_progress_key)
         # make sure any exceptions are not swallowed
         pass
         
@@ -666,7 +662,7 @@ async def invalidate_cloudflare(files):
     
     async with aiohttp.ClientSession() as session:
         # cloudflare only accepts 500 files at a time
-        for i in xrange(0, len(files), 500):
+        for i in range(0, len(files), 500):
             data = {'files': files[i:i+500]}
             retries = 2
             
