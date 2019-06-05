@@ -1,12 +1,22 @@
+-- artist itself updated
 SELECT artist.gid
-FROM artist
-WHERE artist.last_updated > $1
+  FROM artist
+ WHERE artist.last_updated > $1
 
-UNION
+       UNION
 
+  -- artist release group updated (basic rg info gets returned as part of artist query)
 SELECT DISTINCT artist.gid
-FROM artist
-JOIN artist_credit_name ON artist_credit_name.artist = artist.id
-JOIN release_group ON release_group.artist_credit = artist_credit_name.artist_credit
-WHERE artist_credit_name.position = 0
-AND release_group.last_updated > $1
+  FROM artist
+         JOIN artist_credit_name ON artist_credit_name.artist = artist.id
+         JOIN release_group ON release_group.artist_credit = artist_credit_name.artist_credit
+ WHERE artist_credit_name.position = 0
+   AND release_group.last_updated > $1
+
+
+       UNION
+       
+  -- these have been merged into other artists (the other leg will show up artist updated)
+SELECT gid
+  FROM artist_gid_redirect
+ WHERE created > $1
