@@ -345,7 +345,7 @@ async def get_release_group_info_multi(mbids):
     start = timer()
     
     release_group_providers = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)
-    album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)[::-1]
+    album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)
     
     if not release_group_providers:
         raise MissingProviderException('No album provider available')
@@ -354,6 +354,10 @@ async def get_release_group_info_multi(mbids):
 
     # Do the main DB query
     release_groups = await release_group_providers[0].get_release_groups_by_id(mbids)
+    if not release_groups:
+        return release_groups
+
+    # Add in default expiry
     release_groups = [{'data': rg, 'expiry': expiry} for rg in release_groups]
     
     # Start overviews
@@ -365,16 +369,17 @@ async def get_release_group_info_multi(mbids):
         results = await asyncio.gather(*[album_art_providers[0].get_album_images(x['data']['id']) for x in release_groups_without_images])
         
         for i, rg in enumerate(release_groups_without_images):
-            rg['data']['images'] = results[i][0]
-            rg['expiry'] = min(rg['expiry'], results[i][1])
+            images, expiry = results[i]
+            rg['data']['images'] = images
+            rg['expiry'] = min(rg['expiry'], expiry)
     else:
         for rg in release_groups_without_images:
             rg['images'] = []
 
     # Get overview results
     results = await overviews_task
-    for rg in release_groups:
-        overview, expiry = results[0]
+    for i, rg in enumerate(release_groups):
+        overview, expiry = results[i]
         rg['data']['overview'] = overview
         rg['expiry'] = min(rg['expiry'], expiry)
     
