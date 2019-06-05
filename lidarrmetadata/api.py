@@ -171,18 +171,18 @@ async def get_artist_info_route(mbid):
     primary_types = request.args.get('primTypes', None)
     if primary_types:
         primary_types = primary_types.split('|')
-        albums = filter(lambda release_group: release_group.get('Type') in primary_types, albums)
+        albums = list(filter(lambda release_group: release_group.get('Type') in primary_types, albums))
     secondary_types = request.args.get('secTypes', None)
     if secondary_types:
         secondary_types = set(secondary_types.split('|'))
-        albums = filter(lambda release_group: (release_group['SecondaryTypes'] == [] and 'Studio' in secondary_types)
-                        or secondary_types.intersection(release_group.get('SecondaryTypes')),
-                        albums)
+        albums = list(filter(lambda release_group: (release_group['SecondaryTypes'] == [] and 'Studio' in secondary_types)
+                             or secondary_types.intersection(release_group.get('SecondaryTypes')),
+                             albums))
     release_statuses = request.args.get('releaseStatuses', None)
     if release_statuses:
         release_statuses = set(release_statuses.split('|'))
-        albums = filter(lambda album: release_statuses.intersection(album.get('ReleaseStatuses')),
-                        albums)
+        albums = list(filter(lambda album: release_statuses.intersection(album.get('ReleaseStatuses')),
+                             albums))
 
     artist['Albums'] = albums
 
@@ -274,8 +274,6 @@ async def get_artist_info(mbid):
     if artist_art_providers:
         images_task = asyncio.create_task(artist_art_providers[0].get_artist_images(mbid))
         
-    logger.debug("All artist tasks created")
-    
     # Await the overwiew and let the rest finish in meantime
     overview_data, overview_expiry = await link_overview_task
     
@@ -317,22 +315,12 @@ async def get_release_group_info_route(mbid):
 
     return output
 
-async def get_release_group_links_and_overview(mbid):
-    link_providers = provider.get_providers_implementing(provider.ReleaseGroupLinkMixin)    
-    links = await link_providers[0].get_release_group_links(mbid)
-
-    overview, expiry = await get_overview(links)
-    
-    return {'Links': links, 'Overview': overview}, expiry
-
-async def get_release_group_artists(mbid):
+async def get_release_group_artists(release_group):
     
     start = timer()
     
-    track_providers = provider.get_providers_implementing(provider.TracksByReleaseGroupMixin)
-    # Do artist ids first since we want to get cracking on artist details
-    artist_ids = await track_providers[0].get_release_group_artist_ids(mbid)
-    results = await asyncio.gather(*[get_artist_info(gid) for gid in artist_ids])
+    results = await asyncio.gather(*[get_artist_info(gid) for gid in release_group['artistids']])
+                                   
     artists = [result[0] for result in results]
     expiry = min([result[1] for result in results])
     
@@ -345,76 +333,64 @@ class ReleaseGroupNotFoundException(Exception):
 
 @double_cache(util.ALBUM_CACHE)
 async def get_release_group_info_basic(mbid):
+    return (await get_release_group_info_multi([mbid]))[0]
+
+async def get_release_group_info_multi(mbids):
     
     start = timer()
     
     release_group_providers = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)
-    release_providers = provider.get_providers_implementing(provider.ReleasesByReleaseGroupIdMixin)
     album_art_providers = provider.get_providers_implementing(provider.AlbumArtworkMixin)[::-1]
-    track_providers = provider.get_providers_implementing(provider.TracksByReleaseGroupMixin)
     
     if not release_group_providers:
         raise MissingProviderException('No album provider available')
 
-    if not release_providers:
-        raise MissingProviderException('No release provider available')
-    
-    if not track_providers:
-        raise MissingProviderException('No track provider available')
-
     expiry = provider.utcnow() + timedelta(seconds = app.config['CACHE_TTL']['cloudflare'])
 
-    # Overviews and art are next slowest so set these going
-    links_overview_task = asyncio.create_task(get_release_group_links_and_overview(mbid))
-    art_task_1 = asyncio.create_task(album_art_providers[0].get_album_images(mbid))
-    art_task_2 = asyncio.create_task(album_art_providers[1].get_album_images(mbid))
+    # Do the main DB query
+    release_groups = await release_group_providers[0].get_release_groups_by_id(mbids)
+    release_groups = [{'data': rg, 'expiry': expiry} for rg in release_groups]
     
-    # These just query database and are fast
-    release_group_task = asyncio.create_task(release_group_providers[0].get_release_group_by_id(mbid))
-    releases_task = asyncio.create_task(release_providers[0].get_releases_by_rgid(mbid))
-    tracks_task = asyncio.create_task(track_providers[0].get_release_group_tracks(mbid))
+    # if not release_group:
+    #     raise ReleaseGroupNotFoundException(mbid)
     
-    # Wait on this since it's slowest and the rest will get finished in the meantime
-    overview_data, overview_expiry = await links_overview_task
-
-    release_group = await release_group_task
-    if not release_group:
-        raise ReleaseGroupNotFoundException(mbid)
-
-    release_group.update(overview_data)
+    # Start overviews
+    overviews_task = asyncio.gather(*[get_overview(rg['data']['links']) for rg in release_groups])
     
-    release_group['Releases'] = await releases_task
-
-    tracks = await tracks_task
-    for release in release_group['Releases']:
-        release['Tracks'] = [t for t in tracks if t['ReleaseId'] == release['Id']]
-
+    # Do missing images
     if album_art_providers:
-        images1 = await art_task_1
-        if images1:
-            release_group['Images'] = images1
-            images_expiry = expiry
-            art_task_2.cancel()
-        else:
-            release_group['Images'], images_expiry = await art_task_2
-    else:
-        release_group['Images'] = []
+        release_groups_without_images = [x for x in release_groups if not x['data']['images']]
+        results = await asyncio.gather(*[album_art_providers[0].get_album_images(x['data']['id']) for x in release_groups_without_images])
         
-    expiry = min(expiry, overview_expiry, images_expiry)
-    
-    logger.debug(f"Got basic album info in {(timer() - start) * 1000:.0f}ms ")
+        for i, rg in enumerate(release_groups_without_images):
+            # logger.debug(type(rg['data']))
+            # logger.debug(type(results))
+            # logger.debug(type(results[i]))
+            rg['data']['images'] = results[i][0]
+            rg['expiry'] = min(rg['expiry'], results[i][1])
+    else:
+        for rg in release_groups_without_images:
+            rg['images'] = []
 
-    return release_group, expiry
+    # Get overview results
+    results = await overviews_task
+    for rg in release_groups:
+        overview, expiry = results[0]
+        rg['data']['overview'] = overview
+        rg['expiry'] = min(rg['expiry'], expiry)
+    
+    logger.debug(f"Got basic album info for {len(mbids)} albums in {(timer() - start) * 1000:.0f}ms ")
+
+    return [(item['data'], item['expiry']) for item in release_groups]
 
 async def get_release_group_info(mbid):
 
-    artists_task = asyncio.create_task(get_release_group_artists(mbid))
-    release_group_task = asyncio.create_task(get_release_group_info_basic(mbid))
-
-    artists, artist_expiry = await artists_task
-    release_group, rg_expiry = await release_group_task
+    release_group, rg_expiry = await get_release_group_info_basic(mbid)
+    artists, artist_expiry = await get_release_group_artists(release_group)
     
-    release_group['Artists'] = artists
+    release_group['artists'] = artists
+    del release_group['artistids']
+    
     return release_group, min(rg_expiry, artist_expiry)
 
 @app.route('/chart/<name>/<type_>/<selection>')
@@ -499,7 +475,7 @@ async def search_album():
             # Current versions of lidarr will fail trying to parse the tracks contained in releases
             # because it's not expecting it to be present and passes null for ArtistMetadata dict
             for album in albums:
-                album['Releases'] = []
+                album['releases'] = []
             
             validity = min([result[1] for result in results] or [0])
         
