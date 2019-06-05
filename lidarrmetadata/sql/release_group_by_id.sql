@@ -48,7 +48,7 @@ select
       ) as ArtistIds,	
       json_build_object(
         'Count', COALESCE(release_group_meta.rating_count, 0),
-        'Value', release_group_meta.rating / 10
+        'Value', release_group_meta.rating::decimal / 10
       ) as Rating,
       array(
         SELECT url.url
