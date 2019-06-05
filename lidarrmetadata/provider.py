@@ -1130,7 +1130,7 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
     Provider for querying wikipedia
     """
 
-    WIKIPEDIA_REGEX = re.compile(r'https?://(?P<language>\w+)\.wikipedia\.org/wiki/(?P<title>.+)')
+    WIKIPEDIA_REGEX = re.compile(r'https?://(?:(?P<language>\w+)\.)?wikipedia\.org/wiki/(?P<title>.+)')
     WIKIDATA_REGEX = re.compile(r'https?://www.wikidata.org/(wiki|entity)/(?P<entity>.+)')
 
     def __init__(self, session=None, limiter=None):
@@ -1166,8 +1166,8 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
         except ProviderUnavailableException:
             return (cached or '', utcnow() + timedelta(seconds = CONFIG.CACHE_TTL['provider_error']))
 
-        except ValueError:
-            logger.error('Could not get summary from {}'.format(url))
+        except ValueError as error:
+            logger.error(f'Could not get summary from {url}: {str(error)}')
             return '', utcnow() + timedelta(seconds = CONFIG.CACHE_TTL['provider_error'])
             
     async def wikidata_get_summary_from_url(self, url):
@@ -1269,11 +1269,11 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
         match = cls.WIKIPEDIA_REGEX.match(url)
 
         if not match:
-            raise ValueError(u'URL {} does not match regex `{}`'.format(url, cls.WIKIPEDIA_REGEX.pattern))
+            raise ValueError(f'URL {url} does not match regex `{cls.WIKIPEDIA_REGEX.pattern}`')
 
         title = match.group('title')
         language = match.group('language')
-        if language == 'www':
+        if language is None or language == 'www':
             language = 'en'
         
         return title, language

@@ -24,7 +24,9 @@ class TestWikipediaProvider:
         ('http://af.wikipedia.org/wiki/Blink-182', ('Blink-182', 'af')),
         ('https://en.wikipedia.org/wiki/Avenged_Sevenfold', ('Avenged_Sevenfold', 'en')),
         ('https://en.wikipedia.org/wiki/Mumford_%26_Sons', ('Mumford_%26_Sons', 'en')),
-        ('https://ja.wikipedia.org/wiki/%CE%9D_(%E3%83%90%E3%83%B3%E3%83%89)', ('%CE%9D_(%E3%83%90%E3%83%B3%E3%83%89)', 'ja'))
+        ('https://ja.wikipedia.org/wiki/%CE%9D_(%E3%83%90%E3%83%B3%E3%83%89)', ('%CE%9D_(%E3%83%90%E3%83%B3%E3%83%89)', 'ja')),
+        ('https://wikipedia.org/wiki/Toni_Baldwin', ('Toni_Baldwin', 'en')),
+        ('https://www.wikipedia.org/wiki/Toni_Baldwin', ('Toni_Baldwin', 'en'))
     ])
     def test_title_from_url(self, url, expected):
         assert expected == self.provider.wikipedia_title_from_url(url)
