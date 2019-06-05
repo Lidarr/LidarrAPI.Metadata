@@ -1,18 +1,18 @@
-select
+SELECT
   row_to_json(album_data) album
-  from (
-    select
-      release_group.gid as Id,
-      release_group.comment as Disambiguation,
-      release_group.name as Title,
-      release_group_primary_type.name as Type,
+  FROM (
+    SELECT
+      release_group.gid AS Id,
+      release_group.comment AS Disambiguation,
+      release_group.name AS Title,
+      release_group_primary_type.name AS Type,
       array(
         SELECT name
           FROM release_group_secondary_type rgst
                  JOIN release_group_secondary_type_join rgstj ON rgstj.secondary_type = rgst.id
          WHERE rgstj.release_group = release_group.id
          ORDER BY name ASC
-      ) as SecondaryTypes,
+      ) AS SecondaryTypes,
       COALESCE(
         make_date(
           release_group_meta.first_release_date_year,
@@ -25,7 +25,7 @@ select
           COALESCE(release_group_meta.first_release_date_day, 1)
         )
       )as ReleaseDate,
-      artist.gid as ArtistId,
+      artist.gid AS ArtistId,
       array(
 	SELECT DISTINCT
 	  artist.gid
@@ -45,16 +45,16 @@ select
                  JOIN artist_credit_name ON artist_credit_name.artist = artist.id
          WHERE artist_credit_name.artist_credit = release_group.artist_credit
            AND artist_credit_name.position = 0
-      ) as ArtistIds,	
+      ) AS ArtistIds,	
       json_build_object(
         'Count', COALESCE(release_group_meta.rating_count, 0),
         'Value', release_group_meta.rating::decimal / 10
-      ) as Rating,
+      ) AS Rating,
       array(
         SELECT url.url
           FROM url
                  JOIN l_release_group_url ON l_release_group_url.entity0 = release_group.id AND l_release_group_url.entity1 = url.id
-      ) as Links,
+      ) AS Links,
       (
 	SELECT
 	  json_agg(row_to_json(images_data))
@@ -66,16 +66,16 @@ select
 		     JOIN release ON index_listing.release = release.id
 	     WHERE release.release_group = release_group.id
 	  ) images_data
-      ) as images,
+      ) AS images,
       (
         SELECT 
           json_agg(row_to_json(releases_data))
           FROM (
             SELECT
-              release.gid as Id,
-              release.name as Title,
-              release.comment as Disambiguation,
-              release_status.name as Status,
+              release.gid AS Id,
+              release.name AS Title,
+              release.comment AS Disambiguation,
+              release_status.name AS Status,
               (
                 SELECT 
                   COALESCE(
@@ -93,7 +93,7 @@ select
                       FROM release_unknown_country
                      WHERE release_unknown_country.release = release.id
                   ) dates
-              ) as ReleaseDate,
+              ) AS ReleaseDate,
               array(
                 SELECT name FROM label
                                    JOIN release_label ON release_label.label = label.id
@@ -105,7 +105,7 @@ select
                                    JOIN country_area ON country_area.area = area.id
                                    JOIN release_country ON release_country.country = country_area.area
                  WHERE release_country.release = release.id
-              ) as Country,
+              ) AS Country,
               array(
                 SELECT json_build_object(
                   'Format', medium_format.name,
@@ -115,21 +115,21 @@ select
                          JOIN medium_format ON medium_format.id = medium.format
                  WHERE medium.release =  release.id
                  ORDER BY medium.position
-              ) as Media,
+              ) AS Media,
               (SELECT SUM(medium.track_count) FROM medium WHERE medium.release = release.id) AS track_count,
               (
                 SELECT
                   json_agg(row_to_json(track_data))
                   FROM (
                     SELECT
-                      track.gid as Id,
-                      recording.gid as RecordingId,
-                      artist.gid as ArtistId,
-                      track.name as TrackName,
-                      track.length as DurationMs,
-                      medium.position as MediumNumber,
-                      track.number as TrackNumber,
-                      track.position as TrackPositon
+                      track.gid AS Id,
+                      recording.gid AS RecordingId,
+                      artist.gid AS ArtistId,
+                      track.name AS TrackName,
+                      track.length AS DurationMs,
+                      medium.position AS MediumNumber,
+                      track.number AS TrackNumber,
+                      track.position AS TrackPositon
                       FROM track
                              JOIN medium ON track.medium = medium.id
                              JOIN artist_credit_name ON artist_credit_name.artist_credit = track.artist_credit
@@ -140,12 +140,12 @@ select
                        AND recording.video = FALSE
                        AND track.is_data_track = FALSE
                   ) track_data
-              ) as Tracks                                                                                     
+              ) AS Tracks                                                                                     
               FROM release
                      JOIN release_status ON release_status.id = release.status
              WHERE release.release_group = release_group.id
           ) releases_data
-      ) as Releases
+      ) AS Releases
       FROM release_group
              LEFT JOIN release_group_meta ON release_group_meta.id = release_group.id
              LEFT JOIN release_group_primary_type ON release_group.type = release_group_primary_type.id
