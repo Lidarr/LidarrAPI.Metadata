@@ -351,8 +351,8 @@ async def get_release_group_info_multi(mbids):
     release_groups = await release_group_providers[0].get_release_groups_by_id(mbids)
     release_groups = [{'data': rg, 'expiry': expiry} for rg in release_groups]
     
-    # if not release_group:
-    #     raise ReleaseGroupNotFoundException(mbid)
+    if not release_groups:
+        raise ReleaseGroupNotFoundException(mbids)
     
     # Start overviews
     overviews_task = asyncio.gather(*[get_overview(rg['data']['links']) for rg in release_groups])
@@ -363,9 +363,6 @@ async def get_release_group_info_multi(mbids):
         results = await asyncio.gather(*[album_art_providers[0].get_album_images(x['data']['id']) for x in release_groups_without_images])
         
         for i, rg in enumerate(release_groups_without_images):
-            # logger.debug(type(rg['data']))
-            # logger.debug(type(results))
-            # logger.debug(type(results[i]))
             rg['data']['images'] = results[i][0]
             rg['expiry'] = min(rg['expiry'], results[i][1])
     else:
