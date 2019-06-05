@@ -1273,6 +1273,9 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
 
         title = match.group('title')
         language = match.group('language')
+        if language == 'www':
+            language = 'en'
+        
         return title, language
 
     @classmethod
