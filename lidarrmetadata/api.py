@@ -13,6 +13,7 @@ from datetime import timedelta
 import time
 import logging
 import aiohttp
+from timeit import default_timer as timer
 
 import lidarrmetadata
 from lidarrmetadata import chart
@@ -325,12 +326,17 @@ async def get_release_group_links_and_overview(mbid):
     return {'Links': links, 'Overview': overview}, expiry
 
 async def get_release_group_artists(mbid):
+    
+    start = timer()
+    
     track_providers = provider.get_providers_implementing(provider.TracksByReleaseGroupMixin)
     # Do artist ids first since we want to get cracking on artist details
     artist_ids = await track_providers[0].get_release_group_artist_ids(mbid)
     results = await asyncio.gather(*[get_artist_info(gid) for gid in artist_ids])
     artists = [result[0] for result in results]
     expiry = min([result[1] for result in results])
+    
+    logger.debug(f"Got album artists in {(timer() - start) * 1000:.0f}ms ")
     
     return artists, expiry
 
@@ -339,6 +345,8 @@ class ReleaseGroupNotFoundException(Exception):
 
 @double_cache(util.ALBUM_CACHE)
 async def get_release_group_info_basic(mbid):
+    
+    start = timer()
     
     release_group_providers = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)
     release_providers = provider.get_providers_implementing(provider.ReleasesByReleaseGroupIdMixin)
@@ -366,8 +374,6 @@ async def get_release_group_info_basic(mbid):
     releases_task = asyncio.create_task(release_providers[0].get_releases_by_rgid(mbid))
     tracks_task = asyncio.create_task(track_providers[0].get_release_group_tracks(mbid))
     
-    logger.debug("All release group tasks created")
-
     # Wait on this since it's slowest and the rest will get finished in the meantime
     overview_data, overview_expiry = await links_overview_task
 
@@ -395,6 +401,8 @@ async def get_release_group_info_basic(mbid):
         release_group['Images'] = []
         
     expiry = min(expiry, overview_expiry, images_expiry)
+    
+    logger.debug(f"Got basic album info in {(timer() - start) * 1000:.0f}ms ")
 
     return release_group, expiry
 
@@ -402,9 +410,9 @@ async def get_release_group_info(mbid):
 
     artists_task = asyncio.create_task(get_release_group_artists(mbid))
     release_group_task = asyncio.create_task(get_release_group_info_basic(mbid))
-    
-    release_group, rg_expiry = await release_group_task
+
     artists, artist_expiry = await artists_task
+    release_group, rg_expiry = await release_group_task
     
     release_group['Artists'] = artists
     return release_group, min(rg_expiry, artist_expiry)
@@ -476,7 +484,9 @@ async def search_album():
     search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
     
     if search_providers:
+        start = timer()
         album_ids = await search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
+        logger.debug(f"Got album search results in {(timer() - start) * 1000:.0f}ms ")
         
         if basic:
             albums = album_ids
