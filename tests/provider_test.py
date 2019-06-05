@@ -1,44 +1,18 @@
 # coding=utf-8
 import pytest
 
-
 from lidarrmetadata import api # This is imported so the flask app initializes and cache doesn't fail
 from lidarrmetadata import provider
-
-
-class TestMusicbrainzDbProvider:
-
-    @staticmethod
-    @pytest.mark.parametrize('s,expected', [
-        ('abc', 'abc'),
-        # ('blink‐182', 'blink-182'),
-        (u'blink‐182', 'blink-182'),
-        (u'blink\u2010182', 'blink-182'),
-        ('...', '...')
-    ])
-    def test_mb_decode(s, expected):
-        result = provider.MusicbrainzDbProvider().mb_decode(s)
-        assert expected == result
-
-    @staticmethod
-    @pytest.mark.parametrize('s,expected', [
-        ('abc', 'abc'),
-        # ('blink-182', 'blink‐182'),
-        ('blink-182', u'blink‐182'),
-        ('blink-182', u'blink\u2010182'),
-        ('...', '...')
-    ])
-    def test_mb_encode(s, expected):
-        result = provider.MusicbrainzDbProvider().mb_encode(s)
-        assert expected == result
 
 
 class TestWikipediaProvider:
     def setup(self):
         self.provider = provider.WikipediaProvider()
 
-    def test_summary_invalid_url_empty(self):
-        assert '' == self.provider.wikipedia_get_summary_from_title('fakeurl', 'en')
+    @pytest.mark.asyncio
+    async def test_summary_invalid_url_empty(self):
+        await self.provider._init()
+        assert '' == await self.provider.wikipedia_get_summary_from_title('fakeurl', 'en')
         
     def test_title_from_url_invalid(self):
         with pytest.raises(ValueError):
@@ -62,5 +36,8 @@ class TestWikipediaProvider:
         ('https://www.wikidata.org/wiki/Q953918', 'Mumford & Sons are  a British band formed in 2007'),
         ('https://www.wikidata.org/wiki/Q127939', 'Russian folk rock band'),
      ])
-    def test_summary_from_url(self, url, expected):
-        assert self.provider.get_artist_overview(url).startswith(expected)
+    @pytest.mark.asyncio
+    async def test_summary_from_url(self, url, expected):
+        await self.provider._init()
+        result, expiry = await self.provider.get_artist_overview(url)
+        assert result.startswith(expected)
