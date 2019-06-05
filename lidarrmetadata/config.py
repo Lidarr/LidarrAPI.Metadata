@@ -383,7 +383,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     PROVIDERS = {
         'FANARTTVPROVIDER': ([FANART_KEY], {}),
         'SOLRSEARCHPROVIDER': ([], {'SEARCH_SERVER': 'http://solr:8983/solr'}),
-        'MUSICBRAINZDBPROVIDER': ([], {'DB_HOST': POSTGRES_HOST, 'DB_PORT': POSTGRES_PORT}),
+        'MUSICBRAINZDBPROVIDER': ([], {'DB_HOST': 'db', 'DB_PORT': 5432}),
         'WIKIPEDIAPROVIDER': ([], {})
     }
 
