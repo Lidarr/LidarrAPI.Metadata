@@ -105,6 +105,10 @@ def handle_error(e):
         return jsonify(error='Could not connect to redis'), 503
     elif isinstance(e, redis.BusyLoadingError):
         return jsonify(error='Redis not ready'), 503
+    elif isinstance(e, ArtistNotFoundException):
+        return jsonify(error='Artist not found'), 404
+    elif isinstance(e, ReleaseGroupNotFoundException):
+        return jsonify(error='Album not found'), 404
     else:
         sentry_sdk.capture_exception(e)
         return jsonify(error='Internal server error'), 500
@@ -156,9 +160,6 @@ async def get_artist_info_route(mbid):
     albums_task = asyncio.create_task(get_artist_albums(mbid))
 
     artist, expiry = await artist_task
-    if not isinstance(artist, dict):
-        # i.e. we have returned an error response
-        return artist
 
     albums = await albums_task
     if albums is None:
@@ -248,6 +249,12 @@ def double_cache(postgres_cache):
         return wrapper
     return decorator
 
+class ArtistNotFoundException(Exception):
+    pass
+
+class MissingProviderException(Exception):
+    """ Thown when we can't cope without a provider """
+
 @double_cache(util.ARTIST_CACHE)
 async def get_artist_info(mbid):
     
@@ -259,7 +266,7 @@ async def get_artist_info(mbid):
     
     if not artist_providers:
         # 500 error if we don't have an artist provider since it's essential
-        return (jsonify(error='No artist provider available'), 500), None
+        raise MissingProviderException('No artist provider available')
 
     # overviews are the slowest thing so set those going first, followed by images
     link_overview_task = asyncio.create_task(get_artist_links_and_overview(mbid))
@@ -273,7 +280,7 @@ async def get_artist_info(mbid):
     
     artist = await artist_providers[0].get_artist_by_id(mbid)
     if not artist:
-        return (jsonify(error='Artist not found'), 404), None
+        raise ArtistNotFoundException(mbid)
 
     artist.update(overview_data)
     
@@ -297,6 +304,11 @@ async def get_artist_albums(mbid):
 
 @app.route('/album/<mbid>', methods=['GET'])
 async def get_release_group_info_route(mbid):
+    
+    uuid_validation_response = validate_mbid(mbid)
+    if uuid_validation_response:
+        return uuid_validation_response
+    
     output, expiry = await get_release_group_info(mbid)
     
     if isinstance(output, dict):
@@ -322,12 +334,11 @@ async def get_release_group_artists(mbid):
     
     return artists, expiry
 
+class ReleaseGroupNotFoundException(Exception):
+    pass
+
 @double_cache(util.ALBUM_CACHE)
 async def get_release_group_info_basic(mbid):
-    
-    uuid_validation_response = validate_mbid(mbid)
-    if uuid_validation_response:
-        return (uuid_validation_response, None)
     
     release_group_providers = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)
     release_providers = provider.get_providers_implementing(provider.ReleasesByReleaseGroupIdMixin)
@@ -335,13 +346,13 @@ async def get_release_group_info_basic(mbid):
     track_providers = provider.get_providers_implementing(provider.TracksByReleaseGroupMixin)
     
     if not release_group_providers:
-        return (jsonify(error='No album provider available'), 500), None
+        raise MissingProviderException('No album provider available')
 
     if not release_providers:
-        return(jsonify(error='No release provider available'), 500), None        
+        raise MissingProviderException('No release provider available')
     
     if not track_providers:
-        return (jsonify(error='No track provider available'), 500), None
+        raise MissingProviderException('No track provider available')
 
     expiry = provider.utcnow() + timedelta(seconds = app.config['CACHE_TTL']['cloudflare'])
 
@@ -362,7 +373,7 @@ async def get_release_group_info_basic(mbid):
 
     release_group = await release_group_task
     if not release_group:
-        return (jsonify(error='Album not found'), 404), None
+        raise ReleaseGroupNotFoundException(mbid)
 
     release_group.update(overview_data)
     

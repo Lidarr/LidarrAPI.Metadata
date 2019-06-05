@@ -12,7 +12,7 @@ from lidarrmetadata.config import get_config
 from lidarrmetadata import provider
 from lidarrmetadata import util
 from lidarrmetadata import limit
-from lidarrmetadata.api import get_artist_info, get_release_group_info_basic
+from lidarrmetadata.api import get_artist_info, ArtistNotFoundException, get_release_group_info_basic, ReleaseGroupNotFoundException
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -96,10 +96,18 @@ async def update_item(cached_function, mbid):
     cache = cached_function.__cache__
     cache_key = f"{function.__name__}:{mbid}"
     
-    result, expiry = await function(mbid)
-    ttl = (expiry - provider.utcnow()).total_seconds()
+    try:
+        result, expiry = await function(mbid)
+        ttl = (expiry - provider.utcnow()).total_seconds()
     
-    await cache.set(mbid, result, ttl)
+        await cache.set(mbid, result, ttl)
+    except (ArtistNotFoundException, ReleaseGroupNotFoundException) as error:
+        await cache.delete(mbid)
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        logger.error(f"Update failed for {mbid}")
+        raise
             
 async def update_artists(count = 100, max_ttl = 60 * 60):
     while True:
