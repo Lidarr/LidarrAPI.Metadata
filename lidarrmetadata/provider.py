@@ -903,15 +903,15 @@ class MusicbrainzDbProvider(Provider,
     def _build_caa_url(release_id, image_id):
         return 'https://coverartarchive.org/release/{}/{}.jpg'.format(release_id, image_id)
 
-    @staticmethod
-    def _load_release_group(data):
+    @classmethod
+    def _load_release_group(cls, data):
         # Load the json from postgres
         release_group = json.loads(data)
         
         # parse the links
         release_group['links'] = [{
             'target': link,
-            'type': self.parse_url_source(link)
+            'type': cls.parse_url_source(link)
         } for link in release_group['links']]
         
         # parse caa images
@@ -922,7 +922,7 @@ class MusicbrainzDbProvider(Provider,
             for result in release_group['images']:
                 cover_type = type_mapping.get(result['type'], None)
                 if cover_type is not None and cover_type not in art:
-                    art[cover_type] = self._build_caa_url(result['release_gid'], result['image_id'])
+                    art[cover_type] = cls._build_caa_url(result['release_gid'], result['image_id'])
             release_group['images'] = [{'CoverType': art_type, 'Url': url} for art_type, url in art.items()]
         else:
             release_group['images'] = []
@@ -937,7 +937,7 @@ class MusicbrainzDbProvider(Provider,
         if not release_groups:
             return [{}]
         
-        release_groups = [self.load_release_group(item['album']) for item in release_groups]
+        release_groups = [self._load_release_group(item['album']) for item in release_groups]
 
         return release_groups
     
@@ -996,25 +996,6 @@ class MusicbrainzDbProvider(Provider,
         results = [dict(row.items()) for row in data]
 
         return results
-
-    @classmethod
-    def mb_decode(cls, s):
-        """
-        Decodes a string from musicbrainz
-        :param s: String to decode
-        :return: Decoded string
-        """
-        return util.translate_string(s, cls.TRANSLATION_TABLE)
-
-    @classmethod
-    def mb_encode(cls, s):
-        """
-        Encodes a string for musicbrainz
-        :param s: String to encode
-        :return: Musicbrainz encoded string
-        """
-        s = re.sub(' +', ' ', s)
-        return util.translate_string(s, cls.TRANSLATION_TABLE.inverse)
 
     @staticmethod
     def parse_url_source(url):
