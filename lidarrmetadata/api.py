@@ -560,44 +560,6 @@ async def search_route():
             error='Unsupported search type {}'.format(type))
         return error, 400
     
-# @app.route('/fanart_updates')
-# def get_fanart_updates():
-#     fanart_provider = provider.get_providers_implementing(provider.ArtistArtworkMixin)[0]
-    
-#     # long_date = (datetime.datetime(2019, 5, 20, 0, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds()
-#     # short_date = (datetime.datetime(2019, 5, 20, 23, 59, 59) - datetime.datetime(1970, 1, 1)).total_seconds()
-
-#     # Gives updates that happened on the 19th
-#     long_date = (datetime.datetime(2019, 5, 19, 23, 59, 59) - datetime.datetime(1970, 1, 1)).total_seconds()
-#     short_date = (datetime.datetime(2019, 5, 20, 0, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds()
-    
-#     # Gives updates that happened on the 19th
-#     long_date = (datetime.datetime(2019, 5, 12, 23, 59, 59) - datetime.datetime(1970, 1, 1)).total_seconds()
-#     short_date = (datetime.datetime(2019, 5, 13, 0, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds()
-    
-#     # long_date = (datetime.datetime(2019, 5, 19, 23, 59, 59) - datetime.datetime(1970, 1, 1)).total_seconds()
-#     # short_date = (datetime.datetime(2019, 5, 14, 0, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds()
-
-#     # long_date = (datetime.datetime(2019, 5, 11, 0, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds()
-#     # short_date = (datetime.datetime(2019, 5, 12, 0, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds()
-    
-#     # long_date = (datetime.datetime(2019, 5, 12, 0, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds()
-#     # short_date = (datetime.datetime(2019, 5, 13, 0, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds()
-    
-#     # long_date = (datetime.datetime(2019, 5, 13, 0, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds()
-#     # short_date = (datetime.datetime(2019, 5, 14, 0, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds()
-
-    
-#     # long_date = (datetime.datetime(2019, 5, 20, 11, 5, 0) - datetime.datetime(1970, 1, 1)).total_seconds() - 7 * 24 * 60 * 60
-#     # short_date = (datetime.datetime(2019, 5, 20, 11, 0, 0) - datetime.datetime(1970, 1, 1)).total_seconds() - 7 * 24 * 60 * 60
-    
-#     long = fanart_provider.get_fanart_updates(long_date)
-#     short = fanart_provider.get_fanart_updates(short_date)
-    
-#     ids = fanart_provider.diff_fanart_updates(long, short)
-    
-#     return jsonify(sorted(ids))
-
 @app.route('/invalidate')
 async def invalidate_cache():
     
