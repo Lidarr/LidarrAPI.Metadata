@@ -38,7 +38,7 @@ setup(
         'asyncpg',
         'billboard.py>=4.1.0',
         'quart',
-        'pylast<=1.9.0',
+        'pylast>=3.0.0',
         'pytelegraf',
         'pytz',
         'python-dateutil',

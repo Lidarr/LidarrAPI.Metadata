@@ -10,6 +10,7 @@ from aiocache import cached
 from lidarrmetadata import config
 from lidarrmetadata import provider
 from lidarrmetadata import util
+from lidarrmetadata.api import get_release_group_info_basic
 
 async def _parse_itunes_chart(URL, count):
     async with aiohttp.ClientSession() as session:
@@ -58,7 +59,7 @@ async def get_billboard_200_albums_chart(count=10):
 
     search_results = []
     for result in results:
-        search_result = search_provider.search_album_name(result.title, artist_name=result.artist)
+        search_result = await search_provider.search_album_name(result.title, artist_name=result.artist)
         if search_result:
             search_result = search_result[0]
             search_results.append(await _parse_album_search_result(search_result))
@@ -123,28 +124,29 @@ async def get_lastfm_album_chart(count=10, user=None):
     client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY, api_secret=config.get_config().LASTFM_SECRET)
 
     if user:
-        user = util.cache_or_call(client.get_user, user[0])
-        lastfm_albums = util.cache_or_call(user.get_top_albums)
+        user = client.get_user(user[0])
+        lastfm_albums = user.get_top_albums(limit = count * 2)
     else:
-        tag = util.cache_or_call(client.get_tag, 'all')
-        lastfm_albums = util.cache_or_call(tag.get_top_albums)
+        tag = client.get_tag('all')
+        lastfm_albums = tag.get_top_albums(limit = count * 2)
 
     album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
     albums = []
-    for result in pylast.extract_items(lastfm_albums):
+    for lastfm_album in lastfm_albums:
         # TODO Figure out a cleaner way to do this
         rgid = await album_provider.map_query(
-            ('SELECT release_group.gid '
-             'FROM release '
-             'JOIN release_group ON release_group.id = release.release_group '
-             'WHERE release.gid = %s '
-             'LIMIT 1'),
-            [result.get_mbid()])
+            'SELECT release_group.gid '
+            'FROM release '
+            'JOIN release_group ON release_group.id = release.release_group '
+            'WHERE release.gid = $1 '
+            'LIMIT 1',
+            lastfm_album.item.get_mbid()
+        )
 
         if rgid:
-            search_result = await album_provider.get_release_group_by_id(rgid[0]['gid'])
+            search_result = await _parse_album_search_result({'Id': rgid[0]['gid']})
             if search_result:
-                albums.append(await _parse_album_search_result(search_result))
+                albums.append(search_result)
 
                 if len(albums) == count:
                     break
@@ -164,15 +166,15 @@ async def get_lastfm_artist_chart(count=10, user=None):
     client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY, api_secret=config.get_config().LASTFM_SECRET)
 
     if user:
-        user = util.cache_or_call(client.get_user, user[0])
-        lastfm_artists = util.cache_or_call(user.get_top_artists)
+        user = client.get_user(user[0])
+        lastfm_artists = user.get_top_artists(limit = count * 2)
     else:
-        lastfm_artists = util.cache_or_call(client.get_top_artists)
+        lastfm_artists = client.get_top_artists(limit = count * 2)
 
     artists = []
     search_provider = provider.get_providers_implementing(provider.ArtistNameSearchMixin)[0]
-    for lastfm_artist in pylast.extract_items(lastfm_artists):
-        artist = {'ArtistName': lastfm_artist.name, 'ArtistId': lastfm_artist.get_mbid()}
+    for lastfm_artist in lastfm_artists:
+        artist = {'ArtistName': lastfm_artist.item.name, 'ArtistId': lastfm_artist.item.get_mbid()}
 
         if not all(artist.values()):
             results = await search_provider.search_artist_name(artist['ArtistName'], limit=1)
@@ -190,11 +192,11 @@ async def get_lastfm_artist_chart(count=10, user=None):
 
 
 async def _parse_album_search_result(search_result):
-    album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
-    album = await album_provider.get_release_group_by_id(search_result['Id'])
+    album = await get_release_group_info_basic(search_result['Id'])
+    album = album[0]
     return {
-        'AlbumId': album['Id'],
-        'AlbumTitle': album['Title'],
-        'ArtistId': album['ArtistId'],
-        'ReleaseDate': album['ReleaseDate']
+        'AlbumId': album['id'],
+        'AlbumTitle': album['title'],
+        'ArtistId': album['artistid'],
+        'ReleaseDate': album['releasedate']
     }
