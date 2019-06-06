@@ -37,6 +37,7 @@ setup(
         'aioredis',
         'asyncpg',
         'billboard.py>=4.1.0',
+        'gunicorn',
         'quart',
         'pylast>=3.0.0',
         'pytelegraf',
