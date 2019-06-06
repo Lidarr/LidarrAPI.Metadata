@@ -6,7 +6,7 @@ import gunicorn.app.base
 from gunicorn.six import iteritems
 
 import lidarrmetadata
-from lidarrmetadata.api import app
+from lidarrmetadata.app import app
 from lidarrmetadata.config import get_config
 
 

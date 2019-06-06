@@ -22,15 +22,15 @@ logger.info('Have crawler logger')
 
 CONFIG = get_config()
 
-if CONFIG['SENTRY_DSN']:
-    if CONFIG['SENTRY_REDIS_HOST'] is not None:
-        processor = util.SentryRedisTtlProcessor(redis_host=CONFIG['SENTRY_REDIS_HOST'],
-                                                 redis_port=CONFIG['SENTRY_REDIS_PORT'],
-                                                 ttl=CONFIG['SENTRY_TTL'])
+if CONFIG.SENTRY_DSN:
+    if CONFIG.SENTRY_REDIS_HOST is not None:
+        processor = util.SentryRedisTtlProcessor(redis_host=CONFIG.SENTRY_REDIS_HOST,
+                                                 redis_port=CONFIG.SENTRY_REDIS_PORT,
+                                                 ttl=CONFIG.SENTRY_TTL)
     else:
-        processor = util.SentryTtlProcessor(ttl=CONFIG['SENTRY_TTL'])
+        processor = util.SentryTtlProcessor(ttl=CONFIG.SENTRY_TTL)
         
-    sentry_sdk.init(dsn=CONFIG['SENTRY_DSN'],
+    sentry_sdk.init(dsn=CONFIG.SENTRY_DSN,
                     before_send=processor.create_event)
 
 async def update_wikipedia(count = 50, max_ttl = 60 * 60):
