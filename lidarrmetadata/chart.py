@@ -1,7 +1,7 @@
 """
 Code for getting and parsing music charts (Billboard, itunes, etc)
 """
-
+import asyncio
 import billboard
 import pylast
 import aiohttp
@@ -135,6 +135,9 @@ async def get_lastfm_album_chart(count=10, user=None):
     album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
     albums = []
     for lastfm_album in lastfm_albums:
+        # Try to stop lastfm from erroring out
+        await asyncio.sleep(1)
+        
         # TODO Figure out a cleaner way to do this
         rgid = await album_provider.map_query(
             'SELECT release_group.gid '
@@ -178,6 +181,9 @@ async def get_lastfm_artist_chart(count=10, user=None):
     artists = []
     search_provider = provider.get_providers_implementing(provider.ArtistNameSearchMixin)[0]
     for lastfm_artist in lastfm_artists:
+        # Try to stop lastfm from erroring out
+        await asyncio.sleep(1)
+
         artist = {'ArtistName': lastfm_artist.item.name, 'ArtistId': lastfm_artist.item.get_mbid()}
 
         if not all(artist.values()):
