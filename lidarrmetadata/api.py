@@ -552,9 +552,9 @@ async def search_route():
     type = request.args.get('type', None)
 
     if type == 'artist':
-        return search_artist()
+        return await search_artist()
     elif type == 'album':
-        return search_album()
+        return await search_album()
     else:
         error = jsonify(error='Type not provided') if type is None else jsonify(
             error='Unsupported search type {}'.format(type))
