@@ -41,12 +41,6 @@ if app.config['SENTRY_DSN']:
                     integrations=[FlaskIntegration()],
                     before_send=processor.create_event)
 
-# if not app.config['PRODUCTION']:
-#     # Run api doc server if not running in production
-#     from flasgger import Swagger
-
-#     swagger = Swagger(app)
-
 # Set up providers
 for provider_name, (args, kwargs) in app.config['PROVIDERS'].items():
     provider_key = list(filter(lambda k: k.upper() == provider_name,
@@ -429,8 +423,7 @@ async def chart_route(name, type_, selection):
         return jsonify(error='Chart {}/{}/{} not found'.format(*key)), 404
     else:
         result = await charts[key](count, **chart_kwargs)
-        return jsonify(result)
-
+        return add_cache_control_header(jsonify(result), app.config['CACHE_TTL']['chart'])
 
 @app.route('/search/album')
 async def search_album():
