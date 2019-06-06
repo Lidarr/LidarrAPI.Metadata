@@ -6,6 +6,7 @@ import logging
 from timeit import default_timer as timer
 
 import aiohttp
+import sentry_sdk
 
 import lidarrmetadata
 from lidarrmetadata.config import get_config
@@ -20,6 +21,17 @@ logger.setLevel(logging.DEBUG)
 logger.info('Have crawler logger')
 
 CONFIG = get_config()
+
+if CONFIG['SENTRY_DSN']:
+    if CONFIG['SENTRY_REDIS_HOST'] is not None:
+        processor = util.SentryRedisTtlProcessor(redis_host=CONFIG['SENTRY_REDIS_HOST'],
+                                                 redis_port=CONFIG['SENTRY_REDIS_PORT'],
+                                                 ttl=CONFIG['SENTRY_TTL'])
+    else:
+        processor = util.SentryTtlProcessor(ttl=CONFIG['SENTRY_TTL'])
+        
+    sentry_sdk.init(dsn=CONFIG['SENTRY_DSN'],
+                    before_send=processor.create_event)
 
 async def update_wikipedia(count = 50, max_ttl = 60 * 60):
     
@@ -152,8 +164,9 @@ async def init():
 async def crawl():
     await init()
     await asyncio.gather(
-        update_wikipedia(max_ttl = 60 * 60),
-        update_fanart(max_ttl = 60 * 60),
+        # Look further ahead for wiki and fanart so external data is ready before we refresh artist/album
+        update_wikipedia(max_ttl = 60 * 60 * 2),
+        update_fanart(max_ttl = 60 * 60 * 2),
         update_artists(max_ttl = 60 * 60),
         update_albums(max_ttl = 60 * 60)
     )
@@ -161,7 +174,7 @@ async def crawl():
 async def initialize():
     await init()
     await asyncio.gather(
-        # initialize_artists(),
+        initialize_artists(),
         initialize_albums()
     )
     
