@@ -76,6 +76,6 @@ class SentryRedisTtlProcessor(SentryProcessor):
         if self.redis.exists(self._KEY):
             return False
         else:
-            self.redis.set(self._KEY, True, ex=self.ttl)
+            self.redis.set(self._KEY, "rate_limited", ex=self.ttl)
 
         return True
