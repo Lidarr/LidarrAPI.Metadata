@@ -29,7 +29,7 @@ async def _parse_itunes_chart(URL, count):
                         break
             return search_results
 
-@cached(ttl = 60 * 60 * 24 * 7, alias='default')
+@cached(ttl = 60 * 60 * 24, alias='default')
 async def get_apple_music_top_albums_chart(count=10):
     """
     Gets and parses itunes chart
@@ -40,13 +40,13 @@ async def get_apple_music_top_albums_chart(count=10):
         count=4 * count)
     return await _parse_itunes_chart(URL, count)
 
-@cached(ttl = 60 * 60 * 24 * 7, alias='default')
+@cached(ttl = 60 * 60 * 24, alias='default')
 async def get_apple_music_new_albums_chart(count=10):
     URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/new-releases/all/{count}/explicit.json'.format(
         count=4 * count)
     return await _parse_itunes_chart(URL, count)
 
-@cached(ttl = 60 * 60 * 24 * 7, alias='default')
+@cached(ttl = 60 * 60 * 24, alias='default')
 async def get_billboard_200_albums_chart(count=10):
     """
     Gets billboard top 200 albums
@@ -69,7 +69,7 @@ async def get_billboard_200_albums_chart(count=10):
 
     return search_results
 
-@cached(ttl = 60 * 60 * 24 * 7, alias='default')
+@cached(ttl = 60 * 60 * 24, alias='default')
 async def get_billboard_100_artists_chart(count=10):
     """
     Gets billboard top 100 albums
@@ -91,7 +91,7 @@ async def get_billboard_100_artists_chart(count=10):
 
     return search_results
 
-@cached(ttl = 60 * 60 * 24 * 7, alias='default')
+@cached(ttl = 60 * 60 * 24, alias='default')
 async def get_itunes_top_albums_chart(count=10):
     """
     Gets and parses itunes chart
@@ -103,7 +103,7 @@ async def get_itunes_top_albums_chart(count=10):
     return await _parse_itunes_chart(URL, count)
 
 
-@cached(ttl = 60 * 60 * 24 * 7, alias='default')
+@cached(ttl = 60 * 60 * 24, alias='default')
 async def get_itunes_new_albums_chart(count=10):
     """
     Gets and parses itunes new chart
@@ -114,7 +114,7 @@ async def get_itunes_new_albums_chart(count=10):
         count=4 * count)
     return await _parse_itunes_chart(URL, count)
 
-@cached(ttl = 60 * 60 * 24 * 7, alias='default')
+@cached(ttl = 60 * 60 * 24, alias='default')
 async def get_lastfm_album_chart(count=10, user=None):
     """
     Gets and parses lastfm chart
@@ -156,7 +156,7 @@ async def get_lastfm_album_chart(count=10, user=None):
 
     return albums
 
-@cached(ttl = 60 * 60 * 24 * 7, alias='default')
+@cached(ttl = 60 * 60 * 24, alias='default')
 async def get_lastfm_artist_chart(count=10, user=None):
     """
     Gets and parses lastfm chart
