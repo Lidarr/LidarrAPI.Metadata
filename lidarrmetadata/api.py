@@ -423,7 +423,8 @@ async def chart_route(name, type_, selection):
         return jsonify(error='Chart {}/{}/{} not found'.format(*key)), 404
     else:
         result = await charts[key](count, **chart_kwargs)
-        return add_cache_control_header(jsonify(result), app.config['CACHE_TTL']['chart'])
+        expiry = provider.utcnow() + timedelta(seconds=app.config['CACHE_TTL']['chart'])
+        return add_cache_control_header(jsonify(result), expiry)
 
 @app.route('/search/album')
 async def search_album():
