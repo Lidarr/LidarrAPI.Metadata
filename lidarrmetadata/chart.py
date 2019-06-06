@@ -7,10 +7,10 @@ import pylast
 import aiohttp
 from aiocache import cached
 
+from lidarrmetadata import api
 from lidarrmetadata import config
 from lidarrmetadata import provider
 from lidarrmetadata import util
-from lidarrmetadata.api import get_release_group_info_basic
 
 async def _parse_itunes_chart(URL, count):
     async with aiohttp.ClientSession() as session:
@@ -122,6 +122,8 @@ async def get_lastfm_album_chart(count=10, user=None):
     :return: Parsed chart
     """
     client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY, api_secret=config.get_config().LASTFM_SECRET)
+    client.enable_rate_limit()
+    client.disable_caching()
 
     if user:
         user = client.get_user(user[0])
@@ -164,6 +166,8 @@ async def get_lastfm_artist_chart(count=10, user=None):
     :return: Parsed chart
     """
     client = pylast.LastFMNetwork(api_key=config.get_config().LASTFM_KEY, api_secret=config.get_config().LASTFM_SECRET)
+    client.enable_rate_limit()
+    client.disable_caching()
 
     if user:
         user = client.get_user(user[0])
@@ -192,7 +196,7 @@ async def get_lastfm_artist_chart(count=10, user=None):
 
 
 async def _parse_album_search_result(search_result):
-    album = await get_release_group_info_basic(search_result['Id'])
+    album = await api.get_release_group_info_basic(search_result['Id'])
     album = album[0]
     return {
         'AlbumId': album['id'],
