@@ -94,9 +94,9 @@ def handle_error(e):
         return jsonify(error='Could not connect to redis'), 503
     elif isinstance(e, redis.BusyLoadingError):
         return jsonify(error='Redis not ready'), 503
-    elif isinstance(e, ArtistNotFoundException):
+    elif isinstance(e, api.ArtistNotFoundException):
         return jsonify(error='Artist not found'), 404
-    elif isinstance(e, ReleaseGroupNotFoundException):
+    elif isinstance(e, api.ReleaseGroupNotFoundException):
         return jsonify(error='Album not found'), 404
     else:
         sentry_sdk.capture_exception(e)

@@ -656,7 +656,7 @@ class SolrSearchProvider(HttpProvider,
     async def search_artist_name(self, name, limit=None, albums=None):
         
         if albums:
-            return self.search_artist_name_with_albums(name, albums, self.parse_artist_search_with_albums, limit)
+            return await self.search_artist_name_with_albums(name, albums, self.parse_artist_search_with_albums, limit)
 
         # Note that when using a dismax query we shouldn't apply lucene escaping
         # See https://github.com/metabrainz/musicbrainz-server/blob/master/lib/MusicBrainz/Server/Data/WebService.pm
