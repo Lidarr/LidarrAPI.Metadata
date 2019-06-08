@@ -3,9 +3,9 @@ Tests api functionality
 """
 
 import pytest
-import werkzeug.exceptions
+import quart
 
-import lidarrmetadata.api
+import lidarrmetadata.app
 
 
 @pytest.mark.parametrize('s,expected', [
@@ -15,14 +15,16 @@ import lidarrmetadata.api
     ('abc\t', 'abc'),
     ('abc\x00', 'abc')
 ])
-def test_get_search_query(s, expected):
-    with lidarrmetadata.api.app.test_request_context('/search?type=album&query=' + s):
-        result = lidarrmetadata.api.get_search_query()
+@pytest.mark.asyncio
+async def test_get_search_query(s, expected):
+    async with lidarrmetadata.app.app.test_request_context('/search?type=album&query=' + s):
+        result = lidarrmetadata.app.get_search_query()
     assert expected == result
 
 
-def test_get_search_query_blank():
-    with lidarrmetadata.api.app.test_request_context('/search?type=album&query='):
-        with pytest.raises(werkzeug.exceptions.HTTPException) as e:
-            lidarrmetadata.api.get_search_query()
+@pytest.mark.asyncio
+async def test_get_search_query_blank():
+    async with lidarrmetadata.app.app.test_request_context('/search?type=album&query='):
+        with pytest.raises(quart.exceptions.BadRequest) as e:
+            lidarrmetadata.app.get_search_query()
             assert e.code == 400
