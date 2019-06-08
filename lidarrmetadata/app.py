@@ -358,6 +358,7 @@ async def search_route():
         return error, 400
     
 @app.route('/invalidate')
+@no_cache
 async def invalidate_cache():
     
     ## this is used as a prefix in various places to make sure
