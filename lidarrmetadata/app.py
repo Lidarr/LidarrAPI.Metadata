@@ -4,6 +4,7 @@ import functools
 import asyncio
 
 from quart import Quart, abort, make_response, request, jsonify
+from quart.exceptions import HTTPStatusException
 
 import redis
 import sentry_sdk
@@ -25,7 +26,7 @@ from lidarrmetadata import util
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 logger.setLevel(logging.INFO)
-logger.info('Have api logger')
+logger.info('Have app logger')
 
 app = Quart(__name__)
 app.config.from_object(config.get_config())
@@ -76,7 +77,7 @@ def get_search_query():
     """
     query = request.args.get('query')
     if not query:
-        abort(400)
+        abort(400, 'No query provided')
 
     query = query.strip().strip('\x00')
     return query
@@ -86,6 +87,9 @@ def get_search_query():
 def page_not_found_error(e):
     return jsonify(error=str(e)), 404
 
+@app.errorhandler(HTTPStatusException)
+def handle_error(e):
+    return jsonify(error = e.description), e.status_code
 
 @app.errorhandler(500)
 def handle_error(e):
