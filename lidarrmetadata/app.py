@@ -76,7 +76,7 @@ def get_search_query():
     """
     query = request.args.get('query')
     if not query:
-        abort(make_response(jsonify(error='No query provided'), 400))
+        abort(400)
 
     query = query.strip().strip('\x00')
     return query
@@ -247,6 +247,7 @@ async def search_album():
 
     artist_name = request.args.get('artist', '')
     basic = request.args.get('basic', False)
+    include_tracks = request.args.get('includeTracks', False)
 
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
@@ -268,8 +269,9 @@ async def search_album():
             
             # Current versions of lidarr will fail trying to parse the tracks contained in releases
             # because it's not expecting it to be present and passes null for ArtistMetadata dict
-            for album in albums:
-                album['releases'] = []
+            if not include_tracks:
+                for album in albums:
+                    album['releases'] = []
             
             validity = min([result[1] for result in results] or [0])
         
