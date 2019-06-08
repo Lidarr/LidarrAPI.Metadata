@@ -179,7 +179,7 @@ async def get_release_group_info_basic(mbid):
     
     release_groups = await get_release_group_info_multi([mbid])
     if not release_groups:
-        raise ReleaseGroupNotFoundException(mbids)
+        raise ReleaseGroupNotFoundException(mbid)
     
     return release_groups[0]
 
@@ -198,7 +198,7 @@ async def get_release_group_info_multi(mbids):
     # Do the main DB query
     release_groups = await release_group_providers[0].get_release_groups_by_id(mbids)
     if not release_groups:
-        return release_groups
+        return None
 
     # Add in default expiry
     release_groups = [{'data': rg, 'expiry': expiry} for rg in release_groups]

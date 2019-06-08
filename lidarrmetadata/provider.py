@@ -923,7 +923,7 @@ class MusicbrainzDbProvider(Provider,
         logger.debug("got release groups")
         
         if not release_groups:
-            return [{}]
+            return None
         
         release_groups = [self._load_release_group(item['album']) for item in release_groups]
 

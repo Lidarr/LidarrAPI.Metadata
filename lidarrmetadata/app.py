@@ -82,30 +82,30 @@ def get_search_query():
     query = query.strip().strip('\x00')
     return query
 
-
-@app.errorhandler(404)
-def page_not_found_error(e):
-    return jsonify(error=str(e)), 404
-
 @app.errorhandler(HTTPStatusException)
 def handle_error(e):
     return jsonify(error = e.description), e.status_code
 
+@app.errorhandler(api.ReleaseGroupNotFoundException)
+def handle_error(e):
+    return jsonify(error='Album not found'), 404
+
+@app.errorhandler(api.ArtistNotFoundException)
+def handle_error(e):
+    return jsonify(error='Artist not found'), 404
+
+@app.errorhandler(redis.ConnectionError)
+def handle_error(e):
+    return jsonify(error='Could not connect to redis'), 503
+
+@app.errorhandler(redis.BusyLoadingError)
+def handle_error(e):
+    return jsonify(error='Redis not ready'), 503
+
 @app.errorhandler(500)
 def handle_error(e):
-    # TODO Bypass caching instead when caching reworked
-    if isinstance(e, redis.ConnectionError):
-        return jsonify(error='Could not connect to redis'), 503
-    elif isinstance(e, redis.BusyLoadingError):
-        return jsonify(error='Redis not ready'), 503
-    elif isinstance(e, api.ArtistNotFoundException):
-        return jsonify(error='Artist not found'), 404
-    elif isinstance(e, api.ReleaseGroupNotFoundException):
-        return jsonify(error='Album not found'), 404
-    else:
-        sentry_sdk.capture_exception(e)
-        return jsonify(error='Internal server error'), 500
-
+    sentry_sdk.capture_exception(e)
+    return jsonify(error='Internal server error'), 500
 
 def validate_mbid(mbid, check_blacklist=True):
     """
