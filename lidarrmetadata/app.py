@@ -65,8 +65,8 @@ def add_cache_control_header(response, expiry = provider.utcnow() + timedelta(se
 # Decorator to disable caching by endpoint
 def no_cache(func):
     @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        response = func(*args, **kwargs)
+    async def wrapper(*args, **kwargs):
+        response = await func(*args, **kwargs)
         response.cache_control.no_cache = True
         return response
     return wrapper
@@ -124,6 +124,7 @@ def validate_mbid(mbid, check_blacklist=True):
 
 
 @app.route('/')
+@no_cache
 async def default_route():
     """
     Default route with API information
