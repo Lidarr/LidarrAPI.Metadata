@@ -31,7 +31,8 @@ if CONFIG.SENTRY_DSN:
         processor = util.SentryTtlProcessor(ttl=CONFIG.SENTRY_TTL)
         
     sentry_sdk.init(dsn=CONFIG.SENTRY_DSN,
-                    before_send=processor.create_event)
+                    before_send=processor.create_event,
+                    send_default_pii=True)
 
 async def update_wikipedia(count = 50, max_ttl = 60 * 60):
     

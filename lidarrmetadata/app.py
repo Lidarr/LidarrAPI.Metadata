@@ -41,7 +41,8 @@ if app.config['SENTRY_DSN']:
 
     sentry_sdk.init(dsn=app.config['SENTRY_DSN'],
                     integrations=[FlaskIntegration()],
-                    before_send=processor.create_event)
+                    before_send=processor.create_event,
+                    send_default_pii=True)
 
 # Allow all endpoints to be cached by default
 @app.after_request
