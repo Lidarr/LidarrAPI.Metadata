@@ -83,7 +83,6 @@ async def update_fanart(count = 500, max_ttl = 60 * 60):
             
 async def initialize_artists():
     id_provider = provider.get_providers_implementing(provider.ArtistIdListMixin)[0]
-    await id_provider._init()
     
     ids = await id_provider.get_all_artist_ids()
     
@@ -94,7 +93,6 @@ async def initialize_artists():
     
 async def initialize_albums():
     id_provider = provider.get_providers_implementing(provider.ReleaseGroupIdListMixin)[0]
-    await id_provider._init()
     
     ids = await id_provider.get_all_release_group_ids()
     
@@ -160,13 +158,7 @@ async def update_albums(count = 100, max_ttl = 60 * 60):
             # If there weren't any to update sleep, otherwise continue
             await asyncio.sleep(60)
             
-async def init():
-    async_providers = provider.get_providers_implementing(provider.AsyncInit)
-    for prov in async_providers:
-        await prov._init()
-        
 async def crawl():
-    await init()
     await asyncio.gather(
         # Look further ahead for wiki and fanart so external data is ready before we refresh artist/album
         update_wikipedia(max_ttl = 60 * 60 * 2),
@@ -176,7 +168,6 @@ async def crawl():
     )
     
 async def initialize():
-    await init()
     await asyncio.gather(
         initialize_artists(),
         initialize_albums()

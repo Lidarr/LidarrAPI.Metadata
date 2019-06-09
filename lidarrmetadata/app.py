@@ -436,12 +436,6 @@ async def invalidate_cloudflare(files):
                     
                     retries -= 1
 
-@app.before_serving
-async def run_async_init():
-    async_providers = provider.get_providers_implementing(provider.AsyncInit)
-    for prov in async_providers:
-        await prov._init()
-        
 @app.after_serving
 async def run_async_del():
     async_providers = provider.get_providers_implementing(provider.AsyncDel)
