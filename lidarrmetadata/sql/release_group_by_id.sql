@@ -129,7 +129,7 @@ SELECT
                       track.length AS DurationMs,
                       medium.position AS MediumNumber,
                       track.number AS TrackNumber,
-                      track.position AS TrackPositon
+                      track.position AS TrackPosition
                       FROM track
                              JOIN medium ON track.medium = medium.id
                              JOIN artist_credit_name ON artist_credit_name.artist_credit = track.artist_credit
