@@ -416,22 +416,21 @@ class HttpProvider(Provider,
                 json = await resp.json()
                 return json
         except ValueError as error:
-            logger.error(f'Response from {self._name} not valid json: {error}')
+            logger.error(f'Response from {self._name} not valid json', extra=dict(error=error))
             raise ProviderUnavailableException(f'{self._name} returned invalid json')
         except (aiohttp.ClientError, aiohttp.http_exceptions.HttpProcessingError) as error:
-            logger.error(f'aiohttp exception for {url} [{getattr(error, "status", None)}]: {getattr(error, "message", None)}')
+            logger.error(f'aiohttp exception {getattr(error, "status", None)}',
+                         extra = dict(message=getattr(error, "message", None), error=repr(error)))
             raise ProviderUnavailableException(f'{self._name} aiohttp exception')
         except asyncio.CancelledError:
             logger.debug(f'Task cancelled {url}')
             raise
         except asyncio.TimeoutError:
-            logger.error(f'Timeout for {url}')
+            logger.error(f'Timeout for {self._name}', extra=dict(url=url))
             self._count_request('timeout')
             raise ProviderUnavailableException(f'{self._name} timeout')
         except Exception as error:
-            logger.error(f'Non-aiohttp exceptions occured: {getattr(error, "__dict__", {})}')
-            logger.error(repr(error))
-            # raise ProviderUnavailableException(f'{self._name} non-aiohttp exception')
+            logger.error(f'Non-aiohttp exceptions occured: {getattr(error, "__dict__", {})}', extra=dict(error = repr(error)))
             raise
         
     async def get_with_limit(self, url, raise_on_http_error=True, **kwargs):
@@ -1041,7 +1040,7 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
             return (cached or '', utcnow() + timedelta(seconds = CONFIG.CACHE_TTL['provider_error']))
 
         except ValueError as error:
-            logger.error(f'Could not get summary from {url}: {str(error)}')
+            logger.error(f'Could not get summary', extra = dict(url=url, error = repr(error)))
             return '', utcnow() + timedelta(seconds = CONFIG.CACHE_TTL['provider_error'])
             
     async def wikidata_get_summary_from_url(self, url):
