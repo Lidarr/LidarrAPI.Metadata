@@ -24,6 +24,7 @@ from lidarrmetadata.config import get_config
 from lidarrmetadata import limit
 from lidarrmetadata import stats
 from lidarrmetadata import util
+from lidarrmetadata.cache import conn
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -302,18 +303,6 @@ class InvalidateCacheMixin(MixinBase):
         """
         pass
     
-class AsyncInit(MixinBase):
-    """
-    Hook to initialize async items
-    """
-    
-    @abc.abstractmethod
-    async def _init(self, prefix):
-        """
-        Run at initialization using await
-        """
-        pass
-
 class AsyncDel(MixinBase):
     """
     Hook to finalize async items
@@ -359,7 +348,6 @@ class ProviderUnavailableException(Exception):
     pass
 
 class HttpProvider(Provider,
-                   AsyncInit,
                    AsyncDel):
     """
     Generic provider which makes external HTTP queries
@@ -373,19 +361,32 @@ class HttpProvider(Provider,
                                                 CONFIG.STATS_PORT) if CONFIG.ENABLE_STATS else None
         
         self._session = session
+        self.__session_lock = None
             
         if limiter:
             self._limiter = limiter
         else:
             self._limiter = _get_rate_limiter(key=name)
         
-    async def _init(self):
-        # Doesn't require await but needs to happen after the event loop is created otherwise all http requests error
-        if not self._session:
-            self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
+    @property
+    def _session_lock(self):
+        if self.__session_lock is None:
+            self.__session_lock = asyncio.Lock()
+        return self.__session_lock
+    
+    async def _get_session(self):
+        if self._session is None:
+            async with self._session_lock:
+                logger.debug("Initializing AIOHTTP Session")
+                
+                self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
+                
+        return self._session
             
     async def _del(self):
-        await self._session.close()
+        session = await self._get_session()
+        if session:
+            await session.close()
         
     def _count_request(self, result_type):
         if self._stats:
@@ -404,7 +405,8 @@ class HttpProvider(Provider,
         try:
             self._count_request('request')
             start = timer()
-            async with self._session.get(url, **kwargs) as resp:
+            session = await self._get_session()
+            async with session.get(url, **kwargs) as resp:
                 end = timer()
                 elapsed = int((end - start) * 1000)
                 logger.debug(f"Got response [{resp.status}] for URL: {url} in {elapsed}ms ")
@@ -772,7 +774,6 @@ class SolrSearchProvider(HttpProvider,
         return result
     
 class MusicbrainzDbProvider(Provider,
-                            AsyncInit,
                             DataVintageMixin,
                             InvalidateCacheMixin,
                             ArtistIdListMixin,
@@ -811,6 +812,7 @@ class MusicbrainzDbProvider(Provider,
         self._db_user = db_user
         self._db_password = db_password
         self._pool = None
+        self.__pool_lock = None
         
         ## dummy value for initialization, will be picked up from redis later on
         self._last_cache_invalidation = datetime.datetime.now(pytz.utc) - datetime.timedelta(hours = 2)
@@ -821,16 +823,28 @@ class MusicbrainzDbProvider(Provider,
             schema='pg_catalog', format='text'
         )
         
-    async def _init(self):
-        logger.debug("Initializing MB DB pool")
-        self._pool = await asyncpg.create_pool(host = self._db_host,
-                                               port = self._db_port,
-                                               user = self._db_user,
-                                               password = self._db_password,
-                                               database = self._db_name,
-                                               init = self.uuid_as_str,
-                                               statement_cache_size=0)
-        logger.debug("Done")
+    @property
+    def _pool_lock(self):
+        if self.__pool_lock is None:
+            self.__pool_lock = asyncio.Lock()
+        return self.__pool_lock
+    
+    async def _get_pool(self):
+        async with self._pool_lock:
+            if self._pool is None:
+
+                logger.debug("Initializing MB DB pool")
+                
+                # Initialize pool
+                self._pool = await asyncpg.create_pool(host = self._db_host,
+                                                       port = self._db_port,
+                                                       user = self._db_user,
+                                                       password = self._db_password,
+                                                       database = self._db_name,
+                                                       init = self.uuid_as_str,
+                                                       statement_cache_size=0)
+                
+            return self._pool
         
     async def data_vintage(self):
         data = await self.query_from_file('data_vintage.sql')
@@ -965,20 +979,16 @@ class MusicbrainzDbProvider(Provider,
         with open(filename, 'r') as sql:
             return await self.map_query(sql.read(), *args)
 
-    async def map_query(self, sql, *args):
+    @conn
+    async def map_query(self, sql, *args, _conn=None):
         """
         Maps a SQL query to a list of dicts of column name: value
         :param args: Args to pass to cursor.execute
         :param kwargs: Keyword args to pass to cursor.execute
         :return: List of dict with column: value
         """
-        
-        async with self._pool.acquire() as connection:
-            start = timer()
-            data = await connection.fetch(sql, *args)
-            end = timer()
-            elapsed = int((end - start) * 1000)
-            # logger.debug(f"Query complete in {elapsed}ms")
+
+        data = await _conn.fetch(sql, *args)
             
         results = [dict(row.items()) for row in data]
 
