@@ -119,7 +119,7 @@ SELECT
               (SELECT SUM(medium.track_count) FROM medium WHERE medium.release = release.id) AS track_count,
               (
                 SELECT
-                  json_agg(row_to_json(track_data))
+                  COALESCE(json_agg(row_to_json(track_data)), '[]'::json)
                   FROM (
                     SELECT
                       track.gid AS Id,
