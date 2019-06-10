@@ -72,38 +72,26 @@ async def get_overview(links):
     return '', provider.utcnow() + timedelta(days=365)
 
 # Decorator to cache in redis and postgres
-def double_cache(postgres_cache):
+def postgres_cache(cache):
     def decorator(function):
         @functools.wraps(function)
         async def wrapper(*args, **kwargs):
             
             mbid = args[0]
-            cache_key = f"{function.__name__}:{mbid}"
-            
-            # Fast redis cache
-            cached = await util.CACHE.get(cache_key)
-            if cached:
-                return cached
             
             now = provider.utcnow()
 
-            # Slower postgres cache
-            cached, expiry = await postgres_cache.get(mbid)
+            cached, expiry = await cache.get(mbid)
             if cached and expiry > now:
-                # Set redis cache
-                await util.CACHE.set(cache_key, (cached, expiry), ttl=(expiry - now).total_seconds())
                 return cached, expiry
             
             result, expiry = await function(*args, **kwargs)
             ttl = (expiry - now).total_seconds()
             
-            # Set both postgres and redis cache
-            await postgres_cache.set(mbid, result, ttl=ttl)
-            await util.CACHE.set(cache_key, (result, expiry), ttl=ttl)
-            
+            await cache.set(mbid, result, ttl=ttl)
             return result, expiry
 
-        wrapper.__cache__ = postgres_cache
+        wrapper.__cache__ = cache
         return wrapper
     return decorator
 
@@ -113,7 +101,7 @@ class ArtistNotFoundException(Exception):
 class MissingProviderException(Exception):
     """ Thown when we can't cope without a provider """
 
-@double_cache(util.ARTIST_CACHE)
+@postgres_cache(util.ARTIST_CACHE)
 async def get_artist_info(mbid):
     
     expiry = provider.utcnow() + timedelta(seconds = CONFIG.CACHE_TTL['cloudflare'])
@@ -174,7 +162,7 @@ async def get_release_group_artists(release_group):
 class ReleaseGroupNotFoundException(Exception):
     pass
 
-@double_cache(util.ALBUM_CACHE)
+@postgres_cache(util.ALBUM_CACHE)
 async def get_release_group_info_basic(mbid):
     
     release_groups = await get_release_group_info_multi([mbid])

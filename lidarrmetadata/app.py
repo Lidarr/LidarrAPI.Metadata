@@ -391,8 +391,6 @@ async def invalidate_cache():
 
         ## Invalidate all the local caches
         await asyncio.gather(
-            *(util.CACHE.delete(f"get_artist_info:{artist}") for artist in artists),
-            *(util.CACHE.delete(f"get_release_group_info_basic:{album}") for album in albums),
             *(util.ARTIST_CACHE.expire(artist, ttl=-1) for artist in artists),
             *(util.ALBUM_CACHE.expire(album, ttl=-1) for album in albums)
         )
