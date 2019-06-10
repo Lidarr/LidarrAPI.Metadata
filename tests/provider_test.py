@@ -1,7 +1,6 @@
 # coding=utf-8
 import pytest
 
-from lidarrmetadata import api # This is imported so the flask app initializes and cache doesn't fail
 from lidarrmetadata import provider
 
 
@@ -11,7 +10,6 @@ class TestWikipediaProvider:
 
     @pytest.mark.asyncio
     async def test_summary_invalid_url_empty(self):
-        await self.provider._init()
         assert '' == await self.provider.wikipedia_get_summary_from_title('fakeurl', 'en')
         
     def test_title_from_url_invalid(self):
@@ -40,6 +38,5 @@ class TestWikipediaProvider:
      ])
     @pytest.mark.asyncio
     async def test_summary_from_url(self, url, expected):
-        await self.provider._init()
         result, expiry = await self.provider.get_artist_overview(url)
         assert result.startswith(expected)
