@@ -151,5 +151,6 @@ SELECT
              LEFT JOIN release_group_primary_type ON release_group.type = release_group_primary_type.id
              LEFT JOIN artist_credit_name ON artist_credit_name.artist_credit = release_group.artist_credit
              LEFT JOIN artist ON artist_credit_name.artist = artist.id
-     WHERE release_group.gid = ANY($1::uuid[])
+     WHERE artist_credit_name.position = 0
+       AND release_group.gid = ANY($1::uuid[])
   ) album_data;
