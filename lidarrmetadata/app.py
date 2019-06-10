@@ -390,9 +390,10 @@ async def invalidate_cache():
             albums = albums.union(result['albums'])
 
         ## Invalidate all the local caches
+        ## Use set rather than expires so that we add entries for new items also
         await asyncio.gather(
-            *(util.ARTIST_CACHE.expire(artist, ttl=-1) for artist in artists),
-            *(util.ALBUM_CACHE.expire(album, ttl=-1) for album in albums)
+            util.ARTIST_CACHE.multi_set([(artist, None) for artist in artists], ttl=0, timeout=None),
+            util.ALBUM_CACHE.multi_set([(album, None) for album in albums], ttl=0, timeout=None)
         )
 
         ## Invalidate cloudflare cache
