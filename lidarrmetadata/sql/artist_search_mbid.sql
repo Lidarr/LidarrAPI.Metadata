@@ -1,5 +1,10 @@
 SELECT
   artist.gid,
+  array(
+    SELECT gid
+      FROM artist_gid_redirect
+     WHERE artist_gid_redirect.new_id = artist.id
+  ) as oldids,
   artist.name,
   artist.sort_name,
   ended,
