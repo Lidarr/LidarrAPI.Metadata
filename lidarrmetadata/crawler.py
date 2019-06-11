@@ -118,7 +118,7 @@ async def update_items(multi_function, cache, name, count = 100, max_ttl = 60 * 
                 
             if missing:
                 logger.debug(f"Removing deleted {name}s:\n{missing}")
-                await asyncio.gather(*(cache.delete(id) for id in missing_artists))
+                await asyncio.gather(*(cache.delete(id) for id in missing))
                 
             await asyncio.gather(*(cache.set(result['id'], result, ttl=(expiry - provider.utcnow()).total_seconds()) for result, expiry in results))
                 
@@ -128,58 +128,6 @@ async def update_items(multi_function, cache, name, count = 100, max_ttl = 60 * 
             # If there weren't any to update sleep, otherwise continue
             await asyncio.sleep(60)
     
-async def update_artists(count = 100, max_ttl = 60 * 60):
-    while True:
-        keys = await util.ARTIST_CACHE.get_stale(count, provider.utcnow() + timedelta(seconds = max_ttl))
-        logger.debug(f"Got {len(keys)} stale artists to refresh")
-        
-        if keys:
-            start = timer()
-            results = await get_artist_info_multi(keys)
-            
-            if not results:
-                missing_artists = keys
-            else:
-                missing_artists = set(keys) - set(item['id'] for item, _ in results)
-                
-            if missing_artists:
-                logger.debug(f"Removing deleted items:\n{missing_artists}")
-                await asyncio.gather(*(util.ARTIST_CACHE.delete(id) for id in missing_artists))
-                
-            await asyncio.gather(*(util.ARTIST_CACHE.set(result['id'], result, ttl=(expiry - provider.utcnow()).total_seconds()) for result, expiry in results))   
-                
-            logger.debug(f"Refreshed {len(keys)} artists in {timer() - start:.1f}s")
-
-        else:
-            # If there weren't any to update sleep, otherwise continue
-            await asyncio.sleep(60)
-
-async def update_albums(count = 100, max_ttl = 60 * 60):
-    while True:
-        keys = await util.ALBUM_CACHE.get_stale(count, provider.utcnow() + timedelta(seconds = max_ttl))
-        logger.debug(f"Got {len(keys)} stale albums to refresh")
-
-        if keys:
-            start = timer()
-            results = await get_release_group_info_multi(keys)
-            
-            if not results:
-                missing_albums = keys
-            else:
-                missing_albums = set(keys) - set(item['id'] for item, _ in results)
-                
-            if missing_albums:
-                logger.debug(f"Removing deleted albums:\n{missing_albums}")
-                await asyncio.gather(*(util.ALBUM_CACHE.delete(id) for id in missing_albums))
-            
-            await asyncio.gather(*(util.ALBUM_CACHE.set(result['id'], result, ttl=(expiry - provider.utcnow()).total_seconds()) for result, expiry in results))
-            
-            logger.debug(f"Refreshed {len(keys)} albums in {timer() - start:.1f}s")
-
-        else:
-            # If there weren't any to update sleep, otherwise continue
-            await asyncio.sleep(60)
-            
 async def crawl():
     await asyncio.gather(
         # Look further ahead for wiki and fanart so external data is ready before we refresh artist/album
