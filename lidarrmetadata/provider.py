@@ -89,7 +89,7 @@ class ArtistByIdMixin(MixinBase):
     """
 
     @abc.abstractmethod
-    def get_artist_by_id(self, artist_id):
+    def get_artists_by_id(self, artist_id):
         """
         Gets artist by id
         :param artist_id: ID of artist
@@ -245,36 +245,6 @@ class AlbumArtworkMixin(MixinBase):
         Gets images for album with ID
         :param album_id: ID of album
         :return: List of results
-        """
-        pass
-
-
-class ArtistLinkMixin(MixinBase):
-    """
-    Gets links for artist
-    """
-
-    @abc.abstractmethod
-    def get_artist_links(self, artist_id):
-        """
-        Gets links for artist with id
-        :param artist_id: ID of artist
-        :return: List of links
-        """
-        pass
-
-
-class ReleaseGroupLinkMixin(MixinBase):
-    """
-    Gets links for release group
-    """
-
-    @abc.abstractmethod
-    def get_release_group_links(self, release_group_id):
-        """
-        Gets links for release_group with id
-        :param release_group_id: ID of release_group
-        :return: List of links
         """
         pass
 
@@ -793,7 +763,6 @@ class MusicbrainzDbProvider(Provider,
                             InvalidateCacheMixin,
                             ArtistIdListMixin,
                             ArtistByIdMixin,
-                            ArtistLinkMixin,
                             ReleaseGroupByArtistMixin,
                             ReleaseGroupByIdMixin,
                             ReleaseGroupIdListMixin):
@@ -891,28 +860,19 @@ class MusicbrainzDbProvider(Provider,
     async def _invalidate_queries_by_entity_id(self, changed_query):
         entities = await self.query_from_file(changed_query, self._last_cache_invalidation)
         return [entity['gid'] for entity in entities]
-        
-    async def get_artist_by_id(self, artist_id):
-        results = await self.query_from_file('artist_search_mbid.sql', artist_id)
-        
-        logger.debug("got artist")
-        
-        if results:
-            results = results[0]
-        else:
-            return {}
-        return {'Id': results['gid'],
-                'OldIds': results['oldids'],
-                'ArtistName': results['name'],
-                'ArtistAliases': results['aliases'],
-                'SortName': results['sort_name'],
-                'Status': 'ended' if results['ended'] else 'active',
-                'Type': results['type'] or 'Artist',
-                'Disambiguation': results['comment'],
-                'Rating': {'Count': results['rating_count'] or 0,
-                           'Value': results['rating'] / 10 if results[
-                                                                  'rating'] is not None else None}}
     
+    async def get_artists_by_id(self, artist_ids):
+        artists = await self.query_from_file('artist_by_id.sql', artist_ids)
+        
+        logger.debug("got artists")
+        
+        if not artists:
+            return None
+        
+        artists = [self._load_artist(item['artist']) for item in artists]
+
+        return artists
+        
     async def redirect_old_artist_id(self, artist_id):
         results = await self.query_from_file('artist_redirect.sql', artist_id)
         if results:
@@ -926,6 +886,19 @@ class MusicbrainzDbProvider(Provider,
     @staticmethod
     def _build_caa_url(release_id, image_id):
         return 'https://coverartarchive.org/release/{}/{}.jpg'.format(release_id, image_id)
+    
+    @classmethod
+    def _load_artist(cls, data):
+        # Load the json from postgres
+        artist = json.loads(data)
+        
+        # parse the links
+        artist['links'] = [{
+            'target': link,
+            'type': cls.parse_url_source(link)
+        } for link in artist['links']]
+        
+        return artist
 
     @classmethod
     def _load_release_group(cls, data):
@@ -988,14 +961,6 @@ class MusicbrainzDbProvider(Provider,
                  'ReleaseStatuses': result['release_statuses']}
                 for result in results]
     
-
-    async def get_artist_links(self, artist_id):
-        results = await self.query_from_file('links_artist_mbid.sql', artist_id)
-        logger.debug("got artist links")
-        return [{'target': result['url'],
-                 'type': self.parse_url_source(result['url'])}
-                for result in results]
-
     async def query_from_file(self, sql_file, *args):
         """
         Executes query from sql file
