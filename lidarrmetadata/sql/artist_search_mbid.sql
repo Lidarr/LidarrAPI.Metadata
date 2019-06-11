@@ -7,6 +7,11 @@ SELECT
   ) as oldids,
   artist.name,
   artist.sort_name,
+  array(
+    SELECT name
+      FROM artist_alias
+     WHERE artist_alias.artist = artist.id
+  ) as aliases,
   ended,
   comment,
   artist_type.name AS type,
