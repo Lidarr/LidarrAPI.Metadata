@@ -3,7 +3,7 @@ import uuid
 import functools
 import asyncio
 
-from quart import Quart, abort, make_response, request, jsonify
+from quart import Quart, abort, make_response, request, jsonify, redirect, url_for
 from quart.exceptions import HTTPStatusException
 
 import redis
@@ -47,7 +47,7 @@ if app.config['SENTRY_DSN']:
 # Allow all endpoints to be cached by default
 @app.after_request
 def add_cache_control_header(response, expiry = provider.utcnow() + timedelta(seconds=app.config['CACHE_TTL']['cloudflare'])):
-    if response.status_code not in set([200, 400, 403, 404]):
+    if response.status_code not in set([200, 301, 400, 403, 404]):
         response.cache_control.no_cache = True
     # This is a bodge to figure out if we have already set any cache control headers
     elif not response.cache_control or not response.cache_control._directives:
@@ -88,11 +88,27 @@ def handle_error(e):
     return jsonify(error = e.description), e.status_code
 
 @app.errorhandler(api.ReleaseGroupNotFoundException)
-def handle_error(e):
+async def handle_error(e):
+
+    # Look for a redirect
+    album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
+    new_id = await album_provider.redirect_old_release_group_id(e.mbid)
+    
+    if new_id:
+        return redirect(url_for('get_release_group_info_route', mbid=new_id), 301)
+    
     return jsonify(error='Album not found'), 404
 
 @app.errorhandler(api.ArtistNotFoundException)
-def handle_error(e):
+async def handle_error(e):
+
+    # Look for a redirect
+    artist_provider = provider.get_providers_implementing(provider.ArtistByIdMixin)[0]
+    new_id = await artist_provider.redirect_old_artist_id(e.mbid)
+    
+    if new_id:
+        return redirect(url_for('get_artist_info_route', mbid=new_id), 301)
+    
     return jsonify(error='Artist not found'), 404
 
 @app.errorhandler(redis.ConnectionError)

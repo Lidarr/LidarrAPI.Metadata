@@ -96,7 +96,9 @@ def postgres_cache(cache):
     return decorator
 
 class ArtistNotFoundException(Exception):
-    pass
+    def __init__(self, mbid):
+        super().__init__(f"Artist not found: {mbid}")
+        self.mbid = mbid
 
 class MissingProviderException(Exception):
     """ Thown when we can't cope without a provider """
@@ -160,7 +162,9 @@ async def get_release_group_artists(release_group):
     return artists, expiry
 
 class ReleaseGroupNotFoundException(Exception):
-    pass
+    def __init__(self, mbid):
+        super().__init__(f"Album not found: {mbid}")
+        self.mbid = mbid
 
 @postgres_cache(util.ALBUM_CACHE)
 async def get_release_group_info_basic(mbid):
