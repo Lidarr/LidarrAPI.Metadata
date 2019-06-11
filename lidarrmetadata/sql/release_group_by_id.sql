@@ -3,6 +3,11 @@ SELECT
   FROM (
     SELECT
       release_group.gid AS Id,
+      array(
+        SELECT gid
+          FROM release_group_gid_redirect
+         WHERE release_group_gid_redirect.new_id = release_group.id
+      ) as OldIds,
       release_group.comment AS Disambiguation,
       release_group.name AS Title,
       release_group_primary_type.name AS Type,
@@ -68,11 +73,16 @@ SELECT
 	  ) images_data
       ) AS images,
       (
-        SELECT 
-          json_agg(row_to_json(releases_data))
+        SELECT
+          COALESCE(json_agg(row_to_json(releases_data)), '[]'::json)
           FROM (
             SELECT
               release.gid AS Id,
+              array(
+                SELECT gid
+                  FROM release_gid_redirect
+                 WHERE release_gid_redirect.new_id = release.id
+              ) as OldIds,
               release.name AS Title,
               release.comment AS Disambiguation,
               release_status.name AS Status,
@@ -123,7 +133,17 @@ SELECT
                   FROM (
                     SELECT
                       track.gid AS Id,
+                      array(
+                        SELECT gid
+                          FROM track_gid_redirect
+                         WHERE track_gid_redirect.new_id = track.id
+                      ) as OldIds,
                       recording.gid AS RecordingId,
+                      array(
+                        SELECT gid
+                          FROM recording_gid_redirect
+                         WHERE recording_gid_redirect.new_id = recording.id
+                      ) as OldRecordingIds,
                       artist.gid AS ArtistId,
                       track.name AS TrackName,
                       track.length AS DurationMs,
