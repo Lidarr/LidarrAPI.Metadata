@@ -76,11 +76,17 @@ def get_search_query():
     """
     Search for a track
     """
-    query = request.args.get('query')
+    query = request.args.get('query', '')
+    query = query.strip().strip('\x00')
     if not query:
         abort(400, 'No query provided')
-
-    query = query.strip().strip('\x00')
+    
+    logger.info(f"Search query: {query}")
+    
+    # These are invalid search queries for lucene
+    if query in set(['-', '+']):
+        abort(400, 'Invalid search query')
+    
     return query
 
 @app.errorhandler(HTTPStatusException)
