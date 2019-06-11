@@ -96,6 +96,13 @@ class ArtistByIdMixin(MixinBase):
         :return: Artist matching ID or None
         """
         pass
+    
+    @abc.abstractmethod
+    def redirect_old_artist_id(self, artist_id):
+        """
+        Given an id that isn't found, see if it's an old id that needs redirecting.  If so, return new id.
+        """
+        pass
 
 class ArtistIdListMixin(MixinBase):
     """
@@ -150,6 +157,14 @@ class ReleaseGroupByIdMixin(MixinBase):
         :return: Release Group corresponding to rgid
         """
         pass
+    
+    @abc.abstractmethod
+    def redirect_old_release_group_id(self, artist_id):
+        """
+        Given an id that isn't found, see if it's an old id that needs redirecting.  If so, return new id.
+        """
+        pass
+
 
 class ReleaseGroupIdListMixin(MixinBase):
     """
@@ -896,6 +911,12 @@ class MusicbrainzDbProvider(Provider,
                            'Value': results['rating'] / 10 if results[
                                                                   'rating'] is not None else None}}
     
+    async def redirect_old_artist_id(self, artist_id):
+        results = await self.query_from_file('artist_redirect.sql', artist_id)
+        if results:
+            return results[0]['gid']
+        return None
+    
     async def get_all_artist_ids(self):
         results = await self.query_from_file('all_artist_ids.sql')
         return [item['gid'] for item in results]
@@ -941,6 +962,12 @@ class MusicbrainzDbProvider(Provider,
         release_groups = [self._load_release_group(item['album']) for item in release_groups]
 
         return release_groups
+    
+    async def redirect_old_release_group_id(self, id):
+        results = await self.query_from_file('release_group_redirect.sql', id)
+        if results:
+            return results[0]['gid']
+        return None
     
     async def get_all_release_group_ids(self):
         results = await self.query_from_file('all_release_group_ids.sql')
