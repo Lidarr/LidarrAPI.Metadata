@@ -1,5 +1,10 @@
 SELECT DISTINCT
   release_group.gid  AS gid,
+  array(
+    SELECT gid
+      FROM release_group_gid_redirect
+     WHERE release_group_gid_redirect.new_id = release_group.id
+  ) as oldids,
   release_group_primary_type.name as primary_type,
   release_group.name AS album,
   array(

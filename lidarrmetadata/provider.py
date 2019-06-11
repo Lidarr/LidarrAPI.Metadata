@@ -902,6 +902,7 @@ class MusicbrainzDbProvider(Provider,
         else:
             return {}
         return {'Id': results['gid'],
+                'OldIds': results['oldids'],
                 'ArtistName': results['name'],
                 'SortName': results['sort_name'],
                 'Status': 'ended' if results['ended'] else 'active',
@@ -979,6 +980,7 @@ class MusicbrainzDbProvider(Provider,
         logger.debug("got artist release groups")
 
         return [{'Id': result['gid'],
+                 'OldIds': result['oldids'],
                  'Title': result['album'],
                  'Type': result['primary_type'],
                  'SecondaryTypes': result['secondary_types'],
