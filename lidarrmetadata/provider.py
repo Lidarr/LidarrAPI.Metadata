@@ -437,7 +437,7 @@ class HttpProvider(Provider,
             raise ProviderUnavailableException(f'{self._name} returned invalid json')
         except (aiohttp.ClientError, aiohttp.http_exceptions.HttpProcessingError) as error:
             logger.error(f'aiohttp exception {getattr(error, "status", None)}',
-                         extra = dict(message=getattr(error, "message", None), error=repr(error)))
+                         extra = dict(error_message=getattr(error, "message", None), error=repr(error)))
             raise ProviderUnavailableException(f'{self._name} aiohttp exception')
         except asyncio.CancelledError:
             logger.debug(f'Task cancelled {url}')
