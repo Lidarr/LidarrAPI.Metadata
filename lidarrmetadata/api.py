@@ -45,14 +45,6 @@ def validate_mbid(mbid, check_blacklist=True):
     if check_blacklist and mbid in config.get_config().BLACKLISTED_ARTISTS:
         return jsonify(error='Blacklisted artist'), 403
 
-async def get_artist_links_and_overview(mbid):
-    link_providers = provider.get_providers_implementing(provider.ArtistLinkMixin)    
-    links = await link_providers[0].get_artist_links(mbid)
-
-    overview, expiry = await get_overview(links)
-    
-    return {'Links': links, 'Overview': overview}, expiry
-
 async def get_overview(links):
     overview_providers = provider.get_providers_implementing(provider.ArtistOverviewMixin)    
 
@@ -105,40 +97,58 @@ class MissingProviderException(Exception):
 
 @postgres_cache(util.ARTIST_CACHE)
 async def get_artist_info(mbid):
+
+    artists = await get_artist_info_multi([mbid])
+    if not artists:
+        raise ArtistNotFoundException(mbid)
     
-    expiry = provider.utcnow() + timedelta(seconds = CONFIG.CACHE_TTL['cloudflare'])
+    return artists[0]
+
+async def get_artist_info_multi(mbids):
     
-    # TODO A lot of repetitive code here. See if we can refactor
+    start = timer()
+
     artist_providers = provider.get_providers_implementing(provider.ArtistByIdMixin)
     artist_art_providers = provider.get_providers_implementing(provider.ArtistArtworkMixin)
     
     if not artist_providers:
         # 500 error if we don't have an artist provider since it's essential
         raise MissingProviderException('No artist provider available')
-
-    # overviews are the slowest thing so set those going first, followed by images
-    link_overview_task = asyncio.create_task(get_artist_links_and_overview(mbid))
+    
+    expiry = provider.utcnow() + timedelta(seconds = CONFIG.CACHE_TTL['cloudflare'])
+    
+    # Do the main DB query
+    artists = await artist_providers[0].get_artists_by_id(mbids)
+    if not artists:
+        return None
+    
+    # Add in default expiry
+    artists = [{'data': artist, 'expiry': expiry} for artist in artists]
+    
+    # Start overviews
+    overviews_task = asyncio.gather(*[get_overview(artist['data']['links']) for artist in artists])
+    
     if artist_art_providers:
-        images_task = asyncio.create_task(artist_art_providers[0].get_artist_images(mbid))
+        results = await asyncio.gather(*[artist_art_providers[0].get_artist_images(x['data']['id']) for x in artists])
         
-    # Await the overwiew and let the rest finish in meantime
-    overview_data, overview_expiry = await link_overview_task
-    
-    artist = await artist_providers[0].get_artist_by_id(mbid)
-    if not artist:
-        raise ArtistNotFoundException(mbid)
-
-    artist.update(overview_data)
-    
-    if artist_art_providers:
-        images, image_expiry = await images_task
-        artist['Images'] = images
+        for i, artist in enumerate(artists):
+            images, expiry = results[i]
+            artist['data']['images'] = images
+            artist['expiry'] = min(artist['expiry'], expiry)
     else:
-        image_expiry = expiry
-    
-    expiry = min(expiry, overview_expiry, image_expiry)
-        
-    return artist, expiry
+        for artist in artists:
+            artist['images'] = []
+
+    # Get overview results
+    results = await overviews_task
+    for i, artist in enumerate(artists):
+        overview, expiry = results[i]
+        artist['data']['overview'] = overview
+        artist['expiry'] = min(artist['expiry'], expiry)
+            
+    logger.debug(f"Got basic artist info for {len(mbids)} artists in {(timer() - start) * 1000:.0f}ms ")
+
+    return [(item['data'], item['expiry']) for item in artists]
 
 async def get_artist_albums(mbid):
     release_group_providers = provider.get_providers_implementing(
