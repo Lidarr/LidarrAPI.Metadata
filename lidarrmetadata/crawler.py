@@ -131,10 +131,10 @@ async def update_items(multi_function, cache, name, count = 100, max_ttl = 60 * 
 async def crawl():
     await asyncio.gather(
         # Look further ahead for wiki and fanart so external data is ready before we refresh artist/album
-        # update_wikipedia(max_ttl = 60 * 60 * 2),
-        # update_fanart(max_ttl = 60 * 60 * 2),
-        update_items(get_artist_info_multi, util.ARTIST_CACHE, "artist")
-        # update_items(get_release_group_info_multi, util.ALBUM_CACHE, "album")
+        update_wikipedia(max_ttl = 60 * 60 * 2),
+        update_fanart(max_ttl = 60 * 60 * 2),
+        update_items(get_artist_info_multi, util.ARTIST_CACHE, "artist"),
+        update_items(get_release_group_info_multi, util.ALBUM_CACHE, "album")
     )
     
 async def initialize():
