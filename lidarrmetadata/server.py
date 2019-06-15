@@ -33,9 +33,6 @@ def main():
     """
     config = get_config()
 
-    mount_point = config.APPLICATION_ROOT.lstrip('/').rstrip('/')
-    os.environ['SCRIPT_NAME'] = mount_point
-
     options = {
         'bind': '0.0.0.0:{port}'.format(port=config.HTTP_PORT),
         'log_level': 'debug',
