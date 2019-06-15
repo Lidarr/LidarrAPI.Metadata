@@ -101,7 +101,7 @@ async def handle_error(e):
     new_id = await album_provider.redirect_old_release_group_id(e.mbid)
     
     if new_id:
-        return redirect(url_for('get_release_group_info_route', mbid=new_id), 301)
+        return redirect(app.config['ROOT_PATH'] + url_for('get_release_group_info_route', mbid=new_id), 301)
     
     return jsonify(error='Album not found'), 404
 
@@ -113,7 +113,7 @@ async def handle_error(e):
     new_id = await artist_provider.redirect_old_artist_id(e.mbid)
     
     if new_id:
-        return redirect(url_for('get_artist_info_route', mbid=new_id), 301)
+        return redirect(app.config['ROOT_PATH'] + url_for('get_artist_info_route', mbid=new_id), 301)
     
     return jsonify(error='Artist not found'), 404
 
@@ -386,7 +386,7 @@ async def invalidate_cache():
     
     ## this is used as a prefix in various places to make sure
     ## we keep cache for different metadata versions separate
-    base_url = app.config['CLOUDFLARE_URL_BASE'] + '/' +  app.config['APPLICATION_ROOT'].lstrip('/').rstrip('/')
+    base_url = app.config['CLOUDFLARE_URL_BASE'] + '/' +  app.config['ROOT_PATH'].lstrip('/').rstrip('/')
     
     ## Use a cache key to make sure we don't trigger this in parallel
     invalidation_in_progress_key = base_url + 'CacheInvalidationInProgress'
