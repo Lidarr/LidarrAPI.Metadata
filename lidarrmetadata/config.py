@@ -292,6 +292,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # (e.g. we are missing overviews or images)
     DAYS = 60 * 60 * 24
     
+    USE_CACHE = True
     CACHE_TTL = {
         'cloudflare': DAYS * 30,
         'chart': DAYS * 1,
@@ -338,6 +339,37 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
             'port': POSTGRES_CACHE_PORT,
             'db_table': 'album',
             'timeout': 0,
+        }
+    }
+    
+    NULL_CACHE_CONFIG = {
+        'default': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+        },
+        'fanart': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.ExpirySerializer'
+            },
+        },
+        'wikipedia': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.ExpirySerializer'
+            }
+        },
+        'artist': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.ExpirySerializer'
+            }
+
+        },
+        'album': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.ExpirySerializer'
+            }
         }
     }
     
@@ -415,37 +447,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
 
 class TestConfig(DefaultConfig):
-    CACHE_CONFIG = {
-        'default': {
-            'cache': 'lidarrmetadata.cache.NullCache',
-        },
-        'fanart': {
-            'cache': 'lidarrmetadata.cache.NullCache',
-            'serializer': {
-                'class': 'lidarrmetadata.cache.ExpirySerializer'
-            },
-        },
-        'wikipedia': {
-            'cache': 'lidarrmetadata.cache.NullCache',
-            'serializer': {
-                'class': 'lidarrmetadata.cache.ExpirySerializer'
-            }
-        },
-        'artist': {
-            'cache': 'lidarrmetadata.cache.NullCache',
-            'serializer': {
-                'class': 'lidarrmetadata.cache.ExpirySerializer'
-            }
-
-        },
-        'album': {
-            'cache': 'lidarrmetadata.cache.NullCache',
-            'serializer': {
-                'class': 'lidarrmetadata.cache.ExpirySerializer'
-            }
-        }
-    }
-
+    USE_CACHE = False
     ENABLE_STATS = False
     EXTERNAL_LIMIT_CLASS = 'NullRateLimiter'
     SENTRY_REDIS_HOST = None

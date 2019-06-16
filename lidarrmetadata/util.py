@@ -4,6 +4,7 @@ Utility functionality that isn't specific to a given module
 
 import abc
 import time
+import logging
 
 import functools
 import redis
@@ -13,7 +14,19 @@ from aiocache.backends.redis import RedisCache
 from lidarrmetadata import config
 from lidarrmetadata import cache
 
-caches.set_config(config.get_config().CACHE_CONFIG)
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+logger.setLevel(logging.DEBUG)
+logger.info('Have util logger')
+
+
+CONFIG = config.get_config()
+if CONFIG.USE_CACHE:
+    logger.debug('using cache')
+    caches.set_config(CONFIG.CACHE_CONFIG)
+else:
+    logger.debug('null cache')
+    caches.set_config(CONFIG.NULL_CACHE_CONFIG)
 
 # Cache for application
 CACHE = caches.get('default')
