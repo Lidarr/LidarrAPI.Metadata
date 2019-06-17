@@ -1032,6 +1032,8 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
 
             if cached and expires > utcnow():
                 return cached, expires
+        else:
+            cached = None
         
         logger.debug("getting overview")
         
