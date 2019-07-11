@@ -135,6 +135,15 @@ async def get_artist_info_multi(mbids):
             images, expiry = results[i]
             artist['data']['images'] = images
             artist['expiry'] = min(artist['expiry'], expiry)
+
+        if len(artist_art_providers) > 1:
+            artists_without_images = [x for x in artists if not x['data']['images']]
+            results = await asyncio.gather(*[artist_art_providers[1].get_artist_images(x['data']['id']) for x in artists_without_images])
+
+            for i, artist in enumerate(artists_without_images):
+                images, expiry = results[i]
+                artist['data']['images'] = images
+                artist['expiry'] = min(artist['expiry'], expiry)
     else:
         for artist in artists:
             artist['images'] = []
