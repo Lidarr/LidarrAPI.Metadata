@@ -102,7 +102,7 @@ async def update_tadb(count = 500, max_ttl = 60 * 60):
             logger.debug(f"Got {len(keys)} stale tadb items to refresh")
 
             start = timer()
-            await asyncio.gather(*(tadb_provider.refresh_images(mbid) for mbid in keys))
+            await asyncio.gather(*(tadb_provider.refresh_data(mbid) for mbid in keys))
             logger.debug(f"Refreshed {len(keys)} tadb keys in {timer() - start:.1f}s")
 
             # If there weren't any to update sleep, otherwise continue
