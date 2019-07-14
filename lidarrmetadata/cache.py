@@ -219,7 +219,7 @@ class PostgresBackend:
     
     @conn
     async def _clear(self, namespace=None, _conn=None):
-        await _conn.execute(f"DELETE FROM {self._db_table};")
+        await _conn.execute(f"TRUNCATE {self._db_table};")
         return True
     
     @conn
