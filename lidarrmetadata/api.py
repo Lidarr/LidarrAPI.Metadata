@@ -143,12 +143,13 @@ async def get_artist_info_multi(mbids):
             artist['expiry'] = min(artist['expiry'], expiry)
 
         if len(artist_art_providers) > 1:
-            artists_without_images = [x for x in artists if not x['data']['images']]
+            image_types = {'Banner', 'Fanart', 'Logo', 'Poster'}
+            artists_without_images = [x for x in artists if not x['data']['images'] or not image_types.issubset({i['CoverType'] for i in x['data']['images']})]
             results = await asyncio.gather(*[artist_art_providers[1].get_artist_images(x['data']['id']) for x in artists_without_images])
 
             for i, artist in enumerate(artists_without_images):
                 images, expiry = results[i]
-                artist['data']['images'] = images
+                artist['data']['images'] = combine_images(artist['data']['images'], images)
                 artist['expiry'] = min(artist['expiry'], expiry)
     else:
         for artist in artists:
@@ -164,6 +165,14 @@ async def get_artist_info_multi(mbids):
     logger.debug(f"Got basic artist info for {len(mbids)} artists in {(timer() - start) * 1000:.0f}ms ")
 
     return [(item['data'], item['expiry']) for item in artists]
+
+def combine_images(a, b):
+    result = a
+    extra_types = {i['CoverType'] for i in b} - {i['CoverType'] for i in a}
+    extra_images = [i for i in b if i['CoverType'] in extra_types]
+    result.extend(extra_images)
+
+    return result
 
 async def get_artist_albums(mbid):
     release_group_providers = provider.get_providers_implementing(
