@@ -404,7 +404,7 @@ class HttpProvider(Provider,
                 return json
         except ValueError as error:
             logger.error(f'Response from {self._name} not valid json', extra=dict(error=error))
-            raise ProviderUnavailableException(f'{self._name} returned invalid json')
+            raise
         except (aiohttp.ClientError, aiohttp.http_exceptions.HttpProcessingError) as error:
             logger.error(f'aiohttp exception {getattr(error, "status", None)}',
                          extra = dict(error_message=getattr(error, "message", None), error=repr(error)))
@@ -479,23 +479,29 @@ class TheAudioDbProvider(HttpProvider,
 
         if cached is not None and expires > now:
             return handler(cached), expires
-        
+
+        # TheAudioDb provides invalid json for some artists so set these to none
         try:
             results = await self.get_by_mbid(mbid)
-            results, ttl = await self.cache_results(mbid, results)
-            
-            return handler(results), now + timedelta(seconds=ttl)
-
+        except ValueError:
+            results = {}
         except ProviderUnavailableException:
             return (cached or []), now + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
+
+        results, ttl = await self.cache_results(mbid, results)
+        
+        return handler(results), now + timedelta(seconds=ttl)
 
     async def refresh_data(self, mbid):
         try:
             results = await self.get_by_mbid(mbid)
-            await self.cache_results(mbid, results)
-
+        except ValueError:
+            results = {}
         except ProviderUnavailableException:
             logger.debug("TADB unavailable")
+            return
+
+        await self.cache_results(mbid, results)
         
     async def get_by_mbid(self, mbid):
         """
@@ -599,7 +605,7 @@ class FanArtTvProvider(HttpProvider,
             
             return handler(results), now + timedelta(seconds=ttl)
 
-        except ProviderUnavailableException:
+        except (ProviderUnavailableException, ValueError):
             return (cached or []), now + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
         
     async def refresh_images(self, mbid):
@@ -607,7 +613,7 @@ class FanArtTvProvider(HttpProvider,
             results = await self.get_by_mbid(mbid)
             await self.cache_results(mbid, results)
 
-        except ProviderUnavailableException:
+        except (ProviderUnavailableException, ValueError):
             logger.debug("Fanart unavailable")
         
     async def get_by_mbid(self, mbid):
