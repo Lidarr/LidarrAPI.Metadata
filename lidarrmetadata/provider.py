@@ -428,7 +428,8 @@ class HttpProvider(Provider,
             logger.debug(f'{self._name} request rate limited')
             self._count_request('ratelimit')
 
-class TheAudioDbProvider(HttpProvider, 
+class TheAudioDbProvider(HttpProvider,
+                         ArtistOverviewMixin,
                          ArtistArtworkMixin):
     def __init__(self,
                  api_key,
@@ -465,9 +466,13 @@ class TheAudioDbProvider(HttpProvider,
 
     async def get_artist_images(self, artist_id):
         
-        return await self.get_images(artist_id, self.parse_artist_images)
+        return await self.get_data(artist_id, self.parse_artist_images)
+
+    async def get_artist_overview(self, artist_id):
+
+        return await self.get_data(artist_id, self.parse_artist_overview)
         
-    async def get_images(self, mbid, handler):
+    async def get_data(self, mbid, handler):
 
         now = utcnow()
         cached, expires = await util.TADB_CACHE.get(mbid)
@@ -484,7 +489,7 @@ class TheAudioDbProvider(HttpProvider,
         except ProviderUnavailableException:
             return (cached or []), now + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
 
-    async def refresh_images(self, mbid):
+    async def refresh_data(self, mbid):
         try:
             results = await self.get_by_mbid(mbid)
             await self.cache_results(mbid, results)
@@ -532,6 +537,18 @@ class TheAudioDbProvider(HttpProvider,
                   'Poster': response.get('strArtistThumb', '')}
         return [{'CoverType': key, 'Url': value}
                 for key, value in images.items() if value]
+
+    @staticmethod
+    def parse_artist_overview(response):
+        """
+        Parses artist overview to our expected format
+        :param response: API response
+        :return: Overview string
+        """
+        if not response:
+            return ''
+
+        return response.get('strBiographyEN', '')
 
 class FanArtTvProvider(HttpProvider, 
                        AlbumArtworkMixin, 

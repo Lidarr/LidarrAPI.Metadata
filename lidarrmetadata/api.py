@@ -45,7 +45,10 @@ def validate_mbid(mbid, check_blacklist=True):
     if check_blacklist and mbid in config.get_config().BLACKLISTED_ARTISTS:
         return jsonify(error='Blacklisted artist'), 403
 
-async def get_overview(links):
+async def get_overview(links, mbid=None):
+
+    overview = ''
+    expiry = provider.utcnow() + timedelta(days=365)
     overview_providers = provider.get_providers_implementing(provider.ArtistOverviewMixin)    
 
     if overview_providers:
@@ -57,11 +60,14 @@ async def get_overview(links):
             links), None)
 
         if wikidata_link:
-            return await overview_providers[0].get_artist_overview(wikidata_link['target'])
+            overview, expiry = await overview_providers[0].get_artist_overview(wikidata_link['target'])
         elif wikipedia_link:
-            return await overview_providers[0].get_artist_overview(wikipedia_link['target'])
-        
-    return '', provider.utcnow() + timedelta(days=365)
+            overview, expiry = await overview_providers[0].get_artist_overview(wikipedia_link['target'])
+
+        if len(overview_providers) > 1 and mbid and not overview:
+            overview, expiry = await overview_providers[1].get_artist_overview(mbid)
+
+    return overview, expiry
 
 # Decorator to cache in redis and postgres
 def postgres_cache(cache):
@@ -126,7 +132,7 @@ async def get_artist_info_multi(mbids):
     artists = [{'data': artist, 'expiry': expiry} for artist in artists]
     
     # Start overviews
-    overviews_task = asyncio.gather(*[get_overview(artist['data']['links']) for artist in artists])
+    overviews_task = asyncio.gather(*[get_overview(artist['data']['links'], artist['data']['id']) for artist in artists])
     
     if artist_art_providers:
         results = await asyncio.gather(*[artist_art_providers[0].get_artist_images(x['data']['id']) for x in artists])

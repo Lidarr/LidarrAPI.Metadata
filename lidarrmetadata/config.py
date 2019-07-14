@@ -431,11 +431,11 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
     # Provider -> (args, kwargs) dictionaries
     PROVIDERS = {
-        'FANARTTVPROVIDER': ([FANART_KEY], {}),
-        'SOLRSEARCHPROVIDER': ([], {'SEARCH_SERVER': 'http://solr:8983/solr'}),
         'MUSICBRAINZDBPROVIDER': ([], {'DB_HOST': 'db', 'DB_PORT': 5432}),
-        'THEAUDIODBPROVIDER': ([TADB_KEY], {}),
-        'WIKIPEDIAPROVIDER': ([], {})
+        'SOLRSEARCHPROVIDER': ([], {'SEARCH_SERVER': 'http://solr:8983/solr'}),
+        'FANARTTVPROVIDER': ([FANART_KEY], {}),
+        'WIKIPEDIAPROVIDER': ([], {}),
+        'THEAUDIODBPROVIDER': ([TADB_KEY], {})
     }
 
     # Connection info for sentry. Defaults to None, in which case Sentry won't be used
