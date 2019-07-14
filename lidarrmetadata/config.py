@@ -299,6 +299,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
         'provider_error': 60 * 30,
         'redis': DAYS * 7,
         'fanart': DAYS * 30,
+        'tadb': DAYS * 30,
         'wikipedia': DAYS * 7
     }
     
@@ -317,6 +318,13 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
             'endpoint': POSTGRES_CACHE_HOST,
             'port': POSTGRES_CACHE_PORT,
             'db_table': 'fanart',
+            'timeout': 0,
+        },
+        'tadb': {
+            'cache': 'lidarrmetadata.cache.PostgresCache',
+            'endpoint': POSTGRES_CACHE_HOST,
+            'port': POSTGRES_CACHE_PORT,
+            'db_table': 'tadb',
             'timeout': 0,
         },
         'wikipedia': {
@@ -347,6 +355,12 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
             'cache': 'lidarrmetadata.cache.NullCache',
         },
         'fanart': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.ExpirySerializer'
+            },
+        },
+        'tadb': {
             'cache': 'lidarrmetadata.cache.NullCache',
             'serializer': {
                 'class': 'lidarrmetadata.cache.ExpirySerializer'
@@ -402,6 +416,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # in practise it appears the lag is slightly more
     FANART_API_DELAY_SECONDS = 8 * 24 * 60 * 60
 
+    # TADB API credentials
+    TADB_KEY = '1'
+
     # Port to use
     HTTP_PORT = 5001
 
@@ -417,6 +434,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
         'FANARTTVPROVIDER': ([FANART_KEY], {}),
         'SOLRSEARCHPROVIDER': ([], {'SEARCH_SERVER': 'http://solr:8983/solr'}),
         'MUSICBRAINZDBPROVIDER': ([], {'DB_HOST': 'db', 'DB_PORT': 5432}),
+        'THEAUDIODBPROVIDER': ([TADB_KEY], {}),
         'WIKIPEDIAPROVIDER': ([], {})
     }
 

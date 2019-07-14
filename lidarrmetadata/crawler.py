@@ -81,6 +81,33 @@ async def update_fanart(count = 500, max_ttl = 60 * 60):
             # If there weren't any to update sleep, otherwise continue
             if not keys:
                 await asyncio.sleep(60)
+
+async def update_tadb(count = 500, max_ttl = 60 * 60):
+    # Use an aiohttp session which only allows 10 concurrent connections per host to be (a little bit) nice
+    # Only put timeout on sock_read - otherwise we can get timed out waiting for a connection from the pool.
+    # Don't make these count towards rate limiting.
+    # TADB is slow as balls so put in a big timeout.
+    async with aiohttp.ClientSession(
+            timeout = aiohttp.ClientTimeout(sock_read = 10), 
+            connector = aiohttp.TCPConnector(limit_per_host=20)
+    ) as session:
+        tadb_provider = provider.TheAudioDbProvider(
+            CONFIG.TADB_KEY, 
+            session=session, 
+            limiter=limit.NullRateLimiter()
+        )
+
+        while True:
+            keys = await util.TADB_CACHE.get_stale(count, provider.utcnow() + timedelta(seconds = max_ttl))
+            logger.debug(f"Got {len(keys)} stale tadb items to refresh")
+
+            start = timer()
+            await asyncio.gather(*(tadb_provider.refresh_images(mbid) for mbid in keys))
+            logger.debug(f"Refreshed {len(keys)} tadb keys in {timer() - start:.1f}s")
+
+            # If there weren't any to update sleep, otherwise continue
+            if not keys:
+                await asyncio.sleep(60)
             
 async def initialize_artists():
     id_provider = provider.get_providers_implementing(provider.ArtistIdListMixin)[0]
@@ -91,6 +118,16 @@ async def initialize_artists():
     
     await util.ARTIST_CACHE.clear()
     await util.ARTIST_CACHE.multi_set(pairs, ttl=0, timeout=None)
+
+async def initialize_tadb():
+    id_provider = provider.get_providers_implementing(provider.ArtistIdListMixin)[0]
+    
+    ids = await id_provider.get_all_artist_ids()
+    
+    pairs = [(id, None) for id in ids]
+    
+    await util.TADB_CACHE.clear()
+    await util.TADB_CACHE.multi_set(pairs, ttl=0, timeout=None)
     
 async def initialize_albums():
     id_provider = provider.get_providers_implementing(provider.ReleaseGroupIdListMixin)[0]
@@ -133,6 +170,7 @@ async def crawl():
         # Look further ahead for wiki and fanart so external data is ready before we refresh artist/album
         update_wikipedia(max_ttl = 60 * 60 * 2),
         update_fanart(max_ttl = 60 * 60 * 2),
+        update_tadb(max_ttl = 60 * 60 * 2),
         update_items(get_artist_info_multi, util.ARTIST_CACHE, "artist"),
         update_items(get_release_group_info_multi, util.ALBUM_CACHE, "album")
     )
@@ -140,7 +178,8 @@ async def crawl():
 async def initialize():
     await asyncio.gather(
         initialize_artists(),
-        initialize_albums()
+        initialize_albums(),
+        initialize_tadb()
     )
     
 def main():
