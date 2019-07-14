@@ -10,7 +10,7 @@ SELECT
       ) as OldIds,
       release_group.comment AS Disambiguation,
       release_group.name AS Title,
-      release_group_primary_type.name AS Type,
+      COALESCE(release_group_primary_type.name, 'Other') AS Type,
       array(
         SELECT name
           FROM release_group_secondary_type rgst

@@ -1,11 +1,11 @@
-SELECT DISTINCT
+SELECT
   release_group.gid  AS gid,
   array(
     SELECT gid
       FROM release_group_gid_redirect
      WHERE release_group_gid_redirect.new_id = release_group.id
   ) as oldids,
-  release_group_primary_type.name as primary_type,
+  COALESCE(release_group_primary_type.name, 'Other') as primary_type,
   release_group.name AS album,
   array(
     SELECT name FROM release_group_secondary_type rgst
@@ -21,6 +21,6 @@ SELECT DISTINCT
 FROM release_group
   JOIN artist_credit_name ON artist_credit_name.artist_credit = release_group.artist_credit
   JOIN artist ON artist_credit_name.artist = artist.id
-  JOIN release_group_primary_type ON release_group.type = release_group_primary_type.id
+  LEFT JOIN release_group_primary_type ON release_group.type = release_group_primary_type.id
 
 WHERE artist.gid = $1 AND artist_credit_name.position = 0
