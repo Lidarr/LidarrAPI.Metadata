@@ -178,8 +178,7 @@ async def crawl():
 async def initialize():
     await asyncio.gather(
         initialize_artists(),
-        initialize_albums(),
-        initialize_tadb()
+        initialize_albums()
     )
     
 def main():

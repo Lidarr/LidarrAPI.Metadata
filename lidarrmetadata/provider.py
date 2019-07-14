@@ -499,7 +499,7 @@ class TheAudioDbProvider(HttpProvider,
             results = {}
         except ProviderUnavailableException:
             logger.debug("TADB unavailable")
-            return
+            await util.TADB_CACHE.expire(mbid, CONFIG.CACHE_TTL['provider_error'])
 
         await self.cache_results(mbid, results)
         
@@ -519,7 +519,7 @@ class TheAudioDbProvider(HttpProvider,
     async def cache_results(self, mbid, results):
         ttl = CONFIG.CACHE_TTL['tadb']
 
-        results = results.get('artists', None)
+        results = results.get('artists', {})
         if results:
             results = results[0]
 
@@ -615,6 +615,7 @@ class FanArtTvProvider(HttpProvider,
 
         except (ProviderUnavailableException, ValueError):
             logger.debug("Fanart unavailable")
+            await util.FANART_CACHE.expire(mbid, CONFIG.CACHE_TTL['provider_error'])
         
     async def get_by_mbid(self, mbid):
         """
