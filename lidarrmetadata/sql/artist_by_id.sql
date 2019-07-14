@@ -26,7 +26,15 @@ SELECT
         SELECT url.url
           FROM url
                  JOIN l_artist_url ON l_artist_url.entity0 = artist.id AND l_artist_url.entity1 = url.id
-      ) AS Links
+      ) AS Links,
+      array(
+        SELECT genre.name
+          FROM genre
+                 JOIN tag ON genre.name = tag.name
+                 JOIN artist_tag ON artist_tag.tag = tag.id
+         WHERE artist_tag.artist = artist.id
+           AND artist_tag.count > 0
+      ) AS Genres
       FROM artist
              LEFT JOIN artist_type ON artist.type = artist_type.id
              LEFT JOIN artist_meta ON artist.id = artist_meta.id
