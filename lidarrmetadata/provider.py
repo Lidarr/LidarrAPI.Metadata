@@ -428,6 +428,111 @@ class HttpProvider(Provider,
             logger.debug(f'{self._name} request rate limited')
             self._count_request('ratelimit')
 
+class TheAudioDbProvider(HttpProvider, 
+                         ArtistArtworkMixin):
+    def __init__(self,
+                 api_key,
+                 base_url='theaudiodb.com/api/v1/json',
+                 use_https=True,
+                 session=None,
+                 limiter=None):
+        """
+        Class initialization
+
+        :param api_key: fanart.tv API key
+        :param base_url: Base URL of API. Defaults to
+                         webservice.fanart.tv/v3/music
+        :param use_https: Whether or not to use https. Defaults to True.
+        """
+        super().__init__('tadb', session, limiter)
+
+        self._api_key = api_key
+        self._base_url = base_url
+        self.use_https = use_https
+        
+    def build_url(self, mbid):
+        """
+        Builds query url
+        :param mbid: Musicbrainz ID of resource
+        :return: URL to query
+        """
+        scheme = 'https://' if self.use_https else 'http://'
+        url = scheme + self._base_url
+        if url[-1] != '/':
+            url += '/'
+        url += f'{self._api_key}/artist-mb.php?i={mbid}'
+        return url
+
+    async def get_artist_images(self, artist_id):
+        
+        return await self.get_images(artist_id, self.parse_artist_images)
+        
+    async def get_images(self, mbid, handler):
+
+        now = utcnow()
+        cached, expires = await util.TADB_CACHE.get(mbid)
+
+        if cached is not None and expires > now:
+            return handler(cached), expires
+        
+        try:
+            results = await self.get_by_mbid(mbid)
+            results, ttl = await self.cache_results(mbid, results)
+            
+            return handler(results), now + timedelta(seconds=ttl)
+
+        except ProviderUnavailableException:
+            return (cached or []), now + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
+
+    async def refresh_images(self, mbid):
+        try:
+            results = await self.get_by_mbid(mbid)
+            await self.cache_results(mbid, results)
+
+        except ProviderUnavailableException:
+            logger.debug("TADB unavailable")
+        
+    async def get_by_mbid(self, mbid):
+        """
+        Gets the theaudiodb.com response for resource with Musicbrainz id mbid
+        :param mbid: Musicbrainz ID
+        :return: response for mbid
+        """
+        url = self.build_url(mbid)
+        response = await self.get_with_limit(url, raise_on_http_error=False)
+        if response.get('status', None):
+            return {}
+        else:
+            return response
+        
+    async def cache_results(self, mbid, results):
+        ttl = CONFIG.CACHE_TTL['tadb']
+
+        results = results.get('artists', None)
+        if results:
+            results = results[0]
+
+        await util.TADB_CACHE.set(mbid, results, ttl=ttl)
+
+        return results, ttl
+
+    @staticmethod
+    def parse_artist_images(response):
+        """
+        Parses artist images to our expected format
+        :param response: API response
+        :return: List of images in our expected format
+        """
+        if not response:
+            return []
+        
+        images = {'Banner': response.get('strArtistBanner', ''),
+                  'Fanart': response.get('strArtistFanart', ''),
+                  'Logo': response.get('strArtistLogo', ''),
+                  'Poster': response.get('strArtistThumb', '')}
+        return [{'CoverType': key, 'Url': value}
+                for key, value in images.items() if value]
+
 class FanArtTvProvider(HttpProvider, 
                        AlbumArtworkMixin, 
                        ArtistArtworkMixin,

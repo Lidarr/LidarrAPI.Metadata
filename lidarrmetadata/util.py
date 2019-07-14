@@ -31,6 +31,7 @@ else:
 # Cache for application
 CACHE = caches.get('default')
 FANART_CACHE = caches.get('fanart')
+TADB_CACHE = caches.get('tadb')
 WIKI_CACHE = caches.get('wikipedia')
 ARTIST_CACHE = caches.get('artist')
 ALBUM_CACHE = caches.get('album')
