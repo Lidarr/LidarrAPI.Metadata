@@ -481,14 +481,14 @@ class TheAudioDbProvider(HttpProvider,
             return handler(cached), expires
 
         # TheAudioDb provides invalid json for some artists so set these to none
+        ttl = CONFIG.CACHE_TTL['tadb']
         try:
             results = await self.get_by_mbid(mbid)
-        except ValueError:
-            results = {}
-        except ProviderUnavailableException:
-            return (cached or []), now + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
+        except (ProviderUnavailableException, ValueError):
+            results = cached or {}
+            ttl = CONFIG.CACHE_TTL['provider_error']
 
-        results, ttl = await self.cache_results(mbid, results)
+        results, ttl = await self.cache_results(mbid, results, ttl)
         
         return handler(results), now + timedelta(seconds=ttl)
 
@@ -516,9 +516,7 @@ class TheAudioDbProvider(HttpProvider,
         else:
             return response
         
-    async def cache_results(self, mbid, results):
-        ttl = CONFIG.CACHE_TTL['tadb']
-
+    async def cache_results(self, mbid, results, ttl=CONFIG.CACHE_TTL['tadb']):
         results = results.get('artists', {})
         if results:
             results = results[0]
@@ -606,7 +604,7 @@ class FanArtTvProvider(HttpProvider,
             return handler(results), now + timedelta(seconds=ttl)
 
         except (ProviderUnavailableException, ValueError):
-            return (cached or []), now + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
+            return (handler(cached) or []), now + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
         
     async def refresh_images(self, mbid):
         try:
