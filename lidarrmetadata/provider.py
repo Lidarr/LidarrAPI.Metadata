@@ -604,7 +604,7 @@ class FanArtTvProvider(HttpProvider,
             return handler(results), now + timedelta(seconds=ttl)
 
         except (ProviderUnavailableException, ValueError):
-            return (handler(cached) or []), now + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
+            return handler(cached or {}), now + timedelta(seconds=CONFIG.CACHE_TTL['provider_error'])
         
     async def refresh_images(self, mbid):
         try:
