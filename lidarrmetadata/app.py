@@ -305,7 +305,7 @@ async def get_album_search_results(query, limit, include_tracks, artist_name):
                 album['releases'] = []
 
         scores = [result[1] for result in results]
-        validity = min([result[2] for result in results] or [0])
+        validity = min([result[2] for result in results] or [provider.utcnow()])
 
         return albums, scores, validity
         
@@ -371,7 +371,7 @@ async def get_artist_search_results(query, limit):
 
     artists = [result[0] for result in results]
     scores = [result[1] for result in results]
-    validity = min([result[2] for result in results] or [0])
+    validity = min([result[2] for result in results] or [provider.utcnow()])
 
     return artists, scores, validity
 
