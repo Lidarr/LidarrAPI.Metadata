@@ -376,7 +376,7 @@ async def get_artist_search_results(query, limit):
     return artists, scores, validity
 
 @app.route('/search/all', methods=['GET'])
-async def search_combined():
+async def search_all():
     query = get_search_query()
 
     limit = request.args.get('limit', default=10, type=int)
@@ -411,6 +411,8 @@ async def search_route():
         return await search_artist()
     elif type == 'album':
         return await search_album()
+    elif type == 'all':
+        return await search_all()
     else:
         error = jsonify(error='Type not provided') if type is None else jsonify(
             error='Unsupported search type {}'.format(type))
