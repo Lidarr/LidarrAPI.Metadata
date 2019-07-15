@@ -480,11 +480,13 @@ class TheAudioDbProvider(HttpProvider,
         if cached is not None and expires > now:
             return handler(cached), expires
 
-        # TheAudioDb provides invalid json for some artists so set these to none
+        # TheAudioDb provides invalid json for some artists so set these to {}
         ttl = CONFIG.CACHE_TTL['tadb']
         try:
             results = await self.get_by_mbid(mbid)
-        except (ProviderUnavailableException, ValueError):
+        except ValueError:
+            results = {}
+        except:
             results = cached or {}
             ttl = CONFIG.CACHE_TTL['provider_error']
 
@@ -495,11 +497,12 @@ class TheAudioDbProvider(HttpProvider,
     async def refresh_data(self, mbid):
         try:
             results = await self.get_by_mbid(mbid)
-        except ValueError:
-            results = {}
         except ProviderUnavailableException:
             logger.debug("TADB unavailable")
             await util.TADB_CACHE.expire(mbid, CONFIG.CACHE_TTL['provider_error'])
+            return
+        except:
+            results = {}
 
         await self.cache_results(mbid, results)
         
