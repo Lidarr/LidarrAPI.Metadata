@@ -274,39 +274,43 @@ async def search_album():
     query = get_search_query()
 
     artist_name = request.args.get('artist', '')
-    basic = request.args.get('basic', False)
     include_tracks = request.args.get('includeTracks', False)
 
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
 
+    albums, scores, validity = await get_album_search_results(query, limit, include_tracks, artist_name)
+
+    return add_cache_control_header(jsonify(albums), validity)
+
+async def get_album_search_results(query, limit, include_tracks, artist_name):
     search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
     
     if search_providers:
         start = timer()
-        album_ids = await search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
+        search_results = await search_providers[0].search_album_name(query, artist_name=artist_name, limit=limit)
         logger.debug(f"Got album search results in {(timer() - start) * 1000:.0f}ms ")
+
+        async def get_search_result(item):
+            result, validity = await api.get_release_group_info(item['Id'])
+            return result, item['Score'], validity
         
-        if basic:
-            albums = album_ids
-            validity = 1
-        else:
-            
-            results = await asyncio.gather(*[api.get_release_group_info(item['Id']) for item in album_ids])
-            albums = [result[0] for result in results]
-            
-            # Current versions of lidarr will fail trying to parse the tracks contained in releases
-            # because it's not expecting it to be present and passes null for ArtistMetadata dict
-            if not include_tracks:
-                for album in albums:
-                    album['releases'] = []
-            
-            validity = min([result[1] for result in results] or [0])
+        results = await asyncio.gather(*[get_search_result(item) for item in search_results])
+        albums = [result[0] for result in results]
+
+        # Current versions of lidarr will fail trying to parse the tracks contained in releases
+        # because it's not expecting it to be present and passes null for ArtistMetadata dict
+        if not include_tracks:
+            for album in albums:
+                album['releases'] = []
+
+        scores = [result[1] for result in results]
+        validity = min([result[2] for result in results] or [0])
+
+        return albums, scores, validity
         
     else:
-        return jsonify(error="No album search providers"), 500
-
-    return add_cache_control_header(jsonify(albums), validity)
+        abort(500, "No album search providers")
 
 @app.route('/search/artist', methods=['GET'])
 async def search_artist():
@@ -340,32 +344,64 @@ async def search_artist():
                 }
     """
     query = get_search_query()
-    albums = request.args.getlist('album')
 
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
-    
-    basic = request.args.get('basic', False)
 
+    artists, scores, validity = await get_artist_search_results(query, limit)
+    
+    return add_cache_control_header(jsonify(artists), validity)
+
+async def get_artist_search_results(query, limit):
     search_providers = provider.get_providers_implementing(
         provider.ArtistNameSearchMixin)
 
     if not search_providers:
-        return jsonify(error='No search providers available'), 500
+        return abort(500, 'No search providers available')
 
     # TODO Prefer certain providers?
     artist_ids = filter(lambda a: a['Id'] not in config.get_config().BLACKLISTED_ARTISTS,
-                        await search_providers[0].search_artist_name(query, limit=limit, albums=albums))
+                        await search_providers[0].search_artist_name(query, limit=limit))
 
-    if basic:
-        artists = artist_ids
-        validity = 1
-    else:
-        results = await asyncio.gather(*[api.get_artist_info(item['Id']) for item in artist_ids])
-        artists = [result[0] for result in results]
-        validity = min([result[1] for result in results] or [0])
-    
-    return add_cache_control_header(jsonify(artists), validity)
+    async def get_search_result(id, score):
+        result, validity = await api.get_artist_info(id)
+        return result, score, validity
+
+    results = await asyncio.gather(*[get_search_result(item['Id'], item['Score']) for item in artist_ids])
+
+    artists = [result[0] for result in results]
+    scores = [result[1] for result in results]
+    validity = min([result[2] for result in results] or [0])
+
+    return artists, scores, validity
+
+@app.route('/search/all', methods=['GET'])
+async def search_combined():
+    query = get_search_query()
+
+    limit = request.args.get('limit', default=10, type=int)
+    limit = None if limit < 1 else limit
+
+    results = await asyncio.gather(
+        get_artist_search_results(query, limit),
+        get_album_search_results(query, limit, True, None)
+    )
+    artists, artist_scores, artist_validity = results[0]
+    albums, album_scores, album_validity = results[1]
+    validity = min(artist_validity, album_validity)
+
+    artist_items = [{'score': artist_scores[i],
+                     'artist': x,
+                     'album': None}
+                    for i, x in enumerate(artists)]
+    album_items = [{'score': album_scores[i],
+                    'artist': None,
+                    'album': x}
+                   for i, x in enumerate(albums)]
+    results = artist_items + album_items
+    results.sort(key = lambda i: i['score'], reverse = True)
+
+    return add_cache_control_header(jsonify(results), validity)
 
 @app.route('/search')
 async def search_route():

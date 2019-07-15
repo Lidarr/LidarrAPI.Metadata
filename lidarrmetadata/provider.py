@@ -119,7 +119,7 @@ class ArtistNameSearchMixin(MixinBase):
     """
 
     @abc.abstractmethod
-    def search_artist_name(self, name, limit=None, albums=None):
+    def search_artist_name(self, name, limit=None):
         """
         Searches for artist with name
         :param name: Name to search for
@@ -769,11 +769,8 @@ class SolrSearchProvider(HttpProvider,
     async def get_with_limit(self, url):
         return await super().get_with_limit(url, timeout=aiohttp.ClientTimeout(total=5))
             
-    async def search_artist_name(self, name, limit=None, albums=None):
+    async def search_artist_name(self, name, limit=None):
         
-        if albums:
-            return await self.search_artist_name_with_albums(name, albums, self.parse_artist_search_with_albums, limit)
-
         # Note that when using a dismax query we shouldn't apply lucene escaping
         # See https://github.com/metabrainz/musicbrainz-server/blob/master/lib/MusicBrainz/Server/Data/WebService.pm
         url = u'{server}/artist/select?wt=mbjson&q={query}'.format(
@@ -791,7 +788,7 @@ class SolrSearchProvider(HttpProvider,
         
         return self.parse_artist_search(response)
     
-    async def search_artist_name_with_albums(self, artist, albums, handler, limit=None):
+    async def search_albums_with_artist(self, artist, albums, handler, limit=None):
         
         album_query = u" ".join(albums)
         query = u"({album_query}) AND (artist:{artist} OR artistname:{artist} OR creditname:{artist})".format(
@@ -817,7 +814,7 @@ class SolrSearchProvider(HttpProvider,
     async def search_album_name(self, name, limit=None, artist_name=''):
         
         if artist_name:
-            return await self.search_artist_name_with_albums(artist_name, [name], self.parse_album_search, limit)
+            return await self.search_albums_with_artist(artist_name, [name], self.parse_album_search, limit)
 
         # Note that when using a dismax query we shouldn't apply lucene escaping
         # See https://github.com/metabrainz/musicbrainz-server/blob/master/lib/MusicBrainz/Server/Data/WebService.pm
@@ -850,30 +847,9 @@ class SolrSearchProvider(HttpProvider,
         return [{'Id': x['id'],
                  'ArtistName': x['name'],
                  'Type': x['type'] if 'type' in x else '',
-                 'Disambiguation': x['disambiguation'] if 'disambiguation' in x else ''}
+                 'Disambiguation': x['disambiguation'] if 'disambiguation' in x else '',
+                 'Score': x['score']}
                 for x in response['artists']];
-    
-    @staticmethod
-    def parse_artist_search_with_albums(response):
-        
-        if not 'count' in response or response['count'] == 0:
-            return []
-        
-        artists = []
-        seen_artists = set()
-        
-        for rg in response['release-groups']:
-            for credit in rg['artist-credit']:
-                if not credit['artist']['id'] in seen_artists:
-                    seen_artists.add(credit['artist']['id'])
-                    artists.append(credit['artist'])
-                
-        result = [{'Id': artist['id'],
-                    'ArtistName': artist['name'],
-                    'Disambiguation': artist['disambiguation'] if 'disambiguation' in artist else ''}
-                  for artist in artists]
-        
-        return result
     
     @staticmethod
     def parse_album_search(response):
@@ -882,8 +858,9 @@ class SolrSearchProvider(HttpProvider,
             return []
         
         result = [{'Id': result['id'],
-                 'Title': result['title'],
-                 'Type': result['primary-type'] if 'primary-type' in result else 'Unknown'}
+                   'Title': result['title'],
+                   'Type': result['primary-type'] if 'primary-type' in result else 'Unknown',
+                   'Score': result['score']}
                 for result in response['release-groups']]
 
         return result
