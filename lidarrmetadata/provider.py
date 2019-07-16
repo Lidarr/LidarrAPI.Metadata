@@ -474,10 +474,10 @@ class TheAudioDbProvider(HttpProvider,
         
     async def get_data(self, mbid, handler):
 
-        now = utcnow()
         cached, expires = await util.TADB_CACHE.get(mbid)
-
-        if cached is not None and expires > now:
+        now = utcnow()
+        
+        if expires > now:
             return handler(cached), expires
 
         # TheAudioDb provides invalid json for some artists so set these to {}
@@ -513,15 +513,11 @@ class TheAudioDbProvider(HttpProvider,
         :return: response for mbid
         """
         url = self.build_url(mbid)
-        response = await self.get_with_limit(url, raise_on_http_error=False)
-        if response.get('status', None):
-            return {}
-        else:
-            return response
+        return await self.get_with_limit(url)
         
     async def cache_results(self, mbid, results, ttl=CONFIG.CACHE_TTL['tadb']):
-        results = results.get('artists', {})
-        if results:
+        results = results.get('artists', None)
+        if isinstance(results, list):
             results = results[0]
 
         await util.TADB_CACHE.set(mbid, results, ttl=ttl)
