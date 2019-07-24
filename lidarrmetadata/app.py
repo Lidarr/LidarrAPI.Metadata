@@ -496,6 +496,47 @@ async def invalidate_cloudflare(files):
                     
                     retries -= 1
 
+@app.route('/spotify/auth')
+@no_cache
+async def handle_spotify_auth_redirect():
+    code = request.args.get('code', '')
+    state = request.args.get('state', '')
+
+    if not code:
+        abort(400, 'No auth code provided')
+
+    if not state:
+        abort(400, 'No state provided')
+
+    if not state.endswith('/oauth.html'):
+        abort(400, 'Illegal state value')
+
+    spotify_provider = provider.get_providers_implementing(provider.SpotifyAuthMixin)[0]
+
+    try:
+        access_token, expires_in, refresh_token = await spotify_provider.get_token(code)
+        newurl = f"{state}?access_token={access_token}&expires_in={expires_in}&refresh_token={refresh_token}";
+
+        return redirect(newurl, 302)
+    except aiohttp.ClientResponseError as error:
+        abort(error.status, f"spotify: {error.message}")
+
+@app.route('/spotify/renew')
+@no_cache
+async def handle_spotify_token_renew():
+    refresh_token = request.args.get('refresh_token', '')
+
+    if not refresh_token:
+        abort(400, 'No refresh token provided')
+
+    spotify_provider = provider.get_providers_implementing(provider.SpotifyAuthMixin)[0]
+
+    try:
+        json = await spotify_provider.refresh_token(refresh_token)
+        return jsonify(json)
+    except aiohttp.ClientResponseError as error:
+        abort(error.status, error.message)
+
 @app.after_serving
 async def run_async_del():
     async_providers = provider.get_providers_implementing(provider.AsyncDel)

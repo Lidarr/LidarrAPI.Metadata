@@ -426,6 +426,11 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     LASTFM_KEY = ''
     LASTFM_SECRET = ''
 
+    # Spotify app details
+    SPOTIFY_REDIRECT_URL = ''
+    SPOTIFY_ID = ''
+    SPOTIFY_SECRET = ''
+
     # Whether or not running in production
     PRODUCTION = False
 
@@ -435,7 +440,8 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
         'SOLRSEARCHPROVIDER': ([], {'SEARCH_SERVER': 'http://solr:8983/solr'}),
         'FANARTTVPROVIDER': ([FANART_KEY], {}),
         'WIKIPEDIAPROVIDER': ([], {}),
-        'THEAUDIODBPROVIDER': ([TADB_KEY], {})
+        'THEAUDIODBPROVIDER': ([TADB_KEY], {}),
+        'SPOTIFYAUTHPROVIDER': ([], {'CLIENT_ID': SPOTIFY_ID, 'CLIENT_SECRET': SPOTIFY_SECRET, 'REDIRECT_URI': SPOTIFY_REDIRECT_URL})
     }
 
     # Connection info for sentry. Defaults to None, in which case Sentry won't be used

@@ -128,6 +128,27 @@ class ArtistNameSearchMixin(MixinBase):
         """
         pass
 
+class SpotifyAuthMixin(MixinBase):
+    """
+    Provides/renews tokens for spotify API
+    """
+
+    @abc.abstractmethod
+    def get_token(self, code):
+        """
+        Gets spotify token as part of oAuth callback
+        :param code: Auth code from spotify
+        :return: Spotify access and refresh code
+        """
+        pass
+
+    def renew_token(self, refresh_token):
+        """
+        Renews access code given refresh token
+        :param refresh_token: refresh token
+        :return: Spotify access and refresh code
+        """
+        pass
 
 class ReleaseGroupByArtistMixin(MixinBase):
     """
@@ -741,6 +762,57 @@ class FanArtTvProvider(HttpProvider,
         return [{'CoverType': key, 'Url': value['url'].replace('https', 'http')}
                 for key, value in images.items() if value]
 
+class SpotifyAuthProvider(HttpProvider,
+                          SpotifyAuthMixin):
+    
+    """
+    Provider to handle OAuth redirect from spotify
+    """
+    def __init__(self,
+                 token_url='https://accounts.spotify.com/api/token',
+                 redirect_uri='',
+                 client_id='',
+                 client_secret=''):
+        """
+        Class initialization
+        """
+        super(SpotifyAuthProvider, self).__init__('spotify')
+        self._token_url = token_url
+        self._redirect_uri = redirect_uri
+        self._client_id = client_id
+        self._client_secret = client_secret
+
+    async def get_token(self, code):
+
+        body = {'grant_type': 'authorization_code',
+                'code': code,
+                'redirect_uri': self._redirect_uri,
+                'client_id': self._client_id,
+                'client_secret': self._client_secret}
+
+        session = await self._get_session()
+        async with session.post(self._token_url, data=body) as resp:
+            resp.raise_for_status()
+            json = await resp.json()
+
+            access_token = json.get('access_token', '')
+            expires_in = json.get('expires_in', '')
+            refresh_token = json.get('refresh_token', '')
+
+            return access_token, expires_in, refresh_token
+            
+    async def refresh_token(self, refresh_token):
+
+        body = {'grant_type': 'refresh_token',
+                'refresh_token': refresh_token,
+                'client_id': self._client_id,
+                'client_secret': self._client_secret}
+
+        session = await self._get_session()
+        async with session.post(self._token_url, data=body) as resp:
+            resp.raise_for_status()
+            return await resp.json()
+        
 class SolrSearchProvider(HttpProvider,
                          ArtistNameSearchMixin,
                          AlbumNameSearchMixin):
