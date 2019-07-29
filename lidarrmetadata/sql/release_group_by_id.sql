@@ -10,6 +10,11 @@ SELECT
       ) as OldIds,
       release_group.comment AS Disambiguation,
       release_group.name AS Title,
+      array(
+        SELECT name
+          FROM release_group_alias
+         WHERE release_group_alias.release_group = release_group.id
+      ) as Aliases,
       COALESCE(release_group_primary_type.name, 'Other') AS Type,
       array(
         SELECT name
