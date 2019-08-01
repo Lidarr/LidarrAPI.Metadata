@@ -4,6 +4,7 @@ import datetime
 from datetime import timedelta
 import logging
 from timeit import default_timer as timer
+import sys
 
 import aiohttp
 import sentry_sdk
@@ -184,13 +185,19 @@ async def initialize():
 def main():
     
     parser = argparse.ArgumentParser(prog="lidarr-metadata-crawler")
-    parser.add_argument("--initialize", action="store_true")
+    parser.add_argument("--initialize-artists", action="store_true")
+    parser.add_argument("--initialize-albums", action="store_true")
     
     args = parser.parse_args()
-    if args.initialize:
-        asyncio.run(initialize())
-    else:
-        asyncio.run(crawl())
+    if args.initialize_artists:
+        asyncio.run(initialize_artists())
+        sys.exit()
+
+    if args.initialize_albums:
+        asyncio.run(initialize_albums())
+        sys.exit()
+    
+    asyncio.run(crawl())
     
 if __name__ == "__main__":
     main()
