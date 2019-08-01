@@ -67,7 +67,7 @@ SELECT
                  JOIN l_release_group_url ON l_release_group_url.entity0 = release_group.id AND l_release_group_url.entity1 = url.id
       ) AS Links,
       array(
-        SELECT genre.name
+        SELECT INITCAP(genre.name)
           FROM genre
                  JOIN tag ON genre.name = tag.name
                  JOIN release_group_tag ON release_group_tag.tag = tag.id

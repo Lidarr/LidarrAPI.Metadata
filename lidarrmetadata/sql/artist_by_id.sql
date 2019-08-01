@@ -29,7 +29,7 @@ SELECT
                  JOIN l_artist_url ON l_artist_url.entity0 = artist.id AND l_artist_url.entity1 = url.id
       ) AS Links,
       array(
-        SELECT genre.name
+        SELECT INITCAP(genre.name)
           FROM genre
                  JOIN tag ON genre.name = tag.name
                  JOIN artist_tag ON artist_tag.tag = tag.id
