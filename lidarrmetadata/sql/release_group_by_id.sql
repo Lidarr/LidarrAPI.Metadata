@@ -14,6 +14,7 @@ SELECT
         SELECT name
           FROM release_group_alias
          WHERE release_group_alias.release_group = release_group.id
+           AND (release_group_alias.type is NULL OR release_group_alias.type = 1)
       ) as Aliases,
       COALESCE(release_group_primary_type.name, 'Other') AS Type,
       array(

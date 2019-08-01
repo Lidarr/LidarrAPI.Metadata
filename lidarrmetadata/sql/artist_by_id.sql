@@ -14,6 +14,7 @@ SELECT
         SELECT name
           FROM artist_alias
          WHERE artist_alias.artist = artist.id
+           AND (artist_alias.type IS NULL OR artist_alias.type = 1)
       ) as ArtistAliases,
       CASE WHEN artist.ended THEN 'ended' ELSE 'active' END AS Status,
       artist.comment as Disambiguation,
