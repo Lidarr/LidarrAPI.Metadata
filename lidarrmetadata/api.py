@@ -232,18 +232,14 @@ async def get_release_group_info_multi(mbids):
     # Start overviews
     overviews_task = asyncio.gather(*[get_overview(rg['data']['links']) for rg in release_groups])
     
-    # Do missing images
+    # Get fanart images (and prefer those if possible)
     if album_art_providers:
-        release_groups_without_images = [x for x in release_groups if not x['data']['images']]
-        results = await asyncio.gather(*[album_art_providers[0].get_album_images(x['data']['id']) for x in release_groups_without_images])
+        results = await asyncio.gather(*[album_art_providers[0].get_album_images(x['data']['id']) for x in release_groups])
         
-        for i, rg in enumerate(release_groups_without_images):
+        for i, rg in enumerate(release_groups):
             images, expiry = results[i]
-            rg['data']['images'] = images
+            rg['data']['images'] = combine_images(images, rg['data']['images'])
             rg['expiry'] = min(rg['expiry'], expiry)
-    else:
-        for rg in release_groups_without_images:
-            rg['images'] = []
 
     # Get overview results
     results = await overviews_task
