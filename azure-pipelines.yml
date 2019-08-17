@@ -1,0 +1,94 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- master
+- develop
+
+pr:
+- master
+- develop
+
+jobs:
+  - job:
+    strategy:
+      matrix:
+        # Linux_Python36:
+        #   imageName: 'ubuntu-16.04'
+        #   osName: 'Linux'
+        #   pythonVersion: '3.6'
+        #   toxEnv: 'py36'
+        Linux_Python37:
+          imageName: 'ubuntu-16.04'
+          osName: 'Linux'
+          pythonVersion: '3.7'
+          toxEnv: 'py37'
+        # Windows_Python36:
+        #   imageName: 'vs2017-win2016'
+        #   osName: 'Windows'
+        #   pythonVersion: '3.6'
+        #   toxEnv: 'py36'
+        Windows_Python37:
+          imageName: 'vs2017-win2016'
+          osName: 'Windows'
+          pythonVersion: '3.7'
+          toxEnv: 'py37'
+        # Mac_Python36:
+        #   imageName: 'macOS-latest'
+        #   osName: 'macOS'
+        #   pythonVersion: '3.6'
+        #   toxEnv: 'py36'
+        Mac_Python37:
+          imageName: 'macOS-latest'
+          osName: 'macOS'
+          pythonVersion: '3.7'
+          toxEnv: 'py37'
+    displayName: Test
+    pool:
+      vmImage: $(imageName)
+    steps:
+    - task: UsePythonVersion@0
+      displayName: 'Set Python Version $(pythonVersion)'
+      inputs:
+        versionSpec: '$(pythonVersion)'
+    - task: SonarCloudPrepare@1
+      condition: and(succeeded(), eq(variables['osName'], 'Linux'))
+      inputs:
+        SonarCloud: 'SonarCloud'
+        organization: 'lidarr'
+        scannerMode: 'CLI'
+        configMode: 'manual'
+        cliProjectKey: 'lidarr_LidarrAPI.Metadata'
+        cliProjectName: 'LidarrAPI.Metadata'
+        cliProjectVersion: '1.0' # Fix this
+        cliSources: 'lidarrmetadata'
+        extraProperties: |
+          sonar.python.coverage.reportPath=$(System.DefaultWorkingDirectory)/coverage.xml
+    # SLOWWWW and doesn't seem to change anything
+    # - script: cinst pandoc
+    #   displayName: 'Install pandoc'
+    #   condition: and(succeeded(), eq(variables['osName'], 'Windows'))
+    - script: python -m pip install --pre -U pypandoc tox
+      displayName: 'Install tools'
+    - script: tox -e $(toxEnv)
+      displayName: 'Run Tests'
+    - task: PublishTestResults@2
+      inputs:
+        testResultsFiles: '**/test-*.xml'
+        testRunTitle: '$(osName) - Python $(pythonVersion)'
+      condition: succeededOrFailed()
+    - publish: $(System.DefaultWorkingDirectory)/htmlcov
+      artifact: 'PyTestCoverageReport'
+      displayName: Publish PyTest Coverage Report
+      condition: and(succeededOrFailed(), eq(variables['osName'], 'Linux'))
+    - task: PublishCodeCoverageResults@1
+      inputs:
+        codeCoverageTool: Cobertura
+        summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
+        reportDirectory: '$(System.DefaultWorkingDirectory)/**/htmlcov'
+      condition: and(succeededOrFailed(), eq(variables['osName'], 'Linux'))
+    - task: SonarCloudAnalyze@1
+      condition: and(succeeded(), eq(variables['osName'], 'Linux'))
+      displayName: 'Run Sonarcloud Analysis'

@@ -1,18 +1,3 @@
-build: false  # Not a C# project
-
-matrix:
-  fast_finish: true
-
-install:
-  - cinst pandoc
-  - C:\Python36\python -m pip install --pre -U pypandoc tox
-
-test_script:
-  - C:\Python36\scripts\tox
-
-after_test:
-  - C:\Python36\scripts\tox
-
-cache:
-  - '%LOCALAPPDATA%\pip\cache'
-  - '%USERPROFILE%\.cache\pre-commit'
+skip_commits:
+  files:
+    - '**/**'
