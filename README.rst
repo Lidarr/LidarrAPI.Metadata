@@ -1,10 +1,8 @@
 LidarrAPI.Metadata
 ==================
 
-.. image:: https://travis-ci.org/lidarr/LidarrAPI.Metadata.svg?branch=develop
-    :target: https://travis-ci.org/lidarr/LidarrAPI.Metadata
-.. image:: https://ci.appveyor.com/api/projects/status/fek6wd3ljyb7ty4h?svg=true
-    :target: https://ci.appveyor.com/project/Lidarr/lidarrapi-metadata
+.. image:: https://dev.azure.com/Lidarr/Lidarr/_apis/build/status/lidarr.Lidarr?branchName=develop
+    :target: https://dev.azure.com/Lidarr/Lidarr/_build/latest?definitionId=1&branchName=develop
 .. image:: https://api.codacy.com/project/badge/Grade/80dc9be416934129a9959b4620522e8f
    :alt: Codacy Badge
    :target: https://www.codacy.com/app/Lidarr/LidarrAPI.Metadata?utm_source=github.com&utm_medium=referral&utm_content=lidarr/LidarrAPI.Metadata&utm_campaign=badger
