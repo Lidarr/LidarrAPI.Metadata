@@ -36,7 +36,7 @@ setup(
         'aiocache',
         'aioredis',
         'asyncpg',
-        'billboard.py>=4.1.0',
+        'billboard.py>=5.2.2',
         'gunicorn',
         'quart',
         'pylast>=3.0.0',
