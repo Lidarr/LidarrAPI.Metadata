@@ -15,31 +15,16 @@ jobs:
   - job:
     strategy:
       matrix:
-        # Linux_Python36:
-        #   imageName: 'ubuntu-16.04'
-        #   osName: 'Linux'
-        #   pythonVersion: '3.6'
-        #   toxEnv: 'py36'
         Linux_Python37:
           imageName: 'ubuntu-16.04'
           osName: 'Linux'
           pythonVersion: '3.7'
           toxEnv: 'py37'
-        # Windows_Python36:
-        #   imageName: 'vs2017-win2016'
-        #   osName: 'Windows'
-        #   pythonVersion: '3.6'
-        #   toxEnv: 'py36'
         Windows_Python37:
           imageName: 'vs2017-win2016'
           osName: 'Windows'
           pythonVersion: '3.7'
           toxEnv: 'py37'
-        # Mac_Python36:
-        #   imageName: 'macOS-latest'
-        #   osName: 'macOS'
-        #   pythonVersion: '3.6'
-        #   toxEnv: 'py36'
         Mac_Python37:
           imageName: 'macOS-latest'
           osName: 'macOS'
@@ -66,10 +51,6 @@ jobs:
         cliSources: 'lidarrmetadata'
         extraProperties: |
           sonar.python.coverage.reportPath=$(System.DefaultWorkingDirectory)/coverage.xml
-    # SLOWWWW and doesn't seem to change anything
-    # - script: cinst pandoc
-    #   displayName: 'Install pandoc'
-    #   condition: and(succeeded(), eq(variables['osName'], 'Windows'))
     - script: python -m pip install --pre -U pypandoc tox
       displayName: 'Install tools'
     - script: tox -e $(toxEnv)
