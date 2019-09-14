@@ -64,8 +64,8 @@ async def get_overview(links, mbid=None):
         elif wikipedia_link:
             overview, expiry = await overview_providers[0].get_artist_overview(wikipedia_link['target'])
 
-        # if len(overview_providers) > 1 and mbid and not overview:
-        #     overview, expiry = await overview_providers[1].get_artist_overview(mbid)
+        if len(overview_providers) > 1 and mbid and not overview:
+            overview, expiry = await overview_providers[1].get_artist_overview(mbid)
 
     return overview, expiry
 
@@ -142,15 +142,15 @@ async def get_artist_info_multi(mbids):
             artist['data']['images'] = images
             artist['expiry'] = min(artist['expiry'], expiry)
 
-        # if len(artist_art_providers) > 1:
-        #     image_types = {'Banner', 'Fanart', 'Logo', 'Poster'}
-        #     artists_without_images = [x for x in artists if not x['data']['images'] or not image_types.issubset({i['CoverType'] for i in x['data']['images']})]
-        #     results = await asyncio.gather(*[artist_art_providers[1].get_artist_images(x['data']['id']) for x in artists_without_images])
+        if len(artist_art_providers) > 1:
+            image_types = {'Banner', 'Fanart', 'Logo', 'Poster'}
+            artists_without_images = [x for x in artists if not x['data']['images'] or not image_types.issubset({i['CoverType'] for i in x['data']['images']})]
+            results = await asyncio.gather(*[artist_art_providers[1].get_artist_images(x['data']['id']) for x in artists_without_images])
 
-        #     for i, artist in enumerate(artists_without_images):
-        #         images, expiry = results[i]
-        #         artist['data']['images'] = combine_images(artist['data']['images'], images)
-        #         artist['expiry'] = min(artist['expiry'], expiry)
+            for i, artist in enumerate(artists_without_images):
+                images, expiry = results[i]
+                artist['data']['images'] = combine_images(artist['data']['images'], images)
+                artist['expiry'] = min(artist['expiry'], expiry)
     else:
         for artist in artists:
             artist['images'] = []
