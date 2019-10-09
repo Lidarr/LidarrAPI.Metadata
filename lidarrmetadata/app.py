@@ -15,6 +15,7 @@ import time
 import logging
 import aiohttp
 from timeit import default_timer as timer
+from spotipy import SpotifyException
 
 import lidarrmetadata
 from lidarrmetadata import api
@@ -417,6 +418,110 @@ async def search_route():
         error = jsonify(error='Type not provided') if type is None else jsonify(
             error='Unsupported search type {}'.format(type))
         return error, 400
+
+@app.route('/spotify/artist/<spotify_id>', methods=['GET'])
+async def spotify_lookup_artist(spotify_id):
+    mbid, expires = await util.SPOTIFY_CACHE.get(spotify_id)
+
+    if mbid == 0 and expires > provider.utcnow():
+        return jsonify(error='Not found'), 404
+    if mbid is not None:
+        return redirect(app.config['ROOT_PATH'] + url_for('get_artist_info_route', mbid=mbid), 301)
+
+    # Search on links in musicbrainz db
+    link_provider = provider.get_providers_implementing(provider.ArtistByIdMixin)[0]
+    artistid = await link_provider.get_artist_id_from_spotify_id(spotify_id)
+    logger.debug(f"Got match from musicbrainz db: {artistid}")
+    if artistid:
+        await util.SPOTIFY_CACHE.set(spotify_id, artistid, ttl=None)
+        return redirect(app.config['ROOT_PATH'] + url_for('get_artist_info_route', mbid=artistid), 301)
+
+    # Fall back to a text search for a popular album
+    try:
+        spotify_provider = provider.get_providers_implementing(provider.SpotifyIdMixin)[0]
+        spotifyalbum = spotify_provider.album_from_artist(spotify_id)
+    except SpotifyException:
+        await util.SPOTIFY_CACHE.set(spotify_id, 0, ttl=app.config['CACHE_TTL']['cloudflare'])
+        return jsonify(error='Not found'), 404
+    
+    spotifyalbum = await spotify_lookup_by_text_search(spotifyalbum)
+    if spotifyalbum is None:
+        return jsonify(error='Not found'), 404
+
+    await util.SPOTIFY_CACHE.set(spotifyalbum['AlbumSpotifyId'], spotifyalbum['AlbumMusicBrainzId'], ttl=None)
+    await util.SPOTIFY_CACHE.set(spotifyalbum['ArtistSpotifyId'], spotifyalbum['ArtistMusicBrainzId'], ttl=None)
+
+    return redirect(app.config['ROOT_PATH'] + url_for('get_artist_info_route', mbid=spotifyalbum['ArtistMusicBrainzId']), 301)
+
+@app.route('/spotify/album/<spotify_id>', methods=['GET'])
+async def spotify_lookup_album(spotify_id):
+    mbid, expires = await util.SPOTIFY_CACHE.get(spotify_id)
+
+    if mbid == 0 and expires > provider.utcnow():
+        return jsonify(error='Not found'), 404
+    if mbid is not None:
+        return redirect(app.config['ROOT_PATH'] + url_for('get_release_group_info_route', mbid=mbid), 301)
+
+    # Search on links in musicbrainz db
+    link_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
+    albumid = await link_provider.get_release_group_id_from_spotify_id(spotify_id)
+    logger.debug(f"Got match from musicbrainz db: {albumid}")
+    if albumid:
+        await util.SPOTIFY_CACHE.set(spotify_id, 0, ttl=app.config['CACHE_TTL']['cloudflare'])
+        return redirect(app.config['ROOT_PATH'] + url_for('get_release_group_info_route', mbid=albumid), 301)
+
+    # Fall back to a text search
+    try:
+        spotify_provider = provider.get_providers_implementing(provider.SpotifyIdMixin)[0]
+        spotifyalbum = spotify_provider.album(spotify_id)
+    except SpotifyException:
+        await util.SPOTIFY_CACHE.set(spotify_id, 0, ttl=None)
+        return jsonify(error='Not found'), 404
+
+    spotifyalbum = await spotify_lookup_by_text_search(spotifyalbum)
+    if spotifyalbum is None:
+        return jsonify(error='Not found'), 404
+
+    await util.SPOTIFY_CACHE.set(spotifyalbum['AlbumSpotifyId'], spotifyalbum['AlbumMusicBrainzId'], ttl=None)
+
+    return redirect(app.config['ROOT_PATH'] + url_for('get_release_group_info_route', mbid=spotifyalbum['AlbumMusicBrainzId']), 301)
+
+async def spotify_lookup_by_text_search(spotifyalbum):
+    logger.debug(f"Artist: {spotifyalbum['Artist']} Album: {spotifyalbum['Album']}")    
+    
+    # do search
+    search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
+    result = await search_provider.search_album_name(spotifyalbum['Album'], artist_name=spotifyalbum['Artist'], limit=1)
+
+    if not result:
+        ttl = app.config['CACHE_TTL']['cloudflare']
+        await util.SPOTIFY_CACHE.set(spotifyalbum['AlbumSpotifyId'], 0, ttl=ttl)
+        await util.SPOTIFY_CACHE.set(spotifyalbum['ArtistSpotifyId'], 0, ttl=ttl)
+        return None
+
+    # Map back to an artist
+    albumid = result[0]['Id']
+    album, validity = await api.get_release_group_info(result[0]['Id'])
+    artistid = album['artistid']
+
+    spotifyalbum['AlbumMusicBrainzId'] = albumid
+    spotifyalbum['ArtistMusicBrainzId'] = artistid
+
+    return spotifyalbum
+
+@app.route('/spotify/lookup', methods=['POST'])
+async def spotify_lookup():
+    ids = await request.json
+
+    if ids is None:
+        return jsonify(error='Bad Request - expected JSON list of spotify IDs as post body'), 400
+    
+    logger.info(ids)
+
+    results = await util.SPOTIFY_CACHE.multi_get(ids)
+    output = [{'spotifyid': ids[x], 'musicbrainzid': results[x][0]} for x in range(len(ids))]
+
+    return jsonify(output)
     
 @app.route('/invalidate')
 @no_cache

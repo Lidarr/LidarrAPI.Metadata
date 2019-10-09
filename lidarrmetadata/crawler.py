@@ -140,6 +140,16 @@ async def initialize_albums():
     await util.ALBUM_CACHE.clear()
     await util.ALBUM_CACHE.multi_set(pairs, ttl=0, timeout=None)
 
+async def initialize_spotify():
+    link_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
+
+    maps = await link_provider.get_all_spotify_mappings()
+
+    pairs = [(item['spotifyid'], item['mbid']) for item in maps]
+
+    await util.SPOTIFY_CACHE.clear()
+    await util.SPOTIFY_CACHE.multi_set(pairs, ttl=None, timeout=None)
+
 async def update_items(multi_function, cache, name, count = 100, max_ttl = 60 * 60):
     while True:
         keys = await cache.get_stale(count, provider.utcnow() + timedelta(seconds = max_ttl))
@@ -187,14 +197,20 @@ def main():
     parser = argparse.ArgumentParser(prog="lidarr-metadata-crawler")
     parser.add_argument("--initialize-artists", action="store_true")
     parser.add_argument("--initialize-albums", action="store_true")
+    parser.add_argument("--initialize-spotify", action="store_true")
     
     args = parser.parse_args()
+    
     if args.initialize_artists:
         asyncio.run(initialize_artists())
         sys.exit()
 
     if args.initialize_albums:
         asyncio.run(initialize_albums())
+        sys.exit()
+
+    if args.initialize_spotify:
+        asyncio.run(initialize_spotify())
         sys.exit()
     
     asyncio.run(crawl())

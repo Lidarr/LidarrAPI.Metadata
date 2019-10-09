@@ -17,6 +17,8 @@ import asyncio
 import aiohttp
 import asyncpg
 import json
+import spotipy
+from spotipy.oauth2 import SpotifyClientCredentials
 
 import dateutil.parser
 
@@ -104,6 +106,23 @@ class ArtistByIdMixin(MixinBase):
         """
         pass
 
+    @abc.abstractmethod
+    def get_artist_id_from_spotify_id(self, spotify_id):
+        """
+        Gets artist id from spotify id
+        :param spotify_id: Spotify ID of artist
+        :return: Artist matching ID or None
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_all_spotify_mappings(self):
+        """
+        Grabs all link entities from database and parses for spotify maps
+        """
+        pass
+
+
 class ArtistIdListMixin(MixinBase):
     """
     Returns a list of all artist ids we should cache
@@ -183,6 +202,15 @@ class ReleaseGroupByIdMixin(MixinBase):
     def redirect_old_release_group_id(self, artist_id):
         """
         Given an id that isn't found, see if it's an old id that needs redirecting.  If so, return new id.
+        """
+        pass
+
+    @abc.abstractmethod
+    def get_release_group_id_from_spotify_id(self, spotify_id):
+        """
+        Gets artist id from spotify id
+        :param spotify_id: Spotify ID of album
+        :return: Release group matching ID or None
         """
         pass
 
@@ -319,6 +347,19 @@ class AsyncDel(MixinBase):
         """
         Run at initialization using await
         """
+        pass
+
+class SpotifyIdMixin(MixinBase):
+    """
+    Details for a spotify id
+    """
+    
+    @abc.abstractmethod
+    def album_from_artist(self, artist_id):
+        pass
+
+    @abc.abstractmethod
+    def album(self, album_id):
         pass
 
     
@@ -1053,6 +1094,17 @@ class MusicbrainzDbProvider(Provider,
         if results:
             return results[0]['gid']
         return None
+
+    async def get_artist_id_from_spotify_id(self, spotify_id):
+        results = await self.query_from_file('artist_id_from_spotify_id.sql', spotify_id)
+        if results:
+            return results[0]['gid']
+        return None
+
+    async def get_all_spotify_mappings(self):
+        return await self.query_from_file('all_spotify_maps.sql')
+        # return results
+        # return [{'mbid': item['gid'], 'spotifyid': item['spotifyid']} for item in results]
     
     async def get_all_artist_ids(self):
         results = await self.query_from_file('all_artist_ids.sql')
@@ -1118,6 +1170,12 @@ class MusicbrainzDbProvider(Provider,
         if results:
             return results[0]['gid']
         return None
+
+    async def get_release_group_id_from_spotify_id(self, spotify_id):
+        results = await self.query_from_file('release_group_id_from_spotify_id.sql', spotify_id)
+        if results:
+            return results[0]['gid']
+        return None
     
     async def get_all_release_group_ids(self):
         results = await self.query_from_file('all_release_group_ids.sql')
@@ -1178,6 +1236,37 @@ class MusicbrainzDbProvider(Provider,
         except IndexError:
             return domain
 
+class SpotifyProvider(Provider,
+                      SpotifyIdMixin):
+    """
+    Provider to get details for a spotify id
+    """
+
+    def __init__(self, client_id, client_secret):
+        super(SpotifyProvider, self).__init__()
+        
+        client_credentials_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+        self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+
+    def album_from_artist(self, artist_id):
+        top_tracks = self.spotify.artist_top_tracks(artist_id, country='US')
+        album = top_tracks['tracks'][0]['album']
+        artist = album['artists'][0]
+
+        return {'Artist': artist['name'],
+                'ArtistSpotifyId': artist_id,
+                'Album': album['name'],
+                'AlbumSpotifyId': album['id']}
+
+    def album(self, album_id):
+        album = self.spotify.album(album_id)
+        artist = album['artists'][0]
+        
+        return {'Artist': artist['name'],
+                'ArtistSpotifyId': artist['id'],
+                'Album': album['name'],
+                'AlbumSpotifyId': album_id}
+        
 class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
     """
     Provider for querying wikipedia

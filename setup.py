@@ -44,6 +44,7 @@ setup(
         'pytz',
         'python-dateutil',
         'sentry-sdk[flask]',
+        'spotipy',
         'redis',
         'requests',
         'urllib3<1.25',

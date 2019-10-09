@@ -35,6 +35,7 @@ TADB_CACHE = caches.get('tadb')
 WIKI_CACHE = caches.get('wikipedia')
 ARTIST_CACHE = caches.get('artist')
 ALBUM_CACHE = caches.get('album')
+SPOTIFY_CACHE = caches.get('spotify')
 
 def first_key_item(dictionary, key, default=None):
     """

@@ -347,6 +347,13 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
             'port': POSTGRES_CACHE_PORT,
             'db_table': 'album',
             'timeout': 0,
+        },
+        'spotify': {
+            'cache': 'lidarrmetadata.cache.PostgresCache',
+            'endpoint': POSTGRES_CACHE_HOST,
+            'port': POSTGRES_CACHE_PORT,
+            'db_table': 'spotify',
+            'timeout': 0,
         }
     }
     
@@ -380,6 +387,12 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
         },
         'album': {
+            'cache': 'lidarrmetadata.cache.NullCache',
+            'serializer': {
+                'class': 'lidarrmetadata.cache.ExpirySerializer'
+            }
+        },
+        'spotify': {
             'cache': 'lidarrmetadata.cache.NullCache',
             'serializer': {
                 'class': 'lidarrmetadata.cache.ExpirySerializer'
@@ -441,7 +454,8 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
         'FANARTTVPROVIDER': ([FANART_KEY], {}),
         'WIKIPEDIAPROVIDER': ([], {}),
         'THEAUDIODBPROVIDER': ([TADB_KEY], {}),
-        'SPOTIFYAUTHPROVIDER': ([], {'CLIENT_ID': SPOTIFY_ID, 'CLIENT_SECRET': SPOTIFY_SECRET, 'REDIRECT_URI': SPOTIFY_REDIRECT_URL})
+        'SPOTIFYAUTHPROVIDER': ([], {'CLIENT_ID': SPOTIFY_ID, 'CLIENT_SECRET': SPOTIFY_SECRET, 'REDIRECT_URI': SPOTIFY_REDIRECT_URL}),
+        'SPOTIFYPROVIDER': ([], {'CLIENT_ID': SPOTIFY_ID, 'CLIENT_SECRET': SPOTIFY_SECRET})
     }
 
     # Connection info for sentry. Defaults to None, in which case Sentry won't be used
