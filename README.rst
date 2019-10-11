@@ -31,13 +31,17 @@ The metadata server requires access to a musicbrainz postgresql database and sol
 
 To initialize these in docker you can run
 
-```
-docker-compose build
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-docker-compose exec musicbrainz /createdb.sh -fetch
-docker-compose exec sir make install
-docker-compose exec sir make index
-```
+
+``docker-compose build``
+
+``docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d``
+
+``docker-compose exec musicbrainz /createdb.sh -fetch``
+
+``docker-compose exec sir make install``
+
+``docker-compose exec sir make index``
+
 
 These will take several hours to complete.
 
