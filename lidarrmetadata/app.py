@@ -404,6 +404,27 @@ async def search_all():
 
     return add_cache_control_header(jsonify(results), validity)
 
+@app.route('/search/fingerprint', methods=['POST'])
+async def search_fingerprint():
+    ids = await request.json
+
+    if ids is None:
+        return jsonify(error='Bad Request - expected JSON list of recording IDs as post body'), 400
+    
+    logger.info(ids)
+
+    album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
+    album_ids = await album_provider.get_release_groups_by_recording_ids(ids)
+
+    logger.info('got albums')
+    logger.info(album_ids)
+
+    results = await asyncio.gather(*[api.get_release_group_info(id) for id in album_ids])
+    albums = [result[0] for result in results]
+    validity = min([result[1] for result in results] or [provider.utcnow()])
+
+    return add_cache_control_header(jsonify(albums), validity)
+
 @app.route('/search')
 async def search_route():
     type = request.args.get('type', None)
