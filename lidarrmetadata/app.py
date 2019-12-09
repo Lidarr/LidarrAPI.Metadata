@@ -296,7 +296,7 @@ async def get_album_search_results(query, limit, include_tracks, artist_name):
             return result, item['Score'], validity
         
         results = await asyncio.gather(*[get_search_result(item) for item in search_results])
-        albums = [result[0] for result in results]
+        albums = [result[0] for result in results if result[0]['artistid'] not in config.get_config().BLACKLISTED_ARTISTS]
 
         # Current versions of lidarr will fail trying to parse the tracks contained in releases
         # because it's not expecting it to be present and passes null for ArtistMetadata dict
