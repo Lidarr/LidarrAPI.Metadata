@@ -150,6 +150,30 @@ class PostgresBackend:
         return None
 
     @conn
+    async def _multi_get(self, keys, encoding="utf-8", _conn=None):
+        try:
+            start = timer()
+            result = await _conn.fetch(
+                f"""
+select value, expires from {self._db_table}
+right join
+(
+    select key, row_number() over() as key_sorter
+    from (select unnest($1::text[]) as key) as y
+) x on x.key = spotify.key
+order by x.key_sorter""",
+                keys
+            )
+            end = timer()
+            elapsed = int((end - start) * 1000)
+            logger.debug(f"got {len(keys)} keys in {elapsed}ms")
+            if result is not None:
+                return result
+        except KeyError:
+            return None
+        return None
+
+    @conn
     async def _set(self, key, value, ttl=None, _cas_token=None, _conn=None):
         if ttl is not None:
             expiry = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds = ttl)
