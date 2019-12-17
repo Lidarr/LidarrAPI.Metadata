@@ -1164,6 +1164,11 @@ class MusicbrainzDbProvider(Provider,
         release_groups = [self._load_release_group(item['album']) for item in release_groups]
 
         return release_groups
+
+    async def get_release_groups_by_recording_ids(self, rids):
+        results = await self.query_from_file('release_group_by_recording_ids.sql', len(rids), rids)
+
+        return [item['rgid'] for item in results]
     
     async def redirect_old_release_group_id(self, id):
         results = await self.query_from_file('release_group_redirect.sql', id)
