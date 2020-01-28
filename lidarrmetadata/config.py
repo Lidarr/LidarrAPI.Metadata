@@ -295,6 +295,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     USE_CACHE = True
     CACHE_TTL = {
         'cloudflare': DAYS * 30,
+        'changes': 60,
         'chart': DAYS * 1,
         'provider_error': 60 * 30,
         'redis': DAYS * 7,

@@ -123,13 +123,35 @@ class PostgresBackend:
             await self._pool.close()
     
     async def _create_table(self, _conn=None):
-        await _conn.execute(
-            f"CREATE TABLE IF NOT EXISTS {self._db_table} (key varchar PRIMARY KEY, expires timestamp with time zone, value bytea);"
-        )
 
-        await _conn.execute(
-            f"CREATE INDEX IF NOT EXISTS {self._db_table}_expires_idx ON {self._db_table}(expires);"
-        )
+        logger.debug("checking table")
+        result = await _conn.fetchrow(
+                f"SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = '{self._db_table}');",
+            )
+        table_exists = result['exists']
+        logger.debug(f"exists: {table_exists}")
+
+        if table_exists:
+            logger.debug("table exists")
+        else:
+            logger.debug("table doesn't exist")
+            await _conn.execute("""CREATE OR REPLACE FUNCTION cache_updated() RETURNS TRIGGER
+AS
+$$
+BEGIN
+    NEW.updated = current_timestamp;
+    RETURN NEW;
+END;
+$$
+language 'plpgsql';"""
+            )
+
+            await _conn.execute(
+                f"CREATE TABLE IF NOT EXISTS {self._db_table} (key varchar PRIMARY KEY, expires timestamp with time zone, updated timestamp with time zone default current_timestamp, value bytea);"
+                f"CREATE INDEX IF NOT EXISTS {self._db_table}_expires_idx ON {self._db_table}(expires);"
+                f"CREATE INDEX IF NOT EXISTS {self._db_table}_updated_idx ON {self._db_table}(updated DESC) INCLUDE (key);"
+                f"CREATE TRIGGER {self._db_table}_updated_trigger BEFORE UPDATE ON {self._db_table} FOR EACH ROW WHEN (OLD.value IS DISTINCT FROM NEW.value) EXECUTE PROCEDURE cache_updated();"
+            )
             
     @conn
     async def _get(self, key, encoding="utf-8", _conn=None):
@@ -203,7 +225,7 @@ order by x.key_sorter""",
         
         async with _conn.transaction():
             await _conn.execute(
-                f"CREATE TEMP TABLE tmp_table ON COMMIT DROP AS SELECT * FROM {self._db_table} WITH NO DATA;"
+                f"CREATE TEMP TABLE tmp_table ON COMMIT DROP AS SELECT key, expires, value FROM {self._db_table} WITH NO DATA;"
             );
             
             result = await _conn.copy_records_to_table("tmp_table", records=records)
@@ -257,6 +279,19 @@ order by x.key_sorter""",
         )
         return [item['key'] for item in results] if results else []
 
+    @conn
+    async def _get_recently_updated(self, updated_since, limit, _conn=None):
+        results = await _conn.fetch(
+            f"SELECT key FROM {self._db_table} "
+            "WHERE updated > $1 "
+            "ORDER by updated DESC "
+            "LIMIT $2;",
+            updated_since,
+            limit
+        )
+        return [item['key'] for item in results] if results else []
+
+
 class PostgresCache(PostgresBackend, BaseCache):
     """
     Cache implementation using postgres table
@@ -270,6 +305,10 @@ class PostgresCache(PostgresBackend, BaseCache):
         
     async def get_stale(self, count, expires_before, _conn=None):
         return await self._get_stale(count, expires_before, _conn=_conn)
+
+    async def get_recently_updated(self, updated_since, limit, _conn=None):
+        return await self._get_recently_updated(updated_since, limit, _conn=_conn)
+
 
 class NullCache(BaseCache):
     """

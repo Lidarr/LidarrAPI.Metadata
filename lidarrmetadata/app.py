@@ -209,6 +209,25 @@ async def get_release_group_info_route(mbid):
     
     return add_cache_control_header(jsonify(output), expiry)
 
+@app.route('/recent/artist', methods=['GET'])
+@no_cache
+async def get_recently_updated_artists():
+
+    arg = int(request.args.get('since', '0'))
+    since = datetime.datetime.fromtimestamp(arg) if arg > 0 else provider.utcnow() - timedelta(days=2)
+
+    updated = await util.ARTIST_CACHE.get_recently_updated(since, 10000)
+    return jsonify(updated)
+
+@app.route('/recent/album', methods=['GET'])
+async def get_recently_updated_albums():
+
+    arg = int(request.args.get('since', '0'))
+    since = datetime.datetime.fromtimestamp(arg) if arg > 0 else provider.utcnow() - timedelta(days=2)
+
+    updated = await util.ALBUM_CACHE.get_recently_updated(since, 10000)
+    return jsonify(updated)
+
 @app.route('/chart/<name>/<type_>/<selection>')
 async def chart_route(name, type_, selection):
     """
