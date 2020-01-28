@@ -41,3 +41,9 @@ SELECT DISTINCT release_group.gid
          JOIN track ON track.medium = medium.id
          JOIN recording ON track.recording = recording.id
  WHERE recording.last_updated > $1
+
+SELECT DISTINCT release_group.gid
+  FROM release_group
+         JOIN l_release_group_url ON l_release_group_url.entity0 = release_group.id
+         JOIN url ON l_release_group_url.entity1 = url.id
+  WHERE url.last_updated > $1
