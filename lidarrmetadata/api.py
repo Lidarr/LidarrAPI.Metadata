@@ -177,10 +177,10 @@ def combine_images(a, b):
 async def get_artist_albums(mbid):
     release_group_providers = provider.get_providers_implementing(
         provider.ReleaseGroupByArtistMixin)
-    if release_group_providers:
+    if release_group_providers and not mbid in CONFIG.BLACKLISTED_ARTISTS:
         return await release_group_providers[0].get_release_groups_by_artist(mbid)
     else:
-        return None
+        return []
 
 async def get_release_group_artists(release_group):
     
