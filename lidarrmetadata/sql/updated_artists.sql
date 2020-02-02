@@ -25,6 +25,15 @@ SELECT DISTINCT artist.gid
    AND release.last_updated > $1
 
        UNION
+
+   -- artist links updated
+SELECT DISTINCT artist.gid
+  FROM artist
+         JOIN l_artist_url ON l_artist_url.entity0 = artist.id
+         JOIN url ON l_artist_url.entity1 = url.id
+  WHERE url.last_updated > $1
+
+       UNION
        
   -- these have been merged into other artists (the other leg will show up artist updated)
 SELECT gid
