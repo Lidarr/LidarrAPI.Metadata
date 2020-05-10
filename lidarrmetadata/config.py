@@ -442,8 +442,8 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
 
     # Spotify app details
     SPOTIFY_REDIRECT_URL = ''
-    SPOTIFY_ID = ''
-    SPOTIFY_SECRET = ''
+    SPOTIFY_ID = 'replaceme'
+    SPOTIFY_SECRET = 'replaceme'
 
     # Whether or not running in production
     PRODUCTION = False

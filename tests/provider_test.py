@@ -30,10 +30,10 @@ class TestWikipediaProvider:
         assert expected == self.provider.wikipedia_title_from_url(url)
         
     @pytest.mark.parametrize('url,expected', [
-        ('http://en.wikipedia.org/wiki/Blink-182', u'Blink-182 (often stylized as blink-182'),
+        ('http://en.wikipedia.org/wiki/Blink-182', u'Blink-182 (sometimes written as Blink 182;'),
         ('https://ja.wikipedia.org/wiki/%CE%9D_(%E3%83%90%E3%83%B3%E3%83%89)', u'\u03bd'),
         ('https://de.wikipedia.org/wiki/The_Boys#The_Mattless_Boys', 'The Boys are an English punk rock'),
-        ('https://www.wikidata.org/wiki/Q953918', 'Mumford & Sons are  a British folk-rock band formed in 2007'),
+        ('https://www.wikidata.org/wiki/Q953918', 'Mumford & Sons are a British folk rock band formed in 2007'),
         ('https://www.wikidata.org/wiki/Q127939', 'Russian folk rock band'),
      ])
     @pytest.mark.asyncio
