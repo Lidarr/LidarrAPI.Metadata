@@ -47,17 +47,17 @@ if app.config['SENTRY_DSN']:
 
 # Allow all endpoints to be cached by default
 @app.after_request
-def add_cache_control_header(response, expiry = provider.utcnow() + timedelta(seconds=app.config['CACHE_TTL']['cloudflare'])):
+async def add_cache_control_header(response, expiry = provider.utcnow() + timedelta(seconds=app.config['CACHE_TTL']['cloudflare'])):
     if response.status_code not in set([200, 301, 400, 403, 404]):
         response.cache_control.no_cache = True
     # This is a bodge to figure out if we have already set any cache control headers
-    elif not response.cache_control or not response.cache_control._directives:
+    elif not response.cache_control:
         if expiry:
             now = provider.utcnow()
             response.cache_control.public = True
             # We want to allow caching on cloudflare (which we can invalidate)
             # but disallow caching for local users (which we cannot invalidate)
-            response.cache_control.s_maxage = (expiry - now).total_seconds()
+            response.cache_control.s_maxage = int((expiry - now).total_seconds())
             response.cache_control.max_age = 0
             response.expires = now - timedelta(days=1)
         else:
@@ -196,7 +196,7 @@ async def get_artist_info_route(mbid):
 
     artist['Albums'] = albums
 
-    return add_cache_control_header(jsonify(artist), expiry)
+    return await add_cache_control_header(jsonify(artist), expiry)
 
 @app.route('/album/<mbid>', methods=['GET'])
 async def get_release_group_info_route(mbid):
@@ -207,7 +207,7 @@ async def get_release_group_info_route(mbid):
     
     output, expiry = await api.get_release_group_info(mbid)
     
-    return add_cache_control_header(jsonify(output), expiry)
+    return await add_cache_control_header(jsonify(output), expiry)
 
 @app.route('/recent/artist', methods=['GET'])
 @no_cache
@@ -261,7 +261,7 @@ async def chart_route(name, type_, selection):
     else:
         result = await charts[key](count, **chart_kwargs)
         expiry = provider.utcnow() + timedelta(seconds=app.config['CACHE_TTL']['chart'])
-        return add_cache_control_header(jsonify(result), expiry)
+        return await add_cache_control_header(jsonify(result), expiry)
 
 @app.route('/search/album')
 async def search_album():
@@ -294,7 +294,7 @@ async def search_album():
 
     albums, scores, validity = await get_album_search_results(query, limit, include_tracks, artist_name)
 
-    return add_cache_control_header(jsonify(albums), validity)
+    return await add_cache_control_header(jsonify(albums), validity)
 
 async def get_album_search_results(query, limit, include_tracks, artist_name):
     search_providers = provider.get_providers_implementing(provider.AlbumNameSearchMixin)
@@ -363,7 +363,7 @@ async def search_artist():
 
     artists, scores, validity = await get_artist_search_results(query, limit)
     
-    return add_cache_control_header(jsonify(artists), validity)
+    return await add_cache_control_header(jsonify(artists), validity)
 
 async def get_artist_search_results(query, limit):
     search_providers = provider.get_providers_implementing(
@@ -413,7 +413,7 @@ async def search_all():
     results = artist_items + album_items
     results.sort(key = lambda i: i['score'], reverse = True)
 
-    return add_cache_control_header(jsonify(results), validity)
+    return await add_cache_control_header(jsonify(results), validity)
 
 @app.route('/search/fingerprint', methods=['POST'])
 async def search_fingerprint():
@@ -434,7 +434,7 @@ async def search_fingerprint():
     albums = [result[0] for result in results]
     validity = min([result[1] for result in results] or [provider.utcnow()])
 
-    return add_cache_control_header(jsonify(albums), validity)
+    return await add_cache_control_header(jsonify(albums), validity)
 
 @app.route('/search')
 async def search_route():
