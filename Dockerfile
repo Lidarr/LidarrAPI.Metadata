@@ -11,11 +11,12 @@ WORKDIR /metadata
 COPY . /metadata
 
 RUN apk update && \
- apk add postgresql-libs && \
- apk add --virtual .build-deps alpine-sdk musl-dev postgresql-dev && \
- pip install -U setuptools pip && \
- pip install --no-cache-dir .[deploy] && \
- apk --purge del .build-deps
+        apk add postgresql-libs && \
+        apk add --virtual .build-deps alpine-sdk musl-dev postgresql-dev && \
+        pip install -U setuptools pip && \
+        pip install -r requirements.txt && \
+        pip install --no-cache-dir .[deploy] && \
+        apk --purge del .build-deps
 
 RUN adduser --system -u $UID metadata
 

@@ -32,7 +32,8 @@ setup(
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
-        'aiohttp',
+        'aiohttp>=3.0, <4.0',
+        'async-timeout>=3.0, <4.0',
         'aiocache',
         'aioredis',
         'asyncpg',
@@ -47,7 +48,7 @@ setup(
         'spotipy',
         'redis',
         'requests',
-        'urllib3<1.25',
+        'urllib3',
         'uvicorn'
     ],
 
