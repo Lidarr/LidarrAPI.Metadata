@@ -85,9 +85,11 @@ def get_search_query():
     logger.info(f"Search query: {query}")
     
     # These are invalid search queries for lucene
-    if query in set(['-', '+']):
-        abort(400, 'Invalid search query')
-    
+    if query == "+":
+        return "plus"
+    elif query == "-":
+        return "minus"
+
     return query
 
 @app.errorhandler(HTTPStatusException)
