@@ -105,7 +105,7 @@ jobs:
         sentry-cli releases set-commits --auto "${LIDARRVERSION}"
         sentry-cli releases deploys "${LIDARRVERSION}" new -e production
       displayName: Create sentry release
-      condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/master'), eq(variables['system.pullrequest.isfork'], false))
+      condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'), eq(variables['system.pullrequest.isfork'], false))
       env:
         SENTRY_AUTH_TOKEN: $(sentryAuthTokenServarr)
         SENTRY_ORG: $(sentryOrg)
