@@ -100,10 +100,11 @@ jobs:
 
     - bash: |
         echo "Creating sentry release"
+        SENTRYRELEASE="lidarr-metadata-${LIDARRVERSION}"
         curl -sL https://sentry.io/get-cli/ | bash
-        sentry-cli releases new --finalize -p lidarr-metadata "${LIDARRVERSION}"
-        sentry-cli releases set-commits --auto "${LIDARRVERSION}"
-        sentry-cli releases deploys "${LIDARRVERSION}" new -e production
+        sentry-cli releases new --finalize -p lidarr-metadata "${SENTRYRELEASE}"
+        sentry-cli releases set-commits --auto "${SENTRYRELEASE}"
+        sentry-cli releases deploys "${SENTRYRELEASE}" new -e production
       displayName: Create sentry release
       condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'), eq(variables['system.pullrequest.isfork'], false))
       env:

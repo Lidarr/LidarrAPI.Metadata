@@ -42,6 +42,7 @@ if app.config['SENTRY_DSN']:
 
     sentry_sdk.init(dsn=app.config['SENTRY_DSN'],
                     integrations=[FlaskIntegration()],
+                    release=f"lidarr-metadata-{lidarrmetadata.__version__}",
                     before_send=processor.create_event,
                     send_default_pii=True)
 
