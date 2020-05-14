@@ -68,7 +68,8 @@ async def add_cache_control_header(response, expiry = provider.utcnow() + timede
 def no_cache(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
-        response = await func(*args, **kwargs)
+        result = await func(*args, **kwargs)
+        response = await make_response(result)
         response.cache_control.no_cache = True
         return response
     return wrapper
@@ -92,8 +93,13 @@ def get_search_query():
 
     return query
 
-@app.errorhandler(HTTPStatusException)
+@app.errorhandler(500)
 def handle_error(e):
+    sentry_sdk.capture_exception(e)
+    return jsonify(error='Internal server error'), 500
+
+@app.errorhandler(HTTPStatusException)
+async def handle_http_error(e):
     return jsonify(error = e.description), e.status_code
 
 @app.errorhandler(api.ReleaseGroupNotFoundException)
@@ -127,11 +133,6 @@ def handle_error(e):
 @app.errorhandler(redis.BusyLoadingError)
 def handle_error(e):
     return jsonify(error='Redis not ready'), 503
-
-@app.errorhandler(500)
-def handle_error(e):
-    sentry_sdk.capture_exception(e)
-    return jsonify(error='Internal server error'), 500
 
 def validate_mbid(mbid):
     """
