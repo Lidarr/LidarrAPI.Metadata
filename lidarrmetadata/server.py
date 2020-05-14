@@ -34,7 +34,7 @@ def main():
     options = {
         'bind': '0.0.0.0:{port}'.format(port=config.HTTP_PORT),
         'log_level': 'debug',
-        'workers': (multiprocessing.cpu_count() * 2) + 1,
+        'workers': 1,
         'worker_class': 'uvicorn.workers.UvicornWorker'
     }
 
