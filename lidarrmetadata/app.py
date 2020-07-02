@@ -622,9 +622,9 @@ async def invalidate_cloudflare(files):
                'Content-Type': 'application/json'}
     
     async with aiohttp.ClientSession() as session:
-        # cloudflare only accepts 500 files at a time
-        for i in range(0, len(files), 500):
-            data = {'files': files[i:i+500]}
+        # cloudflare only accepts 30 files at a time
+        for i in range(0, len(files), 30):
+            data = {'files': files[i:i+30]}
             retries = 2
             
             while retries > 0:
