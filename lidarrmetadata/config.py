@@ -357,6 +357,14 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
             'timeout': 0,
         }
     }
+
+    CRAWLER_BATCH_SIZE = {
+        'wikipedia': 50,
+        'fanart': 500,
+        'tadb': 500,
+        'artist': 100,
+        'album': 100
+    }
     
     NULL_CACHE_CONFIG = {
         'default': {
