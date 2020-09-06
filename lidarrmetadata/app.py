@@ -84,7 +84,7 @@ def get_search_query():
     if not query:
         abort(400, 'No query provided')
     
-    logger.info(f"Search query: {query}")
+    logger.debug(f"Search query: {query}")
     
     # These are invalid search queries for lucene
     if query == "+":
