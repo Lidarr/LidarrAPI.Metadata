@@ -5,6 +5,8 @@ volumes:
     driver: local
   dbdump:
     driver: local
+  searchdump:
+    driver: local
   solrdata:
     driver: local
   rabbitdata:
@@ -12,12 +14,9 @@ volumes:
   redisdata:
     driver: local
 
-networks:
-  lidarrmetadata:
-
 services:
   redis:
-    image: redis
+    image: redis:6.0
     command: redis-server /usr/local/etc/redis/redis.conf
     restart: unless-stopped
 
@@ -25,11 +24,8 @@ services:
       - redisdata:/data
       - $PWD/redis.conf:/usr/local/etc/redis/redis.conf
 
-    networks:
-      - lidarrmetadata
-      
   db:
-    image: ta264/musicbrainz-postgres
+    image: ghcr.io/lidarr/mb-postgres:1.0.8
     restart: unless-stopped
     
     volumes:
@@ -38,15 +34,13 @@ services:
     env_file:
       - ./postgres.env
     
-    networks:
-      - lidarrmetadata
-
   musicbrainz:
-    image: ta264/musicbrainz-server
+    image: ghcr.io/lidarr/mb-server:1.0.8
     restart: unless-stopped
 
     volumes:
       - dbdump:/media/dbdump
+      - searchdump:/media/searchdump
 
     env_file:
       - ./postgres.env
@@ -55,34 +49,30 @@ services:
       - db
       - redis
 
-    networks:
-      - lidarrmetadata
-
-  solr:
-    image: ta264/musicbrainz-solr
+  search:
+    image: ghcr.io/lidarr/mb-solr:3.3.1.7
     restart: unless-stopped
   
     volumes:
       - solrdata:/opt/solr/server/solr/data
+      - searchdump:/media/searchdump
     
-    networks:
-      - lidarrmetadata
-
-  sir:
-    build:
-        context: sir
+  indexer:
+    image: ghcr.io/lidarr/mb-sir:1.0.8
     restart: unless-stopped
+
+    entrypoint: python -m sir -d amqp_watch --entity-type artist --entity-type release-group
+
+    volumes:
+      - $PWD/sir/config.ini:/code/config.ini
 
     depends_on:
       - db
       - rabbit
-      - solr
+      - search
     
-    networks:
-      - lidarrmetadata
-
   rabbit:
-    image: rabbitmq:3.6
+    image: rabbitmq:3.8
     restart: unless-stopped
 
     volumes:
@@ -93,7 +83,3 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: "abc"
       RABBITMQ_DEFAULT_PASS: "abc"
-    
-    networks:
-      - lidarrmetadata
-
