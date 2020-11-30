@@ -29,17 +29,38 @@ Docker services
 
 The metadata server requires access to a musicbrainz postgresql database and solr search server.
 
-To initialize these in docker you can run::
+To initialize the musicbrainz db run (**do not set brainzcode at this point**)::
 
-  docker-compose build
-  docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-  docker-compose exec musicbrainz /createdb.sh -fetch
-  docker-compose exec sir make install
-  docker-compose exec sir make index
+  docker-compose up -d db
+  docker-compose run --rm musicbrainz /usr/local/bin/createdb.sh -fetch
 
+To set up the search index triggers, run::
 
-These will take several hours to complete.
+  docker-compose up -d indexer musicbrainz
+  docker-compose exec indexer python -m sir amqp_setup
+  admin/create-amqp-extension
+  admin/setup-amqp-triggers install
 
+To set up the search indices, run::
+
+  docker-compose run --rm musicbrainz fetch-dump.sh search
+  docker-compose run --rm search load-search-indexes.sh
+
+The database / search indices are now in line with the latest musicbrainz weekly dump.  To enable replication, set the brainzcode and run::
+
+  docker-compose up -d
+
+And wait for the database / indices to catch up with the latest hourly replication.  This could take a long time.
+
+Next create the extra indices lidarr needs in::
+
+  lidarrmetadata/sql/CreateIndices.sql
+
+Then you need to set up the lidarr cache::
+
+  docker-compose up -d cache-db
+  docker-compose run --rm crawler 
+  
 - `docker-compose.yml` defines the base services required - the musicbrainz database, server, solr and supporting services.
 - `docker-compose.dev.yml` exposes ports for the supporting services in `docker-compose.yml` to allow running the lidarr metadata service on the host.
 - `docker-compose.prod.yml` runs the lidarr metadata service in docker in addition to the supporting services.  Supporting services are not exposed.
