@@ -1,4 +1,4 @@
-FROM python:3.7-alpine
+FROM python:3.9-alpine
 
 ARG UID=1000
 ARG COMMIT_HASH=''
@@ -13,9 +13,8 @@ COPY . /metadata
 RUN apk update && \
         apk add postgresql-libs && \
         apk add --virtual .build-deps alpine-sdk musl-dev postgresql-dev && \
-        pip install -U setuptools pip && \
-        pip install -r requirements.txt && \
-        pip install --no-cache-dir .[deploy] && \
+        pip --disable-pip-version-check --no-cache-dir install -r requirements.txt && \
+        pip --disable-pip-version-check --no-cache-dir install .[deploy] && \
         apk --purge del .build-deps
 
 RUN adduser --system -u $UID metadata

@@ -16,6 +16,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+/venv*
 
 # Other docker stuff
 hooks/
@@ -25,3 +26,7 @@ docker-compose*
 
 # Appveyor
 appveyor.yml
+
+# Other stuff
+/.git
+/.tox

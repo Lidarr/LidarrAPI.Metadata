@@ -39,6 +39,7 @@ setup(
         'asyncpg',
         'billboard.py>=5.2.2',
         'gunicorn',
+        'httptools',
         'quart',
         'pylast>=3.0.0',
         'pytelegraf',
@@ -49,7 +50,8 @@ setup(
         'redis',
         'requests',
         'urllib3',
-        'uvicorn'
+        'uvicorn',
+        'uvloop'
     ],
 
     extras_require={
