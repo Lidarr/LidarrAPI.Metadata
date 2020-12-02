@@ -85,13 +85,13 @@ jobs:
       inputs:
         command: build
         Dockerfile: Dockerfile
-        arguments: --build-arg GIT_BRANCH=$(Build.SourceBranchName) --build-arg COMMIT_HASH=$(Build.SourceVersion) -t $(imageName):latest -t $(imageName):$(Build.SourceBranchName)
+        arguments: --build-arg GIT_BRANCH=$(Build.SourceBranchName) --build-arg COMMIT_HASH=$(Build.SourceVersion) -t ghcr.io/$(imageName):latest -t ghcr.io/$(imageName):$(Build.SourceBranchName)
 
     - task: Docker@2
       displayName: Push image
       condition: and(succeeded(), eq(variables['system.pullrequest.isfork'], false))
       inputs:
-        containerRegistry: 'dockerhub'
+        containerRegistry: 'ghcr'
         repository: $(imageName)
         command: push
         tags: |
