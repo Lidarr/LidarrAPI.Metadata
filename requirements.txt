@@ -35,7 +35,7 @@ redis==3.5.3
 requests==2.25.0
 sentry-sdk==0.19.5
 six==1.15.0
-soupsieve==2.0.1
+soupsieve==2.1
 spotipy==2.16.1
 toml==0.10.2
 typing-extensions==3.7.4.3
