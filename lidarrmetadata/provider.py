@@ -239,6 +239,15 @@ class ReleasesByReleaseGroupIdMixin(MixinBase):
         """
         pass
 
+class SeriesMixin(MixinBase):
+    """
+    Musicbrainz series
+    """
+
+    @abc.abstractmethod
+    def get_series(self, mbid):
+        pass
+
 
 class TrackSearchMixin(MixinBase):
     """
@@ -981,7 +990,8 @@ class MusicbrainzDbProvider(Provider,
                             ArtistByIdMixin,
                             ReleaseGroupByArtistMixin,
                             ReleaseGroupByIdMixin,
-                            ReleaseGroupIdListMixin):
+                            ReleaseGroupIdListMixin,
+                            SeriesMixin):
     """
     Provider for directly querying musicbrainz database
     """
@@ -1198,6 +1208,10 @@ class MusicbrainzDbProvider(Provider,
                  'SecondaryTypes': result['secondary_types'],
                  'ReleaseStatuses': result['release_statuses']}
                 for result in results]
+
+    async def get_series(self, mbid):
+        series = await self.query_from_file('release_group_series.sql', mbid)
+        return [json.loads(x['item']) for x in series]
     
     async def query_from_file(self, sql_file, *args):
         """
