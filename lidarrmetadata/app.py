@@ -267,6 +267,14 @@ async def chart_route(name, type_, selection):
         expiry = provider.utcnow() + timedelta(seconds=app.config['CACHE_TTL']['chart'])
         return await add_cache_control_header(jsonify(result), expiry)
 
+@app.route('/series/<mbid>')
+async def series_route(mbid):
+    series_provider = provider.get_providers_implementing(provider.SeriesMixin)[0]
+    result = await series_provider.get_series(mbid)
+
+    expiry = provider.utcnow() + timedelta(seconds=app.config['CACHE_TTL']['chart'])
+    return await add_cache_control_header(jsonify(result), expiry)
+
 @app.route('/search/album')
 async def search_album():
     """Search for a human-readable album
