@@ -434,13 +434,8 @@ async def search_fingerprint():
     if ids is None:
         return jsonify(error='Bad Request - expected JSON list of recording IDs as post body'), 400
     
-    logger.info(ids)
-
     album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
     album_ids = await album_provider.get_release_groups_by_recording_ids(ids)
-
-    logger.info('got albums')
-    logger.info(album_ids)
 
     results = await asyncio.gather(*[api.get_release_group_info(id) for id in album_ids])
     albums = [result[0] for result in results]
@@ -560,8 +555,6 @@ async def spotify_lookup():
     if ids is None:
         return jsonify(error='Bad Request - expected JSON list of spotify IDs as post body'), 400
     
-    logger.info(ids)
-
     results = await util.SPOTIFY_CACHE.multi_get(ids)
     output = [{'spotifyid': ids[x], 'musicbrainzid': results[x][0]} for x in range(len(ids))]
 

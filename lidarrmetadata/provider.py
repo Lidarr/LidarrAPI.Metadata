@@ -484,7 +484,7 @@ class HttpProvider(Provider,
             logger.debug(f'Task cancelled {url}')
             raise
         except asyncio.TimeoutError:
-            logger.error(f'Timeout for {self._name}', extra=dict(url=url))
+            logger.debug(f'Timeout for {self._name}', extra=dict(url=url))
             self._count_request('timeout')
             raise ProviderUnavailableException(f'{self._name} timeout')
         except Exception as error:
