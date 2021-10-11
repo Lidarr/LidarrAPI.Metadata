@@ -1122,7 +1122,7 @@ class MusicbrainzDbProvider(Provider,
 
     @staticmethod
     def _build_caa_url(release_id, image_id):
-        return 'https://coverartarchive.org/release/{}/{}-1200.jpg'.format(release_id, image_id)
+        return 'https://imagecache.lidarr.audio/v1/caa/{}/{}-1200.jpg'.format(release_id, image_id)
     
     @classmethod
     def _load_artist(cls, data):
