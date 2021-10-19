@@ -446,7 +446,7 @@ class HttpProvider(Provider,
         
     def _count_request(self, result_type):
         if self._stats:
-            self._stats.metric('external', {result_type: 1}, tags={'provider': self._name})
+            self._stats.metric('external_request', {result_type: 1}, tags={'provider': self._name})
 
     def _record_response_result(self, response, elapsed):
         if self._stats:
