@@ -452,10 +452,12 @@ class HttpProvider(Provider,
         if self._stats:
             self._stats.metric('external',
                                {
-                                   'response_time': elapsed,
                                    'response_status_code': response.status
                                },
-                               tags={'provider': self._name})
+                               tags={
+                                   'provider': self._name,
+                                   'response_time': elapsed
+                               })
 
     async def get(self, url, raise_on_http_error=True, **kwargs):
         try:
