@@ -28,14 +28,14 @@ class NullRGProvider(provider.ReleaseGroupByIdMixin):
 
 @pytest.fixture(scope='function')
 def patch_search_provider(monkeypatch):
-    copy = provider.get_providers_implementing
+    before_patch = provider.get_providers_implementing
     def patched_providers(x):
         if x in NullSearchProvider.__mro__:
             return [NullSearchProvider()]
         elif x in NullRGProvider.__mro__:
             return [NullRGProvider()]
 
-        return copy(x)
+        return before_patch(x)
 
     monkeypatch.setattr(provider, 'get_providers_implementing', patched_providers)
 
