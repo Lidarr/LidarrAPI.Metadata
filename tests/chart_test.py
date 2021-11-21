@@ -24,3 +24,7 @@ async def test_billboard_200_albums_chart(patch_search_provider):
 @pytest.mark.asyncio
 async def test_billboard_100_artists_chart(patch_search_provider):
     await chart.get_billboard_100_artists_chart()
+
+@pytest.mark.asyncio
+async def test_apple_music_top_albums_chart(patch_search_provider):
+    await chart.get_apple_music_top_albums_chart()

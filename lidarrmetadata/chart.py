@@ -16,7 +16,7 @@ async def _parse_itunes_chart(URL, count):
     async with aiohttp.ClientSession() as session:
         async with session.get(URL, timeout=aiohttp.ClientTimeout(total=5)) as response:
             json = await response.json()
-            results = filter(lambda r: r.get('kind', '') == 'album', json['feed']['results'])
+            results = filter(lambda r: r.get('kind', '') == 'albums', json['feed']['results'])
             search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
             search_results = []
             for result in results:
@@ -36,7 +36,7 @@ async def get_apple_music_top_albums_chart(count=10):
     :param count: Number of results to return. Defaults to 10
     :return: Chart response for itunes
     """
-    URL = 'https://rss.itunes.apple.com/api/v1/us/apple-music/top-albums/all/{count}/explicit.json'.format(
+    URL = 'https://rss.applemarketingtools.com/api/v2/us/music/most-played/{count}/albums.json'.format(
         count=4 * count)
     return await _parse_itunes_chart(URL, count)
 
