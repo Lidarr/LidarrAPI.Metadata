@@ -1,5 +1,6 @@
 import pytest
 
+from lidarrmetadata import config
 from lidarrmetadata import chart
 from lidarrmetadata import provider
 
@@ -51,10 +52,12 @@ async def test_billboard_100_artists_chart(patch_search_provider):
 async def test_apple_music_top_albums_chart(patch_search_provider):
     await chart.get_apple_music_top_albums_chart()
 
+@pytest.mark.skipif(config.get_config().LASTFM_KEY == '', reason='No LastFM key available')
 @pytest.mark.asyncio
 async def test_lastfm_albums_chart(patch_search_provider):
     await chart.get_lastfm_album_chart()
 
+@pytest.mark.skipif(config.get_config().LASTFM_KEY == '', reason='No LastFM key available')
 @pytest.mark.asyncio
 async def test_lastfm_artists_chart(patch_search_provider):
     await chart.get_lastfm_artist_chart()
