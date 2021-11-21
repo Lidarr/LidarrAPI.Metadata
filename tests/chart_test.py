@@ -13,9 +13,31 @@ class NullSearchProvider(provider.SolrSearchProvider):
     async def search_artist_name(self, *args, **kwargs):
             return []
 
+class NullRGProvider(provider.ReleaseGroupByIdMixin):
+    async def map_query(self, *args, **kwargs):
+        return []
+
+    async def get_release_group_id_from_spotify_id(self, spotify_id):
+        return None
+
+    async def get_release_groups_by_id(self, rgids):
+        return []
+
+    async def redirect_old_release_group_id(self, artist_id):
+        return None
+
 @pytest.fixture(scope='function')
 def patch_search_provider(monkeypatch):
-    monkeypatch.setattr(provider, 'get_providers_implementing', lambda x: [NullSearchProvider()])
+    copy = provider.get_providers_implementing
+    def patched_providers(x):
+        if x in NullSearchProvider.__mro__:
+            return [NullSearchProvider()]
+        elif x in NullRGProvider.__mro__:
+            return [NullRGProvider()]
+
+        return copy(x)
+
+    monkeypatch.setattr(provider, 'get_providers_implementing', patched_providers)
 
 @pytest.mark.asyncio
 async def test_billboard_200_albums_chart(patch_search_provider):
@@ -28,3 +50,11 @@ async def test_billboard_100_artists_chart(patch_search_provider):
 @pytest.mark.asyncio
 async def test_apple_music_top_albums_chart(patch_search_provider):
     await chart.get_apple_music_top_albums_chart()
+
+@pytest.mark.asyncio
+async def test_lastfm_albums_chart(patch_search_provider):
+    await chart.get_lastfm_album_chart()
+
+@pytest.mark.asyncio
+async def test_lastfm_artists_chart(patch_search_provider):
+    await chart.get_lastfm_artist_chart()

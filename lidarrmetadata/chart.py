@@ -138,23 +138,26 @@ async def get_lastfm_album_chart(count=10, user=None):
         # Try to stop lastfm from erroring out
         await asyncio.sleep(1)
         
-        # TODO Figure out a cleaner way to do this
-        rgid = await album_provider.map_query(
-            'SELECT release_group.gid '
-            'FROM release '
-            'JOIN release_group ON release_group.id = release.release_group '
-            'WHERE release.gid = $1 '
-            'LIMIT 1',
-            lastfm_album.item.get_mbid()
-        )
+        try:
+            # TODO Figure out a cleaner way to do this
+            rgid = await album_provider.map_query(
+                'SELECT release_group.gid '
+                'FROM release '
+                'JOIN release_group ON release_group.id = release.release_group '
+                'WHERE release.gid = $1 '
+                'LIMIT 1',
+                lastfm_album.item.get_mbid()
+            )
 
-        if rgid:
-            search_result = await _parse_album_search_result({'Id': rgid[0]['gid']})
-            if search_result:
-                albums.append(search_result)
+            if rgid:
+                search_result = await _parse_album_search_result({'Id': rgid[0]['gid']})
+                if search_result:
+                    albums.append(search_result)
 
-                if len(albums) == count:
-                    break
+                    if len(albums) == count:
+                        break
+        except:
+            pass
 
     if len(albums) > count:
         albums = albums[:count]
