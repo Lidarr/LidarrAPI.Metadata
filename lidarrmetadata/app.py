@@ -202,6 +202,18 @@ async def get_artist_info_route(mbid):
 
     return await add_cache_control_header(jsonify(artist), expiry)
 
+@app.route('/artist/<mbid>/refresh', methods=['POST'])
+async def refresh_artist_route(mbid):
+    uuid_validation_response = validate_mbid(mbid)
+    if uuid_validation_response:
+        return uuid_validation_response
+
+    await util.ARTIST_CACHE.set(mbid, None)
+    base_url = app.config['CLOUDFLARE_URL_BASE'] + '/' +  app.config['ROOT_PATH'].lstrip('/').rstrip('/')
+    await invalidate_cloudflare([f'{base_url}/artist/{mbid}'])
+    return jsonify(success=True)
+
+
 @app.route('/album/<mbid>', methods=['GET'])
 async def get_release_group_info_route(mbid):
     
@@ -212,6 +224,17 @@ async def get_release_group_info_route(mbid):
     output, expiry = await api.get_release_group_info(mbid)
     
     return await add_cache_control_header(jsonify(output), expiry)
+
+@app.route('/album/<mbid>/refresh', methods=['POST'])
+async def refresh_release_group_route(mbid):
+    uuid_validation_response = validate_mbid(mbid)
+    if uuid_validation_response:
+        return uuid_validation_response
+
+    await util.ALBUM_CACHE.set(mbid, None)
+    base_url = app.config['CLOUDFLARE_URL_BASE'] + '/' +  app.config['ROOT_PATH'].lstrip('/').rstrip('/')
+    await invalidate_cloudflare([f'{base_url}/album/{mbid}'])
+    return jsonify(success=True)
 
 @app.route('/recent/artist', methods=['GET'])
 @no_cache
