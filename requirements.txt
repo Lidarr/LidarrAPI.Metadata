@@ -6,7 +6,7 @@ async-timeout==3.0.1
 asyncpg==0.21.0
 attrs==20.3.0
 beautifulsoup4==4.9.3
-billboard.py==6.2.1
+billboard.py==7.0.0
 blinker==1.4
 certifi==2020.12.5
 chardet==3.0.4
