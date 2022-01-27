@@ -628,7 +628,7 @@ class TheAudioDbProvider(HttpProvider,
         }
         
         images = {k: response.get(v) for k, v in image_mapping.items()}
-        return [{'CoverType': key, 'Url': response(value)}
+        return [{'CoverType': key, 'Url': response_url(value)}
                 for key, value in images.items() if value]
 
     @staticmethod
