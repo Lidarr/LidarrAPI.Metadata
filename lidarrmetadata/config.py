@@ -492,6 +492,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Testing mode
     TESTING = False
 
+    # Hosted cache for third-party images
+    IMAGE_CACHE_HOST = "imagecache.lidarr.audio"
+
 
 class TestConfig(DefaultConfig):
     USE_CACHE = False
