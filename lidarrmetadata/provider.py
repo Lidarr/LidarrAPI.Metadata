@@ -11,7 +11,7 @@ import pkg_resources
 import re
 import six
 from timeit import default_timer as timer
-from urllib.parse import parseurl
+from urllib.parse import urlparse
 from urllib.parse import quote as url_quote
 
 import asyncio
@@ -86,7 +86,7 @@ def response_url(url: str) -> str:
     Transforms a URL to a response URL, which can take into account things such as a hosted cache
     for third-party services.
     """
-    parsed = parseurl(url)
+    parsed = urlparse(url)
     if parsed.netloc.endswith("theaudiodb.com"):
         parsed = parsed._replace(
             netloc=CONFIG.IMAGE_CACHE_HOST,
