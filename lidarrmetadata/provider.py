@@ -88,9 +88,10 @@ def response_url(url: str) -> str:
     """
     parsed = urlparse(url)
     if parsed.netloc.endswith("theaudiodb.com"):
+        new_path = re.sub("^/images/media/", "", parsed.path)
         parsed = parsed._replace(
             netloc=CONFIG.IMAGE_CACHE_HOST,
-            path=f"v1/tadb/{parsed.path}"
+            path=f"v1/tadb/{new_path}"
         )
     return parsed.geturl()
 
