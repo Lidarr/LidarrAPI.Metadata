@@ -39,7 +39,7 @@ soupsieve==2.1
 spotipy==2.16.1
 toml==0.10.2
 typing-extensions==3.7.4.3
-urllib3==1.26.7
+urllib3==1.26.8
 uvicorn==0.13.2
 uvloop==0.14.0
 Werkzeug==1.0.1
