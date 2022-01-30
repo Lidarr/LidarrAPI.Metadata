@@ -11,6 +11,7 @@ import pkg_resources
 import re
 import six
 from timeit import default_timer as timer
+from urllib.parse import urlparse
 from urllib.parse import quote as url_quote
 
 import asyncio
@@ -80,6 +81,19 @@ def _get_rate_limiter(key=None):
             "Don't know how to instantiate {}. Defaulting to NullRateLimiter".format(limit_class))
         return limit.NullRateLimiter()
 
+def response_url(url: str) -> str:
+    """
+    Transforms a URL to a response URL, which can take into account things such as a hosted cache
+    for third-party services.
+    """
+    parsed = urlparse(url)
+    if parsed.netloc.endswith("theaudiodb.com"):
+        new_path = re.sub("^/images/media/", "", parsed.path)
+        parsed = parsed._replace(
+            netloc=CONFIG.IMAGE_CACHE_HOST,
+            path=f"v1/tadb/{new_path}"
+        )
+    return parsed.geturl()
 
 class MixinBase(six.with_metaclass(abc.ABCMeta, object)):
     pass
@@ -606,12 +620,16 @@ class TheAudioDbProvider(HttpProvider,
         """
         if not response:
             return []
+
+        image_mapping = {
+            "Banner": "strArtistBanner",
+            "Fanart": "strArtistFanart",
+            "Logo": "strArtistLogo",
+            "Poster": "strArtistThumb"
+        }
         
-        images = {'Banner': response.get('strArtistBanner', ''),
-                  'Fanart': response.get('strArtistFanart', ''),
-                  'Logo': response.get('strArtistLogo', ''),
-                  'Poster': response.get('strArtistThumb', '')}
-        return [{'CoverType': key, 'Url': value}
+        images = {k: response.get(v) for k, v in image_mapping.items()}
+        return [{'CoverType': key, 'Url': response_url(value)}
                 for key, value in images.items() if value]
 
     @staticmethod
