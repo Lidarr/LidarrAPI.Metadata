@@ -105,26 +105,10 @@ async def handle_http_error(e):
 
 @app.errorhandler(api.ReleaseGroupNotFoundException)
 async def handle_error(e):
-
-    # Look for a redirect
-    album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
-    new_id = await album_provider.redirect_old_release_group_id(e.mbid)
-    
-    if new_id:
-        return redirect(app.config['ROOT_PATH'] + url_for('get_release_group_info_route', mbid=new_id), 301)
-    
     return jsonify(error='Album not found'), 404
 
 @app.errorhandler(api.ArtistNotFoundException)
 async def handle_error(e):
-
-    # Look for a redirect
-    artist_provider = provider.get_providers_implementing(provider.ArtistByIdMixin)[0]
-    new_id = await artist_provider.redirect_old_artist_id(e.mbid)
-    
-    if new_id:
-        return redirect(app.config['ROOT_PATH'] + url_for('get_artist_info_route', mbid=new_id), 301)
-    
     return jsonify(error='Artist not found'), 404
 
 @app.errorhandler(redis.ConnectionError)
@@ -340,11 +324,15 @@ async def get_album_search_results(query, limit, include_tracks, artist_name):
         logger.debug(f"Got album search results in {(timer() - start) * 1000:.0f}ms ")
 
         async def get_search_result(item):
-            result, validity = await api.get_release_group_info(item['Id'])
-            return result, item['Score'], validity
+            try:
+                result, validity = await api.get_release_group_info(item['Id'])
+                return result, item['Score'], validity
+            except api.ReleaseGroupNotFoundException:
+                return None, -1, provider.utcnow()
+            
         
         results = await asyncio.gather(*[get_search_result(item) for item in search_results])
-        albums = [result[0] for result in results]
+        albums = [result[0] for result in results if result[0]]
 
         # Current versions of lidarr will fail trying to parse the tracks contained in releases
         # because it's not expecting it to be present and passes null for ArtistMetadata dict
@@ -352,8 +340,8 @@ async def get_album_search_results(query, limit, include_tracks, artist_name):
             for album in albums:
                 album['releases'] = []
 
-        scores = [result[1] for result in results]
-        validity = min([result[2] for result in results] or [provider.utcnow()])
+        scores = [result[1] for result in results if result[0]]
+        validity = min([result[2] for result in results if result[0]] or [provider.utcnow()])
 
         return albums, scores, validity
         
@@ -411,14 +399,17 @@ async def get_artist_search_results(query, limit):
     artist_ids = await search_providers[0].search_artist_name(query, limit=limit)
 
     async def get_search_result(id, score):
-        result, validity = await api.get_artist_info(id)
-        return result, score, validity
+        try:
+            result, validity = await api.get_artist_info(id)
+            return result, score, validity
+        except api.ArtistNotFoundException:
+            return None, -1, provider.utcnow()
 
     results = await asyncio.gather(*[get_search_result(item['Id'], item['Score']) for item in artist_ids])
 
-    artists = [result[0] for result in results]
-    scores = [result[1] for result in results]
-    validity = min([result[2] for result in results] or [provider.utcnow()])
+    artists = [result[0] for result in results if result[0]]
+    scores = [result[1] for result in results if result[0]]
+    validity = min([result[2] for result in results if result[0]] or [provider.utcnow()])
 
     return artists, scores, validity
 

@@ -106,7 +106,12 @@ async def get_artist_info(mbid):
 
     artists = await get_artist_info_multi([mbid])
     if not artists:
-        raise ArtistNotFoundException(mbid)
+        artist_provider = provider.get_providers_implementing(provider.ArtistByIdMixin)[0]
+        new_id = await artist_provider.redirect_old_artist_id(e.mbid)
+        artists = await get_artist_info_multi([new_id])
+        
+        if not artists:
+            raise ArtistNotFoundException(mbid)
     
     return artists[0]
 
@@ -205,7 +210,13 @@ async def get_release_group_info_basic(mbid):
     
     release_groups = await get_release_group_info_multi([mbid])
     if not release_groups:
-        raise ReleaseGroupNotFoundException(mbid)
+
+        album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
+        new_id = await album_provider.redirect_old_release_group_id(e.mbid)
+        release_groups = await get_release_group_info_multi([new_id])
+
+        if not release_groups:
+            raise ReleaseGroupNotFoundException(mbid)
     
     return release_groups[0]
 
