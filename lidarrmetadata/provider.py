@@ -1255,7 +1255,7 @@ class MusicbrainzDbProvider(Provider,
         :return: List of dict with column: value
         """
 
-        data = await _conn.fetch(sql, *args)
+        data = await _conn.fetch(sql, *args, timeout=120)
             
         results = [dict(row.items()) for row in data]
 
