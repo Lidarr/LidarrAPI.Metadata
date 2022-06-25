@@ -19,7 +19,7 @@ hiredis==1.1.0
 hpack==4.0.0
 httptools==0.1.1
 Hypercorn==0.13.2
-hyperframe==6.0.0
+hyperframe==6.0.1
 idna==2.10
 itsdangerous==2.0.0a1
 Jinja2==3.0.0a1
@@ -43,5 +43,5 @@ urllib3==1.26.9
 uvicorn==0.18.1
 uvloop==0.14.0
 Werkzeug==1.0.1
-wsproto==1.0.0
+wsproto==1.1.0
 yarl==1.6.3
