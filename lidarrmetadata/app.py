@@ -11,6 +11,7 @@ import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 import datetime
 from datetime import timedelta
+from dateutil import parser
 import time
 import logging
 import aiohttp
@@ -577,6 +578,13 @@ async def spotify_lookup():
 @app.route('/invalidate')
 @no_cache
 async def invalidate_cache():
+
+    if request.headers.get('authorization') != app.config['INVALIDATE_APIKEY']:
+        return jsonify('Unauthorized'), 401
+
+    since = request.args.get('since')
+    if since:
+        since = parser.parse(since)
     
     ## this is used as a prefix in various places to make sure
     ## we keep cache for different metadata versions separate
@@ -600,7 +608,7 @@ async def invalidate_cache():
         ## Get all the artists/albums that need updating
         cache_users = provider.get_providers_implementing(provider.InvalidateCacheMixin)
         for cache_user in cache_users:
-            result = await cache_user.invalidate_cache(base_url)
+            result = await cache_user.invalidate_cache(base_url, since)
 
             artists = artists.union(result['artists'])
             albums = albums.union(result['albums'])
