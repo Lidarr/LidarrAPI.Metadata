@@ -352,7 +352,7 @@ class InvalidateCacheMixin(MixinBase):
     """
     
     @abc.abstractmethod
-    def invalidate_cache(self, prefix):
+    def invalidate_cache(self, prefix, since):
         """
         Invalidates any internal cache as appropriate and returns entities that need invalidating at API level
         :param prefix: URL prefix for the instance we are clearing cache for
@@ -743,13 +743,15 @@ class FanArtTvProvider(HttpProvider,
 
         return results, ttl
         
-    async def invalidate_cache(self, prefix):
+    async def invalidate_cache(self, prefix, since):
         logger.debug('Invalidating fanart cache')
         
         result = {'artists': [], 'albums': []}
         
         last_invalidation_key = prefix + 'FanartProviderLastCacheInvalidation'
-        self._last_cache_invalidation = await util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
+        if since:
+            since = int(since.timestamp())
+        self._last_cache_invalidation = since or await util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
         current_cache_invalidation = int(time.time())
         
         # Since we don't have a fanart personal key we can only see things with a lag
@@ -1080,10 +1082,10 @@ class MusicbrainzDbProvider(Provider,
         data = await self.query_from_file('data_vintage.sql')
         return data[0]['vintage']
     
-    async def invalidate_cache(self, prefix):
+    async def invalidate_cache(self, prefix, since):
 
         last_invalidation_key = prefix + 'MBProviderLastCacheInvalidation'
-        self._last_cache_invalidation = await util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
+        self._last_cache_invalidation = since or await util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
 
         result = {'artists': [], 'albums': []}
         
