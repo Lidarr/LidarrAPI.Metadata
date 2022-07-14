@@ -497,9 +497,15 @@ async def spotify_lookup_artist(spotify_id):
     except SpotifyException:
         await util.SPOTIFY_CACHE.set(spotify_id, 0, ttl=app.config['CACHE_TTL']['cloudflare'])
         return jsonify(error='Not found'), 404
+
+    if spotifyalbum is None:
+        await util.SPOTIFY_CACHE.set(spotify_id, 0, ttl=app.config['CACHE_TTL']['cloudflare'])
+        return jsonify(error='Not found'), 404
     
     spotifyalbum = await spotify_lookup_by_text_search(spotifyalbum)
+
     if spotifyalbum is None:
+        await util.SPOTIFY_CACHE.set(spotify_id, 0, ttl=app.config['CACHE_TTL']['cloudflare'])
         return jsonify(error='Not found'), 404
 
     await util.SPOTIFY_CACHE.set(spotifyalbum['AlbumSpotifyId'], spotifyalbum['AlbumMusicBrainzId'], ttl=None)

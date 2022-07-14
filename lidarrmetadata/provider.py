@@ -1291,6 +1291,10 @@ class SpotifyProvider(Provider,
 
     def album_from_artist(self, artist_id):
         top_tracks = self.spotify.artist_top_tracks(artist_id, country='US')
+
+        if not top_tracks['tracks']:
+            return None
+
         album = top_tracks['tracks'][0]['album']
         artist = album['artists'][0]
 
