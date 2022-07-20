@@ -746,7 +746,7 @@ class FanArtTvProvider(HttpProvider,
     async def invalidate_cache(self, prefix, since):
         logger.debug('Invalidating fanart cache')
         
-        result = {'artists': [], 'albums': []}
+        result = {'artists': [], 'albums': [], 'spotify_artists': [], 'spotify_albums': []}
         
         last_invalidation_key = prefix + 'FanartProviderLastCacheInvalidation'
         if since:
@@ -1087,7 +1087,7 @@ class MusicbrainzDbProvider(Provider,
         last_invalidation_key = prefix + 'MBProviderLastCacheInvalidation'
         self._last_cache_invalidation = since or await util.CACHE.get(last_invalidation_key) or self._last_cache_invalidation
 
-        result = {'artists': [], 'albums': []}
+        result = {'artists': [], 'albums': [], 'spotify_artists': [], 'spotify_albums': []}
         
         vintage = await self.data_vintage()
         if vintage > self._last_cache_invalidation:
@@ -1095,9 +1095,13 @@ class MusicbrainzDbProvider(Provider,
 
             result['artists'] = await self._invalidate_queries_by_entity_id('updated_artists.sql')
             result['albums'] = await self._invalidate_queries_by_entity_id('updated_albums.sql')
+            result['spotify_artists'] = await self._invalidate_spotify_ids('updated_spotify_artists.sql')
+            result['spotify_albums'] = await self._invalidate_spotify_ids('updated_spotify_albums.sql')
             
             logger.info('Invalidating these artists given musicbrainz updates:\n{}'.format('\n'.join(result['artists'])))
             logger.info('Invalidating these albums given musicbrainz updates:\n{}'.format('\n'.join(result['albums'])))
+            logger.info('Invalidating these spotify artists given musicbrainz updates:\n{}'.format('\n'.join(result['spotify_artists'])))
+            logger.info('Invalidating these spotify albums given musicbrainz updates:\n{}'.format('\n'.join(result['spotify_albums'])))
 
             await util.CACHE.set(last_invalidation_key, vintage)
         else:
@@ -1108,6 +1112,10 @@ class MusicbrainzDbProvider(Provider,
     async def _invalidate_queries_by_entity_id(self, changed_query):
         entities = await self.query_from_file(changed_query, self._last_cache_invalidation)
         return [entity['gid'] for entity in entities]
+
+    async def _invalidate_spotify_ids(self, changed_query):
+        entities = await self.query_from_file(changed_query, self._last_cache_invalidation)
+        return [entity['spotifyid'] for entity in entities]
     
     async def get_artists_by_id(self, artist_ids):
         artists = await self.query_from_file('artist_by_id.sql', artist_ids)

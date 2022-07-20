@@ -7,3 +7,6 @@ CREATE INDEX recording_idx_last_updated ON recording(last_updated);
 CREATE INDEX url_idx_last_updated on url(last_updated);
 CREATE INDEX artist_gid_redirect_idx_last_updated on artist_gid_redirect(created);
 CREATE INDEX release_group_gid_redirect_idx_last_updated on release_group_gid_redirect(created);
+CREATE INDEX l_artist_url_idx_last_updated on l_artist_url(last_updated);
+CREATE INDEX l_release_url_idx_last_updated on l_release_url(last_updated);
+CREATE INDEX l_release_group_url_idx_last_updated on l_release_group_url(last_updated);
