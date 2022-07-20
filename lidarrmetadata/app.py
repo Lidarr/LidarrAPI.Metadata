@@ -547,13 +547,13 @@ async def spotify_lookup_album(spotify_id):
     return redirect(app.config['ROOT_PATH'] + url_for('get_release_group_info_route', mbid=spotifyalbum['AlbumMusicBrainzId']), 301)
 
 async def spotify_lookup_by_text_search(spotifyalbum):
-    logger.debug(f"Artist: {spotifyalbum['Artist']} Album: {spotifyalbum['Album']}")    
+    logger.debug(f"Looking for album corresponding to Artist: {spotifyalbum['Artist']} Album: {spotifyalbum['Album']}")    
     
     # do search
     search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
     result = await search_provider.search_album_name(spotifyalbum['Album'], artist_name=spotifyalbum['Artist'], limit=1)
 
-    if not result:
+    if not result or result[0]['Score'] < 80:
         ttl = app.config['CACHE_TTL']['cloudflare']
         await util.SPOTIFY_CACHE.set(spotifyalbum['AlbumSpotifyId'], 0, ttl=ttl)
         await util.SPOTIFY_CACHE.set(spotifyalbum['ArtistSpotifyId'], 0, ttl=ttl)
@@ -563,6 +563,18 @@ async def spotify_lookup_by_text_search(spotifyalbum):
     albumid = result[0]['Id']
     album, validity = await api.get_release_group_info(result[0]['Id'])
     artistid = album['artistid']
+
+    found_title = album['title']
+    found_artist = next(filter(lambda a: a['id'] == artistid, album['artists']))['artistname']
+
+    logger.info(f"Mapped Spotify Artist: {spotifyalbum['Artist']} Album: {spotifyalbum['Album']} to Artist: {found_artist} Album: {found_title} ")
+
+    # TODO: determine if this would be helpful, add some fuzz if so
+    #if found_title != spotifyalbum['Album'] or found_artist != spotifyalbum['Artist']:
+    #    ttl = app.config['CACHE_TTL']['cloudflare']
+    #    await util.SPOTIFY_CACHE.set(spotifyalbum['AlbumSpotifyId'], 0, ttl=ttl)
+    #    await util.SPOTIFY_CACHE.set(spotifyalbum['ArtistSpotifyId'], 0, ttl=ttl)
+    #    return None
 
     spotifyalbum['AlbumMusicBrainzId'] = albumid
     spotifyalbum['ArtistMusicBrainzId'] = artistid
@@ -610,6 +622,8 @@ async def invalidate_cache():
         ## that we need to invalidate the final responses for
         artists = set()
         albums = set()
+        spotify_artists = set()
+        spotify_albums = set()
 
         ## Get all the artists/albums that need updating
         cache_users = provider.get_providers_implementing(provider.InvalidateCacheMixin)
@@ -618,16 +632,24 @@ async def invalidate_cache():
 
             artists = artists.union(result['artists'])
             albums = albums.union(result['albums'])
+            spotify_artists = spotify_artists.union(result['spotify_artists'])
+            spotify_albums = spotify_albums.union(result['spotify_albums'])
 
         ## Invalidate all the local caches
         ## Use set rather than expires so that we add entries for new items also
         await asyncio.gather(
             util.ARTIST_CACHE.multi_set([(artist, None) for artist in artists], ttl=0, timeout=None),
-            util.ALBUM_CACHE.multi_set([(album, None) for album in albums], ttl=0, timeout=None)
+            util.ALBUM_CACHE.multi_set([(album, None) for album in albums], ttl=0, timeout=None),
+            util.SPOTIFY_CACHE.multi_set([(spotify_artist, None) for spotify_artist in spotify_artists], ttl=0, timeout=None),
+            util.SPOTIFY_CACHE.multi_set([(spotify_album, None) for spotify_album in spotify_albums], ttl=0, timeout=None)
         )
 
         ## Invalidate cloudflare cache
-        invalidated = [f'{base_url}/artist/{artist}' for artist in artists] + [f'{base_url}/album/{album}' for album in albums]
+        invalidated = ([f'{base_url}/artist/{artist}' for artist in artists] + 
+            [f'{base_url}/album/{album}' for album in albums] +
+            [f'{base_url}/spotify/artist/{spotify_artist}' for spotify_artist in spotify_artists] +
+            [f'{base_url}/spotify/album/{spotify_album}' for spotify_album in spotify_albums]
+        )
         await invalidate_cloudflare(invalidated)
     
     finally:
