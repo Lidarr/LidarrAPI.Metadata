@@ -452,6 +452,7 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     SPOTIFY_REDIRECT_URL = ''
     SPOTIFY_ID = 'replaceme'
     SPOTIFY_SECRET = 'replaceme'
+    SPOTIFY_MATCH_MIN_RATIO = 0.8
 
     # Whether or not running in production
     PRODUCTION = False

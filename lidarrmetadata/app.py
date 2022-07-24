@@ -17,6 +17,7 @@ import logging
 import aiohttp
 from timeit import default_timer as timer
 from spotipy import SpotifyException
+import Levenshtein
 
 import lidarrmetadata
 from lidarrmetadata import api
@@ -553,7 +554,7 @@ async def spotify_lookup_by_text_search(spotifyalbum):
     search_provider = provider.get_providers_implementing(provider.AlbumNameSearchMixin)[0]
     result = await search_provider.search_album_name(spotifyalbum['Album'], artist_name=spotifyalbum['Artist'], limit=1)
 
-    if not result or result[0]['Score'] < 80:
+    if not result:
         ttl = app.config['CACHE_TTL']['cloudflare']
         await util.SPOTIFY_CACHE.set(spotifyalbum['AlbumSpotifyId'], 0, ttl=ttl)
         await util.SPOTIFY_CACHE.set(spotifyalbum['ArtistSpotifyId'], 0, ttl=ttl)
@@ -567,14 +568,17 @@ async def spotify_lookup_by_text_search(spotifyalbum):
     found_title = album['title']
     found_artist = next(filter(lambda a: a['id'] == artistid, album['artists']))['artistname']
 
-    logger.info(f"Mapped Spotify Artist: {spotifyalbum['Artist']} Album: {spotifyalbum['Album']} to Artist: {found_artist} Album: {found_title} ")
+    title_dist = Levenshtein.ratio(found_title, spotifyalbum['Album'])
+    artist_dist = Levenshtein.ratio(found_artist, spotifyalbum['Artist'])
+    min_ratio = app.config['SPOTIFY_MATCH_MIN_RATIO']
 
-    # TODO: determine if this would be helpful, add some fuzz if so
-    #if found_title != spotifyalbum['Album'] or found_artist != spotifyalbum['Artist']:
-    #    ttl = app.config['CACHE_TTL']['cloudflare']
-    #    await util.SPOTIFY_CACHE.set(spotifyalbum['AlbumSpotifyId'], 0, ttl=ttl)
-    #    await util.SPOTIFY_CACHE.set(spotifyalbum['ArtistSpotifyId'], 0, ttl=ttl)
-    #    return None
+    if title_dist < min_ratio or artist_dist < min_ratio:
+        ttl = app.config['CACHE_TTL']['cloudflare']
+        await util.SPOTIFY_CACHE.set(spotifyalbum['AlbumSpotifyId'], 0, ttl=ttl)
+        await util.SPOTIFY_CACHE.set(spotifyalbum['ArtistSpotifyId'], 0, ttl=ttl)
+        return None
+
+    logger.info(f"Mapped Spotify Album: '{spotifyalbum['Album']}' by '{spotifyalbum['Artist']}' to Musicbrainz Album: '{found_title}' ({title_dist}) by '{found_artist}' ({artist_dist})")
 
     spotifyalbum['AlbumMusicBrainzId'] = albumid
     spotifyalbum['ArtistMusicBrainzId'] = artistid
