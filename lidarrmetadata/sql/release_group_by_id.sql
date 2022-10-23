@@ -91,6 +91,7 @@ SELECT
 	      FROM cover_art_archive.index_listing
 		     JOIN release ON index_listing.release = release.id
 	     WHERE release.release_group = release_group.id
+	     ORDER BY index_listing.ordering ASC
 	  ) images_data
       ) AS images,
       (
