@@ -37,7 +37,7 @@ requests==2.25.1
 sentry-sdk==0.19.5
 six==1.15.0
 soupsieve==2.3.2.post1
-spotipy==2.16.1
+spotipy==2.22.1
 toml==0.10.2
 typing-extensions==3.7.4.3
 urllib3==1.26.9
