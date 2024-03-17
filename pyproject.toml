@@ -65,3 +65,7 @@ mockredispy = "^2.9.3"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+lidarr-metadata-server = "lidarrmetadata.server:main"
+lidarr-metadata-crawler = "lidarrmetadata.crawler:main"
