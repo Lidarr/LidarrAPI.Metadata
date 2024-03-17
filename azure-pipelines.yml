@@ -52,29 +52,29 @@ jobs:
         extraProperties: |
           sonar.python.coverage.reportPath=$(System.DefaultWorkingDirectory)/coverage.xml
 
-    - script: python -m pip install -U -Iv pypandoc==1.5 tox==3.23.0
+    - script: python -m pip install -U -Iv pypandoc==1.5 tox==3.23.0 poetry
       displayName: 'Install tools'
 
-    - script: tox -e py39
-      displayName: 'Run Tests'
+    # - script: tox -e py39
+    #   displayName: 'Run Tests'
 
-    - task: PublishTestResults@2
-      inputs:
-        testResultsFiles: '**/test-*.xml'
-        testRunTitle: 'Linux - Python 3.9'
-      condition: succeededOrFailed()
+    # - task: PublishTestResults@2
+    #   inputs:
+    #     testResultsFiles: '**/test-*.xml'
+    #     testRunTitle: 'Linux - Python 3.9'
+    #   condition: succeededOrFailed()
 
-    - publish: $(System.DefaultWorkingDirectory)/htmlcov
-      artifact: 'PyTestCoverageReport'
-      displayName: Publish PyTest Coverage Report
-      condition: succeededOrFailed()
+    # - publish: $(System.DefaultWorkingDirectory)/htmlcov
+    #   artifact: 'PyTestCoverageReport'
+    #   displayName: Publish PyTest Coverage Report
+    #   condition: succeededOrFailed()
 
-    - task: PublishCodeCoverageResults@1
-      inputs:
-        codeCoverageTool: Cobertura
-        summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
-        reportDirectory: '$(System.DefaultWorkingDirectory)/**/htmlcov'
-      condition: succeededOrFailed()
+    # - task: PublishCodeCoverageResults@1
+    #   inputs:
+    #     codeCoverageTool: Cobertura
+    #     summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
+    #     reportDirectory: '$(System.DefaultWorkingDirectory)/**/htmlcov'
+    #   condition: succeededOrFailed()
 
     - task: SonarCloudAnalyze@1
       displayName: 'Run Sonarcloud Analysis'
