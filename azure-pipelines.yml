@@ -52,8 +52,8 @@ jobs:
         extraProperties: |
           sonar.python.coverage.reportPath=$(System.DefaultWorkingDirectory)/coverage.xml
 
-    - script: python -m pip install -U -Iv pypandoc==1.5 tox==3.23.0 poetry
-      displayName: 'Install tools'
+    # - script: python -m pip install -U -Iv pypandoc==1.5 tox==3.23.0 poetry
+    #   displayName: 'Install tools'
 
     # - script: tox -e py39
     #   displayName: 'Run Tests'
@@ -76,8 +76,8 @@ jobs:
     #     reportDirectory: '$(System.DefaultWorkingDirectory)/**/htmlcov'
     #   condition: succeededOrFailed()
 
-    - task: SonarCloudAnalyze@1
-      displayName: 'Run Sonarcloud Analysis'
+    # - task: SonarCloudAnalyze@1
+    #   displayName: 'Run Sonarcloud Analysis'
 
     - task: Docker@2
       displayName: Build image
