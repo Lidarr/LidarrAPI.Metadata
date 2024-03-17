@@ -10,6 +10,11 @@ ENV GIT_BRANCH $GIT_BRANCH
 WORKDIR /metadata
 COPY . /metadata
 
+ENV POETRY_VIRTUALENVS_CREATE=false \
+        POETRY_NO_INTERACTION=1 \
+        POETRY_CACHE_DIR='/var/cache/pypoetry' \
+        POETRY_HOME='/usr/local'
+
 RUN apk update && \
         apk add postgresql-libs && \
         apk add --virtual .build-deps alpine-sdk musl-dev postgresql-dev && \
@@ -21,4 +26,4 @@ RUN adduser --system -u $UID metadata
 
 USER metadata
 
-ENTRYPOINT ["poetry", "run", "lidarr-metadata-server"]
+ENTRYPOINT ["lidarr-metadata-server"]
