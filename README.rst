@@ -9,13 +9,16 @@ LidarrAPI.Metadata
 
 This hosts the custom metadata API and resources Lidarr relies on.
 
-Installation
-============
+Development
+===========
 
-The metadata server may be installed with ``pip install .`` in the root
-directory or ``python setup.py install``. A development install that is linked
-to the most recent file versions may be installed with ``pip install -e .`` or
-``python setup.py develop``.
+Dependencies are managed with `poetry <https://python-poetry.org>`_. A
+development environment can be set up with
+  
+..  code-block:: shell
+
+  poetry install --with=dev
+  poetry shell # or poetry run ...
 
 Running
 =======
