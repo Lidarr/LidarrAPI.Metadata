@@ -90,7 +90,7 @@ async def update_tadb(count = 500, max_ttl = 60 * 60):
     # TADB is slow as balls so put in a big timeout.
     async with aiohttp.ClientSession(
             timeout = aiohttp.ClientTimeout(sock_read = 10), 
-            connector = aiohttp.TCPConnector(limit_per_host=20)
+            connector = aiohttp.TCPConnector(limit_per_host=CONFIG.TADB_CONNECTIONS)
     ) as session:
         tadb_provider = provider.TheAudioDbProvider(
             CONFIG.TADB_KEY, 
