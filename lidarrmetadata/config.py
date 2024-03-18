@@ -495,6 +495,9 @@ class DefaultConfig(six.with_metaclass(ConfigMeta, ConfigBase)):
     # Hosted cache for third-party images
     IMAGE_CACHE_HOST = "imagecache.lidarr.audio"
 
+    # Number of concurrent TADB connections for crawler
+    TADB_CONNECTIONS = 5
+
 
 class TestConfig(DefaultConfig):
     USE_CACHE = False
