@@ -89,10 +89,14 @@ def response_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.netloc.endswith("theaudiodb.com"):
         new_path = re.sub("^/images/media/", "", parsed.path)
+        old_parsed = parsed
         parsed = parsed._replace(
             netloc=CONFIG.IMAGE_CACHE_HOST,
             path=f"v1/tadb/{new_path}"
         )
+        logger.debug(f"Transformed {old_parsed.geturl()} to {parsed.geturl()}")
+    else:
+        logger.debug(f"Leaving {parsed.geturl()} as is")
     return parsed.geturl()
 
 class MixinBase(six.with_metaclass(abc.ABCMeta, object)):
