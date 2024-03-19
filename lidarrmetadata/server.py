@@ -8,7 +8,7 @@ from lidarrmetadata.app import app
 from lidarrmetadata.config import get_config
 
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARN)
 
 class StandaloneApplication(gunicorn.app.base.BaseApplication):
 
