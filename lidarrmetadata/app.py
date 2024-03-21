@@ -16,6 +16,10 @@ import logging
 import aiohttp
 from timeit import default_timer as timer
 from spotipy import SpotifyException
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+# TODO: Needs upgrade of urllib3 to 1.26.11
+# from sentry_sdk.integrations.asyncpg import AsyncPgIntegration
+from sentry_sdk.integrations.quart import QuartIntegration
 import Levenshtein
 
 import lidarrmetadata
@@ -44,6 +48,10 @@ if app.config['SENTRY_DSN']:
     sentry_sdk.init(dsn=app.config['SENTRY_DSN'],
                     release=f"lidarr-metadata-{lidarrmetadata.__version__}",
                     before_send=processor.create_event,
+                    integrations=[
+                        QuartIntegration()
+                        ],
+                    enable_tracing=True,
                     send_default_pii=True)
 
 # Allow all endpoints to be cached by default
