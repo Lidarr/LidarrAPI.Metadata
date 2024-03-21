@@ -16,7 +16,8 @@ import logging
 import aiohttp
 from timeit import default_timer as timer
 from spotipy import SpotifyException
-from sentry_sdk.integrations.asyncio import AsyncioIntegration
+# TODO: Needs sentry 1.43
+# from sentry_sdk.integrations.asyncio import AsyncioIntegration
 # TODO: Needs upgrade of urllib3 to 1.26.11
 # from sentry_sdk.integrations.asyncpg import AsyncPgIntegration
 from sentry_sdk.integrations.quart import QuartIntegration
