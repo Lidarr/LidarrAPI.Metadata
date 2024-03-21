@@ -9,7 +9,8 @@ from lidarrmetadata import limit
 limit.redis.Redis = mockredis.mock_redis_client
 
 
-class BaseTestRateLimiter(object):
+class BaseTestRateLimiter:
+    
     def test_allowed(self):
         for _ in range(5):
             with self.limiter.limited():
@@ -28,7 +29,7 @@ class BaseTestRateLimiter(object):
 
 
 class TestSimpleRateLimiter(BaseTestRateLimiter):
-    def setup(self):
+    def setup_method(self, _):
         self.limiter = limit.SimpleRateLimiter(queue_size=5, time_delta=1000)
 
 

@@ -4,11 +4,10 @@ import functools
 import asyncio
 
 from quart import Quart, abort, make_response, request, jsonify, redirect, url_for
-from quart.exceptions import HTTPStatusException
+from werkzeug.exceptions import HTTPException
 
 import redis
 import sentry_sdk
-from sentry_sdk.integrations.flask import FlaskIntegration
 import datetime
 from datetime import timedelta
 from dateutil import parser
@@ -43,7 +42,6 @@ if app.config['SENTRY_DSN']:
         processor = util.SentryTtlProcessor(ttl=app.config['SENTRY_TTL'])
 
     sentry_sdk.init(dsn=app.config['SENTRY_DSN'],
-                    integrations=[FlaskIntegration()],
                     release=f"lidarr-metadata-{lidarrmetadata.__version__}",
                     before_send=processor.create_event,
                     send_default_pii=True)
@@ -101,7 +99,7 @@ def handle_error(e):
     sentry_sdk.capture_exception(e)
     return jsonify(error='Internal server error'), 500
 
-@app.errorhandler(HTTPStatusException)
+@app.errorhandler(HTTPException)
 async def handle_http_error(e):
     return jsonify(error = e.description), e.status_code
 

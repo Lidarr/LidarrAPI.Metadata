@@ -4,6 +4,7 @@ Tests api functionality
 
 import pytest
 import quart
+from werkzeug.exceptions import BadRequest
 
 import lidarrmetadata.app
 
@@ -25,6 +26,6 @@ async def test_get_search_query(s, expected):
 @pytest.mark.asyncio
 async def test_get_search_query_blank():
     async with lidarrmetadata.app.app.test_request_context('/search?type=album&query='):
-        with pytest.raises(quart.exceptions.BadRequest) as e:
+        with pytest.raises(BadRequest) as e:
             lidarrmetadata.app.get_search_query()
             assert e.code == 400
