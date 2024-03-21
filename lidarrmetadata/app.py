@@ -53,7 +53,9 @@ if app.config['SENTRY_DSN']:
                     before_send=processor.create_event,
                     integrations=[
                     ],
-                    enable_tracing=True,
+                    # TODO: Needs later sentry
+                    # enable_tracing=True,
+                    traces_sample_rate=1.0,
                     send_default_pii=True)
 
 # Allow all endpoints to be cached by default
