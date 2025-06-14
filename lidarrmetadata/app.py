@@ -528,7 +528,7 @@ async def spotify_lookup_album(spotify_id):
     albumid = await link_provider.get_release_group_id_from_spotify_id(spotify_id)
     logger.debug(f"Got match from musicbrainz db: {albumid}")
     if albumid:
-        await util.SPOTIFY_CACHE.set(spotify_id, 0, ttl=app.config['CACHE_TTL']['cloudflare'])
+        await util.SPOTIFY_CACHE.set(spotify_id, albumid, ttl=app.config['CACHE_TTL']['cloudflare'])
         return redirect(app.config['ROOT_PATH'] + url_for('get_release_group_info_route', mbid=albumid), 301)
 
     # Fall back to a text search
