@@ -39,11 +39,11 @@ jobs:
       inputs:
         versionSpec: '3.9'
 
-    - task: SonarCloudPrepare@1
+    - task: SonarCloudPrepare@3
       inputs:
         SonarCloud: 'SonarCloud'
         organization: 'lidarr'
-        scannerMode: 'CLI'
+        scannerMode: 'cli'
         configMode: 'manual'
         cliProjectKey: 'lidarr_LidarrAPI.Metadata'
         cliProjectName: 'LidarrAPI.Metadata'
@@ -76,7 +76,7 @@ jobs:
     #     reportDirectory: '$(System.DefaultWorkingDirectory)/**/htmlcov'
     #   condition: succeededOrFailed()
 
-    # - task: SonarCloudAnalyze@1
+    # - task: SonarCloudAnalyze@3
     #   displayName: 'Run Sonarcloud Analysis'
 
     - task: Docker@2
