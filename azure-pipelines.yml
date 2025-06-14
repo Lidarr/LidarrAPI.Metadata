@@ -25,7 +25,7 @@ jobs:
     displayName: Build
 
     pool:
-      vmImage: 'Ubuntu-20.04'
+      vmImage: 'ubuntu-22.04'
 
     steps:
     - powershell: Write-Host "##vso[build.updatebuildnumber]$($env:LIDARRVERSION)"
