@@ -5,7 +5,7 @@ services:
     ports:
       - "5432:5432"
 
-  solr:
+  search:
     ports:
       - "8983:8983"
       

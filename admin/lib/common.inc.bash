@@ -21,12 +21,12 @@ then
       DOCKER_CMD='docker'
       ;;
     linux*)
-      if groups | grep -Eqw 'sudo|wheel'
-      then
-        DOCKER_CMD='sudo docker'
-      elif groups | grep -Eqw 'docker|root'
+      if groups | grep -Eqw 'docker|root'
       then
         DOCKER_CMD='docker'
+      elif groups | grep -Eqw 'sudo|wheel'
+      then
+        DOCKER_CMD='sudo docker'
       else
         echo >&2 "$SCRIPT_NAME: cannot set docker command: please either"
         echo >&2 "  * add the user '$USER' to the group 'sudo' or 'wheel'"
@@ -49,12 +49,12 @@ then
       DOCKER_COMPOSE_CMD='docker-compose'
       ;;
     linux*)
-      if groups | grep -Eqw 'sudo|wheel'
-      then
-        DOCKER_COMPOSE_CMD='sudo docker-compose'
-      elif groups | grep -Eqw 'docker-compose|root'
+      if groups | grep -Eqw 'docker|root'
       then
         DOCKER_COMPOSE_CMD='docker-compose'
+      elif groups | grep -Eqw 'sudo|wheel'
+      then
+        DOCKER_COMPOSE_CMD='sudo docker-compose'
       else
         echo >&2 "$SCRIPT_NAME: cannot set docker-compose command: please either"
         echo >&2 "  * add the user '$USER' to the group 'sudo' or 'wheel'"
