@@ -1,29 +1,54 @@
 """
 Structured logging configuration using structlog.
-Based on structlog documentation best practices.
+Based on structlog documentation best practices with pydantic-settings integration.
 """
 import logging
 import sys
-from typing import Any
+from typing import Any, Optional
 
 import structlog
 
+from lidarrmetadata.logging_settings import get_logging_settings, LoggingSettings
+
 
 def configure_structlog(
-    debug: bool = False,
-    json_logs: bool = True,
+    settings: Optional[LoggingSettings] = None,
+    # Legacy parameters for backward compatibility
+    debug: Optional[bool] = None,
+    json_logs: Optional[bool] = None,
 ) -> None:
     """
     Configure structlog with integration to stdlib logging.
     
     Args:
-        debug: Enable debug level logging
-        json_logs: Use JSON formatting for structured logs
+        settings: LoggingSettings instance. If None, will get global settings.
+        debug: DEPRECATED - Use LOG_LEVEL=debug instead. Enable debug level logging
+        json_logs: DEPRECATED - Use LOG_FORMAT=text instead. Use JSON formatting for structured logs
     """
+    # Get settings or use provided ones
+    if settings is None:
+        settings = get_logging_settings()
+    
+    # Handle legacy parameters for backward compatibility
+    if debug is not None or json_logs is not None:
+        # Override settings based on legacy parameters
+        if debug is not None:
+            log_level = logging.DEBUG if debug else logging.INFO
+        else:
+            log_level = settings.to_python_log_level()
+            
+        if json_logs is not None:
+            use_json = json_logs
+        else:
+            use_json = settings.use_json_format()
+    else:
+        # Use new settings
+        log_level = settings.to_python_log_level()
+        use_json = settings.use_json_format()
     # Configure timestamping and log level
     timestamper = structlog.processors.TimeStamper(fmt="iso")
     
-    if json_logs:
+    if use_json:
         # JSON output for production
         processors = [
             # Filter out logs by level
@@ -81,7 +106,7 @@ def configure_structlog(
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
-        level=logging.DEBUG if debug else logging.INFO,
+        level=log_level,
     )
 
 
