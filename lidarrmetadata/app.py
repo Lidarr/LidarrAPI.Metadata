@@ -4,11 +4,10 @@ import functools
 import asyncio
 
 from quart import Quart, abort, make_response, request, jsonify, redirect, url_for
-from quart.exceptions import HTTPStatusException
+from werkzeug.exceptions import HTTPException
 
 import redis
 import sentry_sdk
-from sentry_sdk.integrations.flask import FlaskIntegration
 import datetime
 from datetime import timedelta
 from dateutil import parser
@@ -17,6 +16,13 @@ import logging
 import aiohttp
 from timeit import default_timer as timer
 from spotipy import SpotifyException
+# TODO: Needs sentry 1.43
+# from sentry_sdk.integrations.asyncio import AsyncioIntegration
+# TODO: Needs upgrade of urllib3 to 1.26.11
+# from sentry_sdk.integrations.asyncpg import AsyncPgIntegration
+# TODO: Needs a different version of quart or you get
+# cannot import name '_request_ctx_stack' from 'quart'
+# from sentry_sdk.integrations.quart import QuartIntegration
 import Levenshtein
 
 import lidarrmetadata
@@ -43,9 +49,13 @@ if app.config['SENTRY_DSN']:
         processor = util.SentryTtlProcessor(ttl=app.config['SENTRY_TTL'])
 
     sentry_sdk.init(dsn=app.config['SENTRY_DSN'],
-                    integrations=[FlaskIntegration()],
                     release=f"lidarr-metadata-{lidarrmetadata.__version__}",
                     before_send=processor.create_event,
+                    integrations=[
+                    ],
+                    # TODO: Needs later sentry
+                    # enable_tracing=True,
+                    traces_sample_rate=1.0,
                     send_default_pii=True)
 
 # Allow all endpoints to be cached by default
@@ -101,7 +111,7 @@ def handle_error(e):
     sentry_sdk.capture_exception(e)
     return jsonify(error='Internal server error'), 500
 
-@app.errorhandler(HTTPStatusException)
+@app.errorhandler(HTTPException)
 async def handle_http_error(e):
     return jsonify(error = e.description), e.status_code
 
