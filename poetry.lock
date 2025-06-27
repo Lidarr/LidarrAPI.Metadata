@@ -1428,6 +1428,23 @@ typing-extensions = {version = ">=3.10.0", markers = "python_version < \"3.10\""
 full = ["httpx (>=0.22.0)", "itsdangerous", "jinja2", "python-multipart", "pyyaml"]
 
 [[package]]
+name = "structlog"
+version = "23.3.0"
+description = "Structured Logging for Python"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "structlog-23.3.0-py3-none-any.whl", hash = "sha256:d6922a88ceabef5b13b9eda9c4043624924f60edbb00397f4d193bd754cde60a"},
+    {file = "structlog-23.3.0.tar.gz", hash = "sha256:24b42b914ac6bc4a4e6f716e82ac70d7fb1e8c3b1035a765591953bfc37101a5"},
+]
+
+[package.extras]
+dev = ["structlog[tests,typing]"]
+docs = ["furo", "myst-parser", "sphinx", "sphinx-notfound-page", "sphinxcontrib-mermaid", "sphinxext-opengraph", "twisted"]
+tests = ["freezegun (>=0.2.8)", "pretend", "pytest (>=6.0)", "pytest-asyncio (>=0.17)", "simplejson"]
+typing = ["mypy (>=1.4)", "rich", "twisted"]
+
+[[package]]
 name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
@@ -1706,4 +1723,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4"
-content-hash = "5f0e9c85d6ffbffd93a3ed9b306aea34fcbd4953fe5d02c8ccaeb406de05513c"
+content-hash = "4f3871debff63d0d5fba05f48646f160b286f44248e120ad910965a25a48ad1a"
