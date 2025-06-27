@@ -1303,18 +1303,18 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)", "win-inet-pton"]
 
 [[package]]
 name = "sentry-sdk"
-version = "0.19.5"
+version = "1.9.1"
 description = "Python client for Sentry (https://sentry.io)"
 optional = false
 python-versions = "*"
 files = [
-    {file = "sentry-sdk-0.19.5.tar.gz", hash = "sha256:737a094e49a529dd0fdcaafa9e97cf7c3d5eb964bd229821d640bc77f3502b3f"},
-    {file = "sentry_sdk-0.19.5-py2.py3-none-any.whl", hash = "sha256:0a711ec952441c2ec89b8f5d226c33bc697914f46e876b44a4edd3e7864cf4d0"},
+    {file = "sentry-sdk-1.9.1.tar.gz", hash = "sha256:0c8d2e1a02c4d438aec762cd82c1f785f6477a9436fd6279996be0b0f139dd5a"},
+    {file = "sentry_sdk-1.9.1-py2.py3-none-any.whl", hash = "sha256:6167aa8f39d50661cee560db76b71c256a1b5ad68c3fcdc9df20c4c9b3796c8c"},
 ]
 
 [package.dependencies]
 certifi = "*"
-urllib3 = ">=1.10.0"
+urllib3 = {version = ">=1.26.9", markers = "python_version >= \"3.5\""}
 
 [package.extras]
 aiohttp = ["aiohttp (>=3.5)"]
@@ -1324,12 +1324,16 @@ celery = ["celery (>=3)"]
 chalice = ["chalice (>=1.16.0)"]
 django = ["django (>=1.8)"]
 falcon = ["falcon (>=1.4)"]
+fastapi = ["fastapi (>=0.79.0)"]
 flask = ["blinker (>=1.1)", "flask (>=0.11)"]
+httpx = ["httpx (>=0.16.0)"]
 pure-eval = ["asttokens", "executing", "pure-eval"]
 pyspark = ["pyspark (>=2.4.4)"]
+quart = ["blinker (>=1.1)", "quart (>=0.16.1)"]
 rq = ["rq (>=0.6)"]
 sanic = ["sanic (>=0.8)"]
 sqlalchemy = ["sqlalchemy (>=1.2)"]
+starlette = ["starlette (>=0.19.1)"]
 tornado = ["tornado (>=5)"]
 
 [[package]]
@@ -1702,4 +1706,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<4"
-content-hash = "b147f5c9166363b127a0f5e08d3f4b54781baa21906aa21860f96edb1a4bbf0c"
+content-hash = "5f0e9c85d6ffbffd93a3ed9b306aea34fcbd4953fe5d02c8ccaeb406de05513c"

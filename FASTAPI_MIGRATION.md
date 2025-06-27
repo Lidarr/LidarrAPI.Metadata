@@ -6,13 +6,13 @@ Converting Lidarr Metadata API from Quart to FastAPI endpoint by endpoint to res
 ## Phase 1: Dual Setup
 - [x] Add FastAPI dependencies to pyproject.toml (also updated aiohttp, async-timeout, yarl, typing-extensions)
 - [x] Create FastAPI app alongside existing Quart app
-- [ ] Set up routing logic to direct specific endpoints to FastAPI vs Quart
+- [x] Set up routing logic to direct specific endpoints to FastAPI vs Quart
 - [ ] Port shared middleware (CORS, Sentry, rate limiting)
 
 ## Phase 2: Endpoint Migration (Simple to Complex)
 
 ### Basic Endpoints
-- [ ] `GET /` - Basic info endpoint (no external dependencies)
+- [x] `GET /` - Basic info endpoint (no external dependencies)
 - [ ] `GET /recent/artist` - Database queries only
 - [ ] `GET /recent/album` - Database queries only
 

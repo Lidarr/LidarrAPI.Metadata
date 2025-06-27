@@ -6,7 +6,7 @@ import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 import lidarrmetadata
-from lidarrmetadata import config, util
+from lidarrmetadata import config, util, provider
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
@@ -47,7 +47,7 @@ if CONFIG.SENTRY_DSN:
 
     sentry_sdk.init(
         dsn=CONFIG.SENTRY_DSN,
-        integrations=[FastApiIntegration(auto_enabling_integrations=False)],
+        integrations=[FastApiIntegration()],
         release=f"lidarr-metadata-{lidarrmetadata.__version__}",
         before_send=processor.create_event,
         send_default_pii=True
@@ -58,3 +58,30 @@ if CONFIG.SENTRY_DSN:
 async def health_check():
     """Health check endpoint for FastAPI"""
     return {"status": "healthy", "framework": "fastapi"}
+
+# Root endpoint - migrated from Quart
+@fastapi_app.get("/")
+async def default_route():
+    """
+    Default route with API information
+    FastAPI version of the root endpoint
+    """
+    vintage_providers = provider.get_providers_implementing(
+        provider.DataVintageMixin)
+    
+    # Get data vintage from first provider
+    data = None
+    if vintage_providers:
+        try:
+            data = await vintage_providers[0].data_vintage()
+        except Exception as e:
+            logger.warning(f"Failed to get data vintage: {e}")
+            data = None
+
+    info = {
+        'branch': os.getenv('GIT_BRANCH'),
+        'commit': os.getenv('COMMIT_HASH'),
+        'version': lidarrmetadata.__version__,
+        'replication_date': data
+    }
+    return info
