@@ -26,4 +26,5 @@ RUN adduser --system -u $UID metadata
 
 USER metadata
 
-ENTRYPOINT ["lidarr-metadata-server"]
+ENTRYPOINT ["uvicorn"]
+CMD ["lidarrmetadata.hybrid_app:app", "--host", "0.0.0.0", "--port", "5001"]
