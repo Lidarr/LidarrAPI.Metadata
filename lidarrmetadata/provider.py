@@ -32,6 +32,58 @@ from lidarrmetadata.logging_config import get_logger
 logger = get_logger(__name__)
 logger.info('Have provider logger')
 
+def debug_async_operation(func):
+    """
+    Decorator to log async operations with timing and provider info for debugging.
+    """
+    import functools
+    import time
+    
+    @functools.wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        provider_name = getattr(self, '_name', self.__class__.__name__)
+        
+        # Log operation start with arguments
+        logger.debug(
+            "Provider operation started",
+            provider=provider_name,
+            operation=func.__name__,
+            args_count=len(args),
+            kwargs_keys=list(kwargs.keys()) if kwargs else []
+        )
+        
+        start_time = time.time()
+        
+        try:
+            result = await func(self, *args, **kwargs)
+            elapsed = time.time() - start_time
+            
+            logger.info(
+                "Provider operation completed",
+                provider=provider_name,
+                operation=func.__name__,
+                elapsed_seconds=round(elapsed, 4),
+                success=True
+            )
+            
+            return result
+            
+        except Exception as e:
+            elapsed = time.time() - start_time
+            
+            logger.error(
+                "Provider operation failed",
+                provider=provider_name,
+                operation=func.__name__,
+                elapsed_seconds=round(elapsed, 4),
+                error=str(e),
+                error_type=type(e).__name__,
+                success=False
+            )
+            raise
+    
+    return wrapper
+
 CONFIG = get_config()
 
 # Provider class dictionary
@@ -553,10 +605,12 @@ class TheAudioDbProvider(HttpProvider,
         url += f'{self._api_key}/artist-mb.php?i={mbid}'
         return url
 
+    @debug_async_operation
     async def get_artist_images(self, artist_id):
         
         return await self.get_data(artist_id, self.parse_artist_images)
 
+    @debug_async_operation
     async def get_artist_overview(self, artist_id):
 
         return await self.get_data(artist_id, self.parse_artist_overview)
@@ -595,6 +649,7 @@ class TheAudioDbProvider(HttpProvider,
 
         await self.cache_results(mbid, results)
         
+    @debug_async_operation
     async def get_by_mbid(self, mbid):
         """
         Gets the theaudiodb.com response for resource with Musicbrainz id mbid
@@ -673,10 +728,12 @@ class FanArtTvProvider(HttpProvider,
         ## dummy value for initialization, will be picked up from redis later on
         self._last_cache_invalidation = time.time() - 60 * 60 * 24
 
+    @debug_async_operation
     async def get_artist_images(self, artist_id):
         
         return await self.get_images(artist_id, self.parse_artist_images)
         
+    @debug_async_operation
     async def get_album_images(self, album_id):
         
         return await self.get_images(album_id, self.parse_album_images)
@@ -707,6 +764,7 @@ class FanArtTvProvider(HttpProvider,
             logger.debug("Fanart unavailable")
             await util.FANART_CACHE.expire(mbid, CONFIG.CACHE_TTL['provider_error'])
         
+    @debug_async_operation
     async def get_by_mbid(self, mbid):
         """
         Gets the fanart.tv response for resource with Musicbrainz id mbid
@@ -911,6 +969,7 @@ class SolrSearchProvider(HttpProvider,
     async def get_with_limit(self, url):
         return await super().get_with_limit(url, timeout=aiohttp.ClientTimeout(total=5))
             
+    @debug_async_operation
     async def search_artist_name(self, name, limit=None):
         
         # Note that when using a dismax query we shouldn't apply lucene escaping
@@ -953,6 +1012,7 @@ class SolrSearchProvider(HttpProvider,
 
         return handler(response)
     
+    @debug_async_operation
     async def search_album_name(self, name, limit=None, artist_name=''):
         
         if artist_name:
@@ -1119,6 +1179,7 @@ class MusicbrainzDbProvider(Provider,
         entities = await self.query_from_file(changed_query, self._last_cache_invalidation)
         return [entity['spotifyid'] for entity in entities]
     
+    @debug_async_operation
     async def get_artists_by_id(self, artist_ids):
         artists = await self.query_from_file('artist_by_id.sql', artist_ids)
         
@@ -1195,6 +1256,7 @@ class MusicbrainzDbProvider(Provider,
             
         return release_group
 
+    @debug_async_operation
     async def get_release_groups_by_id(self, rgids):
         release_groups = await self.query_from_file('release_group_by_id.sql', rgids)
         
@@ -1344,6 +1406,7 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
             'vi', 'zh'
         )
         
+    @debug_async_operation
     async def get_artist_overview(self, url, ignore_cache=False):
         
         if not ignore_cache:

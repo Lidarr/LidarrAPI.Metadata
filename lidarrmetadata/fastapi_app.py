@@ -16,7 +16,6 @@ CONFIG = config.get_config()
 configure_structlog(
     debug=CONFIG.DEBUG,
     json_logs=not CONFIG.DEBUG,  # Use JSON in production, human-readable in debug
-    include_logger_name=True
 )
 
 # Get structured logger
