@@ -4,7 +4,6 @@ Utility functionality that isn't specific to a given module
 
 import abc
 import time
-import logging
 
 import functools
 import redis
@@ -13,10 +12,9 @@ from aiocache.backends.redis import RedisCache
 
 from lidarrmetadata import config
 from lidarrmetadata import cache
+from lidarrmetadata.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 logger.info('Have util logger')
 
 

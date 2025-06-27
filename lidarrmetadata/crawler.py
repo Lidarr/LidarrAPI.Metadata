@@ -2,7 +2,6 @@ import argparse
 import asyncio
 import datetime
 from datetime import timedelta
-import logging
 from timeit import default_timer as timer
 import sys
 
@@ -15,10 +14,9 @@ from lidarrmetadata import provider
 from lidarrmetadata import util
 from lidarrmetadata import limit
 from lidarrmetadata.api import get_artist_info_multi, ArtistNotFoundException, get_release_group_info_multi, ReleaseGroupNotFoundException
+from lidarrmetadata.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 logger.info('Have crawler logger')
 
 CONFIG = get_config()

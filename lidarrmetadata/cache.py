@@ -3,7 +3,6 @@ Defines the custom redis cache backend which compresses pickle dumps
 """
 import functools
 import hashlib
-import logging
 import contextlib
 import zlib
 import asyncio
@@ -13,10 +12,9 @@ from timeit import default_timer as timer
 
 from aiocache.serializers import BaseSerializer, PickleSerializer
 from aiocache.base import BaseCache
+from lidarrmetadata.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
+logger = get_logger(__name__)
 logger.info('Have cache logger')
 
 try:

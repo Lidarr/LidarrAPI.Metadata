@@ -6,7 +6,6 @@ from datetime import timedelta
 import time
 import pytz
 import imp
-import logging
 import pkg_resources
 import re
 import six
@@ -28,8 +27,9 @@ from lidarrmetadata import limit
 from lidarrmetadata import stats
 from lidarrmetadata import util
 from lidarrmetadata.cache import conn
+from lidarrmetadata.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 logger.info('Have provider logger')
 
 CONFIG = get_config()

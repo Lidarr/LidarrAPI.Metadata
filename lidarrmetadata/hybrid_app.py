@@ -3,7 +3,6 @@ Hybrid application that routes requests between Quart and FastAPI based on featu
 This allows for gradual migration of endpoints from Quart to FastAPI.
 """
 import os
-import logging
 from typing import Dict, Set
 
 from quart import Quart
@@ -13,8 +12,9 @@ from fastapi.middleware.wsgi import WSGIMiddleware
 from lidarrmetadata.app import app as quart_app
 from lidarrmetadata.fastapi_app import fastapi_app
 from lidarrmetadata import config
+from lidarrmetadata.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Configuration for which endpoints should use FastAPI
 # Set environment variable FASTAPI_ENDPOINTS to comma-separated list of endpoints

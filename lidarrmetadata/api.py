@@ -7,7 +7,6 @@ import redis
 import datetime
 from datetime import timedelta
 import time
-import logging
 import aiohttp
 from timeit import default_timer as timer
 
@@ -15,10 +14,9 @@ import lidarrmetadata
 from lidarrmetadata import config
 from lidarrmetadata import provider
 from lidarrmetadata import util
+from lidarrmetadata.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
+logger = get_logger(__name__)
 logger.info('Have api logger')
 
 CONFIG = config.get_config()
