@@ -1,19 +1,17 @@
 """
 Structured logging configuration using structlog.
-Integrates with the standard library logging and provides async-aware logging.
+Based on structlog documentation best practices.
 """
 import logging
 import sys
 from typing import Any
 
 import structlog
-from structlog.types import Processor
 
 
 def configure_structlog(
     debug: bool = False,
     json_logs: bool = True,
-    include_logger_name: bool = True
 ) -> None:
     """
     Configure structlog with integration to stdlib logging.
@@ -21,54 +19,70 @@ def configure_structlog(
     Args:
         debug: Enable debug level logging
         json_logs: Use JSON formatting for structured logs
-        include_logger_name: Include logger name in log records
     """
+    # Configure timestamping and log level
+    timestamper = structlog.processors.TimeStamper(fmt="iso")
+    
+    if json_logs:
+        # JSON output for production
+        processors = [
+            # Filter out logs by level
+            structlog.stdlib.filter_by_level,
+            # Add logger name, log level, and timestamp
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            timestamper,
+            # Add caller info
+            structlog.processors.CallsiteParameterAdder(
+                parameters=[
+                    structlog.processors.CallsiteParameter.FILENAME,
+                    structlog.processors.CallsiteParameter.FUNC_NAME,
+                    structlog.processors.CallsiteParameter.LINENO,
+                ]
+            ),
+            # Format stack info and exceptions
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            # Ensure strings are unicode
+            structlog.processors.UnicodeDecoder(),
+            # Render as JSON
+            structlog.processors.JSONRenderer()
+        ]
+    else:
+        # Human-readable output for development
+        processors = [
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            timestamper,
+            structlog.processors.CallsiteParameterAdder(
+                parameters=[
+                    structlog.processors.CallsiteParameter.FILENAME,
+                    structlog.processors.CallsiteParameter.FUNC_NAME,
+                    structlog.processors.CallsiteParameter.LINENO,
+                ]
+            ),
+            structlog.processors.StackInfoRenderer(),
+            structlog.processors.format_exc_info,
+            structlog.processors.UnicodeDecoder(),
+            # Use colored console output
+            structlog.dev.ConsoleRenderer(colors=True)
+        ]
+
+    # Configure structlog
+    structlog.configure(
+        processors=processors,
+        wrapper_class=structlog.stdlib.BoundLogger,
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        cache_logger_on_first_use=True,
+    )
+
     # Configure standard library logging
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
         level=logging.DEBUG if debug else logging.INFO,
     )
-
-    # Shared processors for both stdlib and structlog
-    shared_processors: list[Processor] = [
-        # Add timestamp
-        structlog.stdlib.add_log_level,
-        structlog.stdlib.add_logger_name if include_logger_name else structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.stdlib.PositionalArgumentsFormatter(),
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-        structlog.processors.UnicodeDecoder(),
-    ]
-
-    if json_logs:
-        # JSON formatting for production
-        shared_processors.append(structlog.processors.JSONRenderer())
-    else:
-        # Human-readable formatting for development
-        shared_processors.append(structlog.dev.ConsoleRenderer(colors=True))
-
-    # Configure structlog
-    structlog.configure(
-        processors=shared_processors,
-        wrapper_class=structlog.stdlib.BoundLogger,
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        cache_logger_on_first_use=True,
-    )
-
-    # Configure stdlib logging to use structlog rendering
-    handler = logging.StreamHandler()
-    handler.setFormatter(structlog.stdlib.ProcessorFormatter(
-        processor=structlog.dev.ConsoleRenderer(colors=not json_logs) if not json_logs 
-        else structlog.processors.JSONRenderer()
-    ))
-    
-    # Update root logger
-    root_logger = logging.getLogger()
-    root_logger.handlers.clear()
-    root_logger.addHandler(handler)
-    root_logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
@@ -82,6 +96,14 @@ def get_logger(name: str) -> structlog.stdlib.BoundLogger:
         Configured structlog logger
     """
     return structlog.get_logger(name)
+
+
+def add_context(**kwargs) -> None:
+    """
+    Add context to all subsequent log messages in this context.
+    """
+    structlog.contextvars.clear_contextvars()
+    structlog.contextvars.bind_contextvars(**kwargs)
 
 
 # Convenience function for timing operations
