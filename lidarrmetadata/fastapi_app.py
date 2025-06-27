@@ -7,14 +7,21 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 import lidarrmetadata
 from lidarrmetadata import config, util, provider
+from lidarrmetadata.logging_config import configure_structlog, get_logger
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
-logger.info('Have FastAPI logger')
-
-# Get configuration
+# Get configuration first
 CONFIG = config.get_config()
+
+# Configure structured logging
+configure_structlog(
+    debug=CONFIG.DEBUG,
+    json_logs=not CONFIG.DEBUG,  # Use JSON in production, human-readable in debug
+    include_logger_name=True
+)
+
+# Get structured logger
+logger = get_logger(__name__)
+logger.info("FastAPI app initializing")
 
 # Initialize FastAPI app
 fastapi_app = FastAPI(
