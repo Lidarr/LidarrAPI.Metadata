@@ -9,6 +9,7 @@ import imp
 import pkg_resources
 import re
 import six
+import ssl
 from timeit import default_timer as timer
 from urllib.parse import urlparse
 from urllib.parse import quote as url_quote
@@ -16,6 +17,7 @@ from urllib.parse import quote as url_quote
 import asyncio
 import aiohttp
 import asyncpg
+import certifi
 import json
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -503,7 +505,14 @@ class HttpProvider(Provider,
             async with self._session_lock:
                 logger.debug("Initializing AIOHTTP Session")
                 
-                self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
+                # Create SSL context with proper certificate verification
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+                connector = aiohttp.TCPConnector(ssl=ssl_context)
+                
+                self._session = aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000),
+                    connector=connector
+                )
                 
         return self._session
             
