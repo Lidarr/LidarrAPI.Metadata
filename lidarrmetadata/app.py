@@ -27,8 +27,6 @@ from lidarrmetadata import provider
 from lidarrmetadata import util
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
 logger.info('Have app logger')
 
 app = Quart(__name__)
