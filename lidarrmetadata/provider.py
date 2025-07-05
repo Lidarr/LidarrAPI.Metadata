@@ -28,6 +28,7 @@ from lidarrmetadata.config import get_config
 from lidarrmetadata import limit
 from lidarrmetadata import stats
 from lidarrmetadata import util
+from lidarrmetadata.circuit_breaker import protected_call, CircuitBreakerConfig
 from lidarrmetadata.cache import conn
 from lidarrmetadata.logging_config import get_logger
 
@@ -1267,7 +1268,15 @@ class MusicbrainzDbProvider(Provider,
 
     @debug_async_operation
     async def get_release_groups_by_id(self, rgids):
-        release_groups = await self.query_from_file('release_group_by_id.sql', rgids)
+        # Use circuit breaker for database operations
+        db_config = CircuitBreakerConfig(failure_threshold=3, recovery_timeout=30, timeout=15.0)
+        release_groups = await protected_call(
+            "musicbrainz_db", 
+            self.query_from_file, 
+            'release_group_by_id.sql', 
+            rgids,
+            config=db_config
+        )
         
         logger.debug("got release groups")
         
