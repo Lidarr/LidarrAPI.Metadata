@@ -58,12 +58,27 @@ async def get_overview(links, mbid=None):
             links), None)
 
         if wikidata_link:
-            overview, expiry = await overview_providers[0].get_artist_overview(wikidata_link['target'])
+            try:
+                result = await overview_providers[0].get_artist_overview(wikidata_link['target'])
+                if result and len(result) == 2:
+                    overview, expiry = result
+            except Exception as e:
+                logger.warning(f"Failed to get overview from wikidata: {e}")
         elif wikipedia_link:
-            overview, expiry = await overview_providers[0].get_artist_overview(wikipedia_link['target'])
+            try:
+                result = await overview_providers[0].get_artist_overview(wikipedia_link['target'])
+                if result and len(result) == 2:
+                    overview, expiry = result
+            except Exception as e:
+                logger.warning(f"Failed to get overview from wikipedia: {e}")
 
         if len(overview_providers) > 1 and mbid and not overview:
-            overview, expiry = await overview_providers[1].get_artist_overview(mbid)
+            try:
+                result = await overview_providers[1].get_artist_overview(mbid)
+                if result and len(result) == 2:
+                    overview, expiry = result
+            except Exception as e:
+                logger.warning(f"Failed to get overview from fallback provider: {e}")
 
     return overview, expiry
 
@@ -134,36 +149,110 @@ async def get_artist_info_multi(mbids):
     # Add in default expiry
     artists = [{'data': artist, 'expiry': expiry} for artist in artists]
     
-    # Start overviews
-    overviews_task = asyncio.gather(*[get_overview(artist['data']['links'], artist['data']['id']) for artist in artists])
+    # Start overviews with proper task-to-artist mapping
+    overview_coroutines = [get_overview(artist['data']['links'], artist['data']['id']) for artist in artists]
+    overview_tasks = [asyncio.create_task(coro) for coro in overview_coroutines]
+    done, pending = await asyncio.wait(overview_tasks, timeout=10)
+    logger.debug("Got artist overviews", extra={'results': len(done), 'pending': len(pending)})
+    for task in pending:
+        task.cancel()
     
+    # Map completed tasks back to their corresponding artists
+    task_to_index = {task: i for i, task in enumerate(overview_tasks)}
+    overview_results = {}
+    for task in done:
+        if not task.cancelled():
+            try:
+                result = task.result()
+                index = task_to_index[task]
+                overview_results[index] = result
+            except Exception as e:
+                logger.warning(f"Overview task failed for artist {task_to_index.get(task, 'unknown')}: {e}")
+                if task in task_to_index:
+                    overview_results[task_to_index[task]] = (None, provider.utcnow())
     if artist_art_providers:
-        results = await asyncio.gather(*[artist_art_providers[0].get_artist_images(x['data']['id']) for x in artists])
+        # Create artist images tasks with proper mapping
+        image_coroutines = [artist_art_providers[0].get_artist_images(x['data']['id']) for x in artists]
+        # Filter out None values that might be returned by non-async methods
+        image_coroutines = [coro for coro in image_coroutines if coro is not None]
+        if image_coroutines:
+            image_tasks = [asyncio.create_task(coro) for coro in image_coroutines]
+            done, pending = await asyncio.wait(image_tasks, timeout=10)
+            logger.debug("Got artist images", extra={'results': len(done), 'pending': len(pending)})
+            for task in pending:
+                task.cancel()
+            
+            # Map completed tasks back to their corresponding artists
+            task_to_index = {task: i for i, task in enumerate(image_tasks)}
+            image_results = {}
+            for task in done:
+                if not task.cancelled():
+                    try:
+                        result = task.result()
+                        index = task_to_index[task]
+                        image_results[index] = result
+                    except Exception as e:
+                        logger.warning(f"Artist image task failed for artist {task_to_index.get(task, 'unknown')}: {e}")
+                        if task in task_to_index:
+                            image_results[task_to_index[task]] = ([], provider.utcnow())
+        else:
+            logger.debug("No artist image coroutines to process")
+            image_results = {}
         
+        # Apply image results to artists
         for i, artist in enumerate(artists):
-            images, expiry = results[i]
-            artist['data']['images'] = images
-            artist['expiry'] = min(artist['expiry'], expiry)
+            if i in image_results:
+                result = image_results[i]
+                if result and len(result) == 2:
+                    images, expiry = result
+                    artist['data']['images'] = images
+                    artist['expiry'] = min(artist['expiry'], expiry)
+                else:
+                    artist['data']['images'] = []
+            else:
+                artist['data']['images'] = []
 
         if len(artist_art_providers) > 1:
             image_types = {'Banner', 'Fanart', 'Logo', 'Poster'}
             artists_without_images = [x for x in artists if not x['data']['images'] or not image_types.issubset({i['CoverType'] for i in x['data']['images']})]
-            results = await asyncio.gather(*[artist_art_providers[1].get_artist_images(x['data']['id']) for x in artists_without_images])
-
-            for i, artist in enumerate(artists_without_images):
-                images, expiry = results[i]
-                artist['data']['images'] = combine_images(artist['data']['images'], images)
-                artist['expiry'] = min(artist['expiry'], expiry)
+            if artists_without_images:
+                # Get image coroutines and filter out None values
+                image_coroutines = [artist_art_providers[1].get_artist_images(x['data']['id']) for x in artists_without_images]
+                image_coroutines = [coro for coro in image_coroutines if coro is not None]
+                
+                if image_coroutines:
+                    results = await asyncio.gather(*image_coroutines, return_exceptions=True)
+                    
+                    for i, artist in enumerate(artists_without_images):
+                        if i < len(results):
+                            result = results[i]
+                            if not isinstance(result, Exception) and result is not None:
+                                try:
+                                    if len(result) == 2:
+                                        images, expiry = result
+                                        artist['data']['images'] = combine_images(artist['data']['images'], images)
+                                        artist['expiry'] = min(artist['expiry'], expiry)
+                                    else:
+                                        logger.warning(f"Second artist art provider returned invalid result length for artist {i}: {result}")
+                                except (TypeError, AttributeError):
+                                    logger.warning(f"Second artist art provider returned non-sequence result for artist {i}: {type(result)}")
+                            else:
+                                if isinstance(result, Exception):
+                                    logger.warning(f"Second artist art provider failed for artist {i}: {result}")
+                                else:
+                                    logger.warning(f"Second artist art provider returned invalid result for artist {i}: {result}")
     else:
         for artist in artists:
             artist['images'] = []
 
-    # Get overview results
-    results = await overviews_task
+    # Apply overview results to artists
     for i, artist in enumerate(artists):
-        overview, expiry = results[i]
-        artist['data']['overview'] = overview
-        artist['expiry'] = min(artist['expiry'], expiry)
+        if i in overview_results:
+            overview, expiry = overview_results[i]
+            artist['data']['overview'] = overview
+            artist['expiry'] = min(artist['expiry'], expiry)
+        else:
+            artist['data']['overview'] = None
             
     logger.debug(f"Got basic artist info for {len(mbids)} artists in {(timer() - start) * 1000:.0f}ms ")
 
@@ -189,10 +278,28 @@ async def get_release_group_artists(release_group):
     
     start = timer()
     
-    results = await asyncio.gather(*[get_artist_info(gid) for gid in release_group['artistids']])
-                                   
-    artists = [result[0] for result in results]
-    expiry = min([result[1] for result in results])
+    if not release_group.get('artistids'):
+        return [], provider.utcnow()
+    
+    # Use asyncio.gather with return_exceptions to handle failures
+    results = await asyncio.gather(*[get_artist_info(gid) for gid in release_group['artistids']], 
+                                   return_exceptions=True)
+    
+    # Filter out exceptions and validate results
+    valid_results = []
+    for i, result in enumerate(results):
+        if isinstance(result, Exception):
+            logger.warning(f"Failed to get artist info for {release_group['artistids'][i]}: {result}")
+        elif result and hasattr(result, '__len__') and len(result) == 2:
+            valid_results.append(result)
+        else:
+            logger.warning(f"Invalid result from get_artist_info for {release_group['artistids'][i]}: {result}")
+    
+    if not valid_results:
+        return [], provider.utcnow()
+    
+    artists = [result[0] for result in valid_results]
+    expiry = min([result[1] for result in valid_results])
     
     logger.debug(f"Got album artists in {(timer() - start) * 1000:.0f}ms ")
     
@@ -238,24 +345,77 @@ async def get_release_group_info_multi(mbids):
     # Add in default expiry
     release_groups = [{'data': rg, 'expiry': expiry} for rg in release_groups]
     
-    # Start overviews
-    overviews_task = asyncio.gather(*[get_overview(rg['data']['links']) for rg in release_groups])
+    # Start overviews with timeout and error handling
+    overview_coroutines = [get_overview(rg['data']['links']) for rg in release_groups]
+    overview_tasks = [asyncio.create_task(coro) for coro in overview_coroutines if coro is not None]
+    if overview_tasks:
+        done, pending = await asyncio.wait(overview_tasks, timeout=10)
+        for task in pending:
+            task.cancel()
+        
+        # Map completed tasks back to their corresponding release groups
+        task_to_index = {task: i for i, task in enumerate(overview_tasks)}
+        overview_results = {}
+        for task in done:
+            if not task.cancelled():
+                try:
+                    result = task.result()
+                    index = task_to_index[task]
+                    if result and hasattr(result, '__len__') and len(result) == 2:
+                        overview_results[index] = result
+                    else:
+                        overview_results[index] = (None, provider.utcnow())
+                except Exception as e:
+                    logger.warning(f"Overview task failed for release group {task_to_index.get(task, 'unknown')}: {e}")
+                    if task in task_to_index:
+                        overview_results[task_to_index[task]] = (None, provider.utcnow())
+    else:
+        overview_results = {}
     
     # Get fanart images (and prefer those if possible)
     if album_art_providers:
-        results = await asyncio.gather(*[album_art_providers[0].get_album_images(x['data']['id']) for x in release_groups])
+        image_coroutines = [album_art_providers[0].get_album_images(x['data']['id']) for x in release_groups]
+        image_coroutines = [coro for coro in image_coroutines if coro is not None]
+        if image_coroutines:
+            image_tasks = [asyncio.create_task(coro) for coro in image_coroutines]
+            done, pending = await asyncio.wait(image_tasks, timeout=10)
+            for task in pending:
+                task.cancel()
+            
+            # Map completed tasks back to their corresponding release groups
+            task_to_index = {task: i for i, task in enumerate(image_tasks)}
+            image_results = {}
+            for task in done:
+                if not task.cancelled():
+                    try:
+                        result = task.result()
+                        index = task_to_index[task]
+                        if result and hasattr(result, '__len__') and len(result) == 2:
+                            image_results[index] = result
+                        else:
+                            image_results[index] = ([], provider.utcnow())
+                    except Exception as e:
+                        logger.warning(f"Image task failed for release group {task_to_index.get(task, 'unknown')}: {e}")
+                        if task in task_to_index:
+                            image_results[task_to_index[task]] = ([], provider.utcnow())
+        else:
+            image_results = {}
         
+        # Apply image results to release groups
         for i, rg in enumerate(release_groups):
-            images, expiry = results[i]
-            rg['data']['images'] = combine_images(images, rg['data']['images'])
-            rg['expiry'] = min(rg['expiry'], expiry)
+            if i in image_results:
+                images, expiry = image_results[i]
+                rg['data']['images'] = combine_images(images, rg['data']['images'])
+                rg['expiry'] = min(rg['expiry'], expiry)
 
-    # Get overview results
-    results = await overviews_task
+    # Apply overview results to release groups
     for i, rg in enumerate(release_groups):
-        overview, expiry = results[i]
-        rg['data']['overview'] = overview
-        rg['expiry'] = min(rg['expiry'], expiry)
+        if i in overview_results:
+            overview, expiry = overview_results[i]
+            rg['data']['overview'] = overview
+            rg['expiry'] = min(rg['expiry'], expiry)
+        else:
+            rg['data']['overview'] = None
     
     logger.debug(f"Got basic album info for {len(mbids)} albums in {(timer() - start) * 1000:.0f}ms ")
 

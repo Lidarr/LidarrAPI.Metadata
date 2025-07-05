@@ -331,7 +331,31 @@ async def get_album_search_results(query, limit, include_tracks, artist_name):
                 return None, -1, provider.utcnow()
             
         
-        results = await asyncio.gather(*[get_search_result(item) for item in search_results])
+        # Use asyncio.wait with timeout to prevent hanging
+        search_coroutines = [get_search_result(item) for item in search_results]
+        search_tasks = [asyncio.create_task(coro) for coro in search_coroutines if coro is not None]
+        if search_tasks:
+            done, pending = await asyncio.wait(search_tasks, timeout=10)
+            logger.debug("Got album search results", extra={'query': query, 'results': len(done), 'pending': len(pending)})
+            
+            # Cancel any pending tasks
+            for task in pending:
+                task.cancel()
+            
+            # Get results from completed tasks
+            results = []
+            for task in done:
+                if not task.cancelled():
+                    try:
+                        result = task.result()
+                        results.append(result)
+                    except Exception as e:
+                        logger.warning(f"Album search task failed: {e}")
+                        results.append((None, -1, provider.utcnow()))
+        else:
+            logger.debug("No album search tasks to process")
+            results = []
+        
         albums = [result[0] for result in results if result[0]]
 
         # Current versions of lidarr will fail trying to parse the tracks contained in releases
@@ -405,8 +429,15 @@ async def get_artist_search_results(query, limit):
         except api.ArtistNotFoundException:
             return None, -1, provider.utcnow()
 
-    results = await asyncio.gather(*[get_search_result(item['Id'], item['Score']) for item in artist_ids])
+    done, pending = await asyncio.wait(
+        [get_search_result(item['Id'], item['Score']) for item in artist_ids], 
+        timeout=10
+        )
+    logger.debug("Got artist search results", extra={'query': query, 'results': len(done), 'pending': len(pending)})
+    for task in pending:
+        task.cancel()
 
+    results = [task.result() for task in done if not task.cancelled()]
     artists = [result[0] for result in results if result[0]]
     scores = [result[1] for result in results if result[0]]
     validity = min([result[2] for result in results if result[0]] or [provider.utcnow()])

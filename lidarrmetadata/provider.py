@@ -625,7 +625,7 @@ class TheAudioDbProvider(HttpProvider,
         return await self.get_data(artist_id, self.parse_artist_overview)
         
     async def get_data(self, mbid, handler):
-
+        return []
         cached, expires = await util.TADB_CACHE.get(mbid)
         now = utcnow()
         
@@ -748,7 +748,7 @@ class FanArtTvProvider(HttpProvider,
         return await self.get_images(album_id, self.parse_album_images)
         
     async def get_images(self, mbid, handler):
-
+        return []
         now = utcnow()
         cached, expires = await util.FANART_CACHE.get(mbid)
 
