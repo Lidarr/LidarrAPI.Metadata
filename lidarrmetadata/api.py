@@ -2,7 +2,9 @@ import os
 import uuid
 import functools
 import asyncio
-from typing import List, Callable, Any, Tuple, Optional
+from typing import List, Callable, Any, Tuple, Optional, Dict
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 
 import redis
 import datetime
@@ -16,6 +18,7 @@ from lidarrmetadata import config
 from lidarrmetadata import provider
 from lidarrmetadata import util
 from lidarrmetadata.logging_config import get_logger
+from lidarrmetadata.async_tracker import track_async_operation, safe_async_call
 
 logger = get_logger(__name__)
 logger.info('Have api logger')
@@ -196,17 +199,17 @@ class MissingProviderException(Exception):
 
 @postgres_cache(util.ARTIST_CACHE)
 async def get_artist_info(mbid):
-
-    artists = await get_artist_info_multi([mbid])
-    if not artists:
-        artist_provider = provider.get_providers_implementing(provider.ArtistByIdMixin)[0]
-        new_id = await artist_provider.redirect_old_artist_id(mbid)
-        artists = await get_artist_info_multi([new_id])
-        
+    async with track_async_operation("get_artist_info", timeout=15, mbid=mbid):
+        artists = await get_artist_info_multi([mbid])
         if not artists:
-            raise ArtistNotFoundException(mbid)
-    
-    return artists[0]
+            artist_provider = provider.get_providers_implementing(provider.ArtistByIdMixin)[0]
+            new_id = await artist_provider.redirect_old_artist_id(mbid)
+            artists = await get_artist_info_multi([new_id])
+            
+            if not artists:
+                raise ArtistNotFoundException(mbid)
+        
+        return artists[0]
 
 async def get_artist_info_multi(mbids):
     
@@ -265,12 +268,18 @@ async def get_artist_info_multi(mbids):
                 image_coroutines = [coro for coro in image_coroutines if coro is not None]
                 
                 if image_coroutines:
-                    results = await asyncio.gather(*image_coroutines, return_exceptions=True)
+                    # Use timeout utility for image fetching
+                    results, valid_indices = await execute_async_tasks_with_timeout(
+                        image_coroutines,
+                        timeout=10,
+                        task_name="artist_images",
+                        default_result=(None, provider.utcnow())
+                    )
                     
                     for i, artist in enumerate(artists_without_images):
-                        if i < len(results):
+                        if i < len(results) and i in valid_indices:
                             result = results[i]
-                            if not isinstance(result, Exception) and result is not None:
+                            if result is not None:
                                 try:
                                     if len(result) == 2:
                                         images, expiry = result
@@ -325,17 +334,22 @@ async def get_release_group_artists(release_group):
     if not release_group.get('artistids'):
         return [], provider.utcnow()
     
-    # Use asyncio.gather with return_exceptions to handle failures
-    results = await asyncio.gather(*[get_artist_info(gid) for gid in release_group['artistids']], 
-                                   return_exceptions=True)
+    # Use timeout utility for better hanging prevention
+    artist_coroutines = [get_artist_info(gid) for gid in release_group['artistids']]
+    results, valid_indices = await execute_async_tasks_with_timeout(
+        artist_coroutines,
+        timeout=15,
+        task_name="release_group_artists",
+        default_result=(None, provider.utcnow())
+    )
     
-    # Filter out exceptions and validate results
+    # Filter valid results
     valid_results = []
     for i, result in enumerate(results):
-        if isinstance(result, Exception):
-            logger.warning(f"Failed to get artist info for {release_group['artistids'][i]}: {result}")
-        elif result and hasattr(result, '__len__') and len(result) == 2:
+        if i in valid_indices and result and hasattr(result, '__len__') and len(result) == 2:
             valid_results.append(result)
+        elif i not in valid_indices:
+            logger.warning(f"Artist info timed out for {release_group['artistids'][i]}")
         else:
             logger.warning(f"Invalid result from get_artist_info for {release_group['artistids'][i]}: {result}")
     

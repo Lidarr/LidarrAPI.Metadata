@@ -9,6 +9,8 @@ import lidarrmetadata
 from lidarrmetadata import config, util, provider
 from lidarrmetadata.logging_config import configure_structlog, get_logger
 from lidarrmetadata.logging_settings import get_logging_settings
+from lidarrmetadata.async_tracker import operation_tracker
+from lidarrmetadata.circuit_breaker import circuit_breakers
 
 # Get configuration first
 CONFIG = config.get_config()
@@ -63,6 +65,26 @@ if CONFIG.SENTRY_DSN:
 async def health_check():
     """Health check endpoint for FastAPI"""
     return {"status": "healthy", "framework": "fastapi"}
+
+# Async operations health check endpoint
+@fastapi_app.get("/health/async")
+async def async_health_check():
+    """
+    Health check endpoint showing async operation status and hanging operations.
+    Useful for monitoring and debugging hanging async calls.
+    """
+    status = operation_tracker.get_status()
+    
+    # Add circuit breaker information
+    circuit_stats = circuit_breakers.get_all_stats()
+    
+    # Add some basic health indicators
+    status["healthy"] = status["hanging_operations"] == 0
+    status["total_recent_operations"] = len(operation_tracker.completed_operations)
+    status["framework"] = "fastapi"
+    status["circuit_breakers"] = circuit_stats
+    
+    return status
 
 # Root endpoint - migrated from Quart
 @fastapi_app.get("/")
