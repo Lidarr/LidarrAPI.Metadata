@@ -26,6 +26,7 @@ if os.environ.get('FASTAPI_ENDPOINTS'):
 # For development, you can also configure this programmatically
 FASTAPI_ENABLED_ENDPOINTS: Set[str] = {
     '/health',  # Health check endpoint (FastAPI only)
+    '/health/async',  # Async health check endpoint (FastAPI only)
     '/',        # Root endpoint - migrated to FastAPI
     # Add more endpoints here as we migrate them
 }

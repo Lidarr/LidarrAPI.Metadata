@@ -26,6 +26,7 @@ from lidarrmetadata import chart
 from lidarrmetadata import config
 from lidarrmetadata import provider
 from lidarrmetadata import util
+from lidarrmetadata.async_tracker import operation_tracker
 
 logger = logging.getLogger(__name__)
 logger.info('Have app logger')
