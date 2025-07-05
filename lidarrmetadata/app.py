@@ -465,12 +465,29 @@ async def search_all():
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
 
-    results = await asyncio.gather(
+    # Use timeout utility for search operations
+    search_operations = [
         get_artist_search_results(query, limit),
         get_album_search_results(query, limit, True, None)
+    ]
+    
+    results, valid_indices = await execute_async_tasks_with_timeout(
+        search_operations,
+        timeout=20,
+        task_name="search_all",
+        default_result=([], [], provider.utcnow())
     )
-    artists, artist_scores, artist_validity = results[0]
-    albums, album_scores, album_validity = results[1]
+    
+    # Extract results with fallback for failed operations
+    if 0 in valid_indices and results[0]:
+        artists, artist_scores, artist_validity = results[0]
+    else:
+        artists, artist_scores, artist_validity = [], [], provider.utcnow()
+    
+    if 1 in valid_indices and results[1]:
+        albums, album_scores, album_validity = results[1]  
+    else:
+        albums, album_scores, album_validity = [], [], provider.utcnow()
     validity = min(artist_validity, album_validity)
 
     artist_items = [{'score': artist_scores[i],
@@ -496,9 +513,24 @@ async def search_fingerprint():
     album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
     album_ids = await album_provider.get_release_groups_by_recording_ids(ids)
 
-    results = await asyncio.gather(*[api.get_release_group_info(id) for id in album_ids])
-    albums = [result[0] for result in results]
-    validity = min([result[1] for result in results] or [provider.utcnow()])
+    # Use timeout utility for album info gathering
+    album_coroutines = [api.get_release_group_info(id) for id in album_ids]
+    results, valid_indices = await execute_async_tasks_with_timeout(
+        album_coroutines,
+        timeout=15,
+        task_name="fingerprint_search",
+        default_result=(None, provider.utcnow())
+    )
+    
+    # Extract valid results
+    albums = []
+    validities = []
+    for i, result in enumerate(results):
+        if i in valid_indices and result and result[0]:
+            albums.append(result[0])
+            validities.append(result[1])
+    
+    validity = min(validities or [provider.utcnow()])
 
     return await add_cache_control_header(jsonify(albums), validity)
 
