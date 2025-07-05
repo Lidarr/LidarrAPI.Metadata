@@ -21,6 +21,7 @@ import Levenshtein
 
 import lidarrmetadata
 from lidarrmetadata import api
+from lidarrmetadata.api import execute_async_tasks_with_timeout
 from lidarrmetadata import chart
 from lidarrmetadata import config
 from lidarrmetadata import provider
@@ -331,30 +332,14 @@ async def get_album_search_results(query, limit, include_tracks, artist_name):
                 return None, -1, provider.utcnow()
             
         
-        # Use asyncio.wait with timeout to prevent hanging
+        # Use utility function for timeout handling
         search_coroutines = [get_search_result(item) for item in search_results]
-        search_tasks = [asyncio.create_task(coro) for coro in search_coroutines if coro is not None]
-        if search_tasks:
-            done, pending = await asyncio.wait(search_tasks, timeout=10)
-            logger.debug("Got album search results", extra={'query': query, 'results': len(done), 'pending': len(pending)})
-            
-            # Cancel any pending tasks
-            for task in pending:
-                task.cancel()
-            
-            # Get results from completed tasks
-            results = []
-            for task in done:
-                if not task.cancelled():
-                    try:
-                        result = task.result()
-                        results.append(result)
-                    except Exception as e:
-                        logger.warning(f"Album search task failed: {e}")
-                        results.append((None, -1, provider.utcnow()))
-        else:
-            logger.debug("No album search tasks to process")
-            results = []
+        results, _ = await execute_async_tasks_with_timeout(
+            search_coroutines,
+            timeout=10,
+            task_name="album_search",
+            default_result=(None, -1, provider.utcnow())
+        )
         
         albums = [result[0] for result in results if result[0]]
 

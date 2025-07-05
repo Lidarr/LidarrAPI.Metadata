@@ -2,6 +2,7 @@ import os
 import uuid
 import functools
 import asyncio
+from typing import List, Callable, Any, Tuple, Optional
 
 import redis
 import datetime
@@ -20,6 +21,69 @@ logger = get_logger(__name__)
 logger.info('Have api logger')
 
 CONFIG = config.get_config()
+
+async def execute_async_tasks_with_timeout(
+    coroutines: List[Any], 
+    timeout: int = 10,
+    task_name: str = "task",
+    default_result: Any = None
+) -> Tuple[List[Any], List[int]]:
+    """
+    Execute a list of coroutines with timeout and proper error handling.
+    
+    Args:
+        coroutines: List of coroutines to execute
+        timeout: Timeout in seconds
+        task_name: Name for logging purposes
+        default_result: Default result for failed tasks
+    
+    Returns:
+        Tuple of (results_list, valid_indices) where results_list contains results
+        in the same order as input coroutines, and valid_indices contains indices
+        of successful tasks.
+    """
+    if not coroutines:
+        return [], []
+    
+    # Filter out None coroutines and create tasks
+    valid_coroutines = [(i, coro) for i, coro in enumerate(coroutines) if coro is not None]
+    if not valid_coroutines:
+        return [default_result] * len(coroutines), []
+    
+    # Create tasks and maintain mapping
+    tasks = []
+    coro_to_original_index = {}
+    for i, (original_index, coro) in enumerate(valid_coroutines):
+        task = asyncio.create_task(coro)
+        tasks.append(task)
+        coro_to_original_index[task] = original_index
+    
+    # Execute with timeout
+    done, pending = await asyncio.wait(tasks, timeout=timeout)
+    logger.debug(f"Completed {task_name} tasks", extra={'completed': len(done), 'pending': len(pending)})
+    
+    # Cancel pending tasks
+    for task in pending:
+        task.cancel()
+    
+    # Initialize results array with default values
+    results = [default_result] * len(coroutines)
+    valid_indices = []
+    
+    # Process completed tasks
+    for task in done:
+        if not task.cancelled():
+            original_index = coro_to_original_index[task]
+            try:
+                result = task.result()
+                # Store the result - let the calling code handle tuple unpacking
+                results[original_index] = result
+                valid_indices.append(original_index)
+            except Exception as e:
+                logger.warning(f"{task_name} failed for index {original_index}: {e}")
+                results[original_index] = default_result
+    
+    return results, valid_indices
 
 # Set up providers
 for provider_name, (args, kwargs) in CONFIG.PROVIDERS.items():
@@ -149,66 +213,30 @@ async def get_artist_info_multi(mbids):
     # Add in default expiry
     artists = [{'data': artist, 'expiry': expiry} for artist in artists]
     
-    # Start overviews with proper task-to-artist mapping
+    # Get overviews with timeout handling
     overview_coroutines = [get_overview(artist['data']['links'], artist['data']['id']) for artist in artists]
-    overview_tasks = [asyncio.create_task(coro) for coro in overview_coroutines]
-    done, pending = await asyncio.wait(overview_tasks, timeout=10)
-    logger.debug("Got artist overviews", extra={'results': len(done), 'pending': len(pending)})
-    for task in pending:
-        task.cancel()
-    
-    # Map completed tasks back to their corresponding artists
-    task_to_index = {task: i for i, task in enumerate(overview_tasks)}
-    overview_results = {}
-    for task in done:
-        if not task.cancelled():
-            try:
-                result = task.result()
-                index = task_to_index[task]
-                overview_results[index] = result
-            except Exception as e:
-                logger.warning(f"Overview task failed for artist {task_to_index.get(task, 'unknown')}: {e}")
-                if task in task_to_index:
-                    overview_results[task_to_index[task]] = (None, provider.utcnow())
+    overview_results, _ = await execute_async_tasks_with_timeout(
+        overview_coroutines, 
+        timeout=10, 
+        task_name="overview",
+        default_result=(None, provider.utcnow())
+    )
     if artist_art_providers:
-        # Create artist images tasks with proper mapping
+        # Get artist images with timeout handling
         image_coroutines = [artist_art_providers[0].get_artist_images(x['data']['id']) for x in artists]
-        # Filter out None values that might be returned by non-async methods
-        image_coroutines = [coro for coro in image_coroutines if coro is not None]
-        if image_coroutines:
-            image_tasks = [asyncio.create_task(coro) for coro in image_coroutines]
-            done, pending = await asyncio.wait(image_tasks, timeout=10)
-            logger.debug("Got artist images", extra={'results': len(done), 'pending': len(pending)})
-            for task in pending:
-                task.cancel()
-            
-            # Map completed tasks back to their corresponding artists
-            task_to_index = {task: i for i, task in enumerate(image_tasks)}
-            image_results = {}
-            for task in done:
-                if not task.cancelled():
-                    try:
-                        result = task.result()
-                        index = task_to_index[task]
-                        image_results[index] = result
-                    except Exception as e:
-                        logger.warning(f"Artist image task failed for artist {task_to_index.get(task, 'unknown')}: {e}")
-                        if task in task_to_index:
-                            image_results[task_to_index[task]] = ([], provider.utcnow())
-        else:
-            logger.debug("No artist image coroutines to process")
-            image_results = {}
+        image_results, _ = await execute_async_tasks_with_timeout(
+            image_coroutines,
+            timeout=10,
+            task_name="artist_images", 
+            default_result=([], provider.utcnow())
+        )
         
         # Apply image results to artists
         for i, artist in enumerate(artists):
-            if i in image_results:
-                result = image_results[i]
-                if result and len(result) == 2:
-                    images, expiry = result
-                    artist['data']['images'] = images
-                    artist['expiry'] = min(artist['expiry'], expiry)
-                else:
-                    artist['data']['images'] = []
+            if i < len(image_results) and image_results[i]:
+                images, expiry = image_results[i]
+                artist['data']['images'] = images
+                artist['expiry'] = min(artist['expiry'], expiry)
             else:
                 artist['data']['images'] = []
 
@@ -247,7 +275,7 @@ async def get_artist_info_multi(mbids):
 
     # Apply overview results to artists
     for i, artist in enumerate(artists):
-        if i in overview_results:
+        if i < len(overview_results) and overview_results[i]:
             overview, expiry = overview_results[i]
             artist['data']['overview'] = overview
             artist['expiry'] = min(artist['expiry'], expiry)
