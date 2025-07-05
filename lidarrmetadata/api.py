@@ -370,18 +370,18 @@ class ReleaseGroupNotFoundException(Exception):
 
 @postgres_cache(util.ALBUM_CACHE)
 async def get_release_group_info_basic(mbid):
-    
-    release_groups = await get_release_group_info_multi([mbid])
-    if not release_groups:
-
-        album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
-        new_id = await album_provider.redirect_old_release_group_id(mbid)
-        release_groups = await get_release_group_info_multi([new_id])
-
+    async with track_async_operation("get_release_group_info_basic", timeout=15, mbid=mbid):
+        release_groups = await get_release_group_info_multi([mbid])
         if not release_groups:
-            raise ReleaseGroupNotFoundException(mbid)
-    
-    return release_groups[0]
+
+            album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
+            new_id = await album_provider.redirect_old_release_group_id(mbid)
+            release_groups = await get_release_group_info_multi([new_id])
+
+            if not release_groups:
+                raise ReleaseGroupNotFoundException(mbid)
+        
+        return release_groups[0]
 
 async def get_release_group_info_multi(mbids):
     
@@ -480,11 +480,11 @@ async def get_release_group_info_multi(mbids):
     return [(item['data'], item['expiry']) for item in release_groups]
 
 async def get_release_group_info(mbid):
-
-    release_group, rg_expiry = await get_release_group_info_basic(mbid)
-    artists, artist_expiry = await get_release_group_artists(release_group)
-    
-    release_group['artists'] = artists
-    del release_group['artistids']
-    
-    return release_group, min(rg_expiry, artist_expiry)
+    async with track_async_operation("get_release_group_info", timeout=20, mbid=mbid):
+        release_group, rg_expiry = await get_release_group_info_basic(mbid)
+        artists, artist_expiry = await get_release_group_artists(release_group)
+        
+        release_group['artists'] = artists
+        del release_group['artistids']
+        
+        return release_group, min(rg_expiry, artist_expiry)

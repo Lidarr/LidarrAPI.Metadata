@@ -226,7 +226,7 @@ async def get_release_group_info_route(mbid):
     # Use utility function for timeout handling
     results, valid_indices = await execute_async_tasks_with_timeout(
         [api.get_release_group_info(mbid)],
-        timeout=10,
+        timeout=20,
         task_name="album_info",
         default_result=(None, provider.utcnow())
     )
