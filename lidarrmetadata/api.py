@@ -53,18 +53,34 @@ async def execute_async_tasks_with_timeout(
     # Create tasks and maintain mapping
     tasks = []
     coro_to_original_index = {}
+    coro_to_name = {}
     for i, (original_index, coro) in enumerate(valid_coroutines):
         task = asyncio.create_task(coro)
         tasks.append(task)
         coro_to_original_index[task] = original_index
+        # Store coroutine name for logging
+        coro_name = getattr(coro, '__name__', None) or getattr(coro, 'cr_code', {}).get('co_name', 'unknown')
+        if hasattr(coro, 'cr_code'):
+            coro_name = f"{coro.cr_code.co_name}()"
+        coro_to_name[task] = coro_name
     
     # Execute with timeout
     done, pending = await asyncio.wait(tasks, timeout=timeout)
     logger.debug(f"Completed {task_name} tasks", extra={'completed': len(done), 'pending': len(pending)})
     
-    # Cancel pending tasks
-    for task in pending:
-        task.cancel()
+    # Cancel pending tasks and log which ones timed out
+    if pending:
+        timed_out_indices = [coro_to_original_index[task] for task in pending]
+        timed_out_names = [coro_to_name[task] for task in pending]
+        logger.warning(f"{task_name} tasks timed out after {timeout}s: {', '.join(timed_out_names)}", extra={
+            'timed_out_indices': timed_out_indices,
+            'timed_out_coroutines': timed_out_names,
+            'task_name': task_name,
+            'timeout': timeout
+        })
+        for task in pending:
+            logger.debug(f"Cancelling timed out task: {coro_to_name[task]}")
+            task.cancel()
     
     # Initialize results array with default values
     results = [default_result] * len(coroutines)

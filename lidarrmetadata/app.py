@@ -158,12 +158,28 @@ async def get_artist_info_route(mbid):
     if uuid_validation_response:
         return uuid_validation_response
     
-    artist_task = asyncio.create_task(api.get_artist_info(mbid))
-    albums_task = asyncio.create_task(api.get_artist_albums(mbid))
-
-    artist, expiry = await artist_task
-
-    albums = await albums_task
+    # Use utility function for timeout handling
+    artist_coroutine = api.get_artist_info(mbid)
+    albums_coroutine = api.get_artist_albums(mbid)
+    
+    results, valid_indices = await execute_async_tasks_with_timeout(
+        [artist_coroutine, albums_coroutine],
+        timeout=10,
+        task_name="artist_info",
+        default_result=(None, provider.utcnow())
+    )
+    
+    # Extract artist info (first task)
+    if 0 in valid_indices and results[0] is not None:
+        artist, expiry = results[0]
+    else:
+        abort(504, 'Artist info request timed out or failed')
+    
+    # Extract albums (second task)
+    if 1 in valid_indices and results[1] is not None:
+        albums = results[1]
+    else:
+        albums = []
         
     # Filter release group types
     # This will soon happen client side but keep around until api version is bumped for older clients
@@ -206,7 +222,19 @@ async def get_release_group_info_route(mbid):
     if uuid_validation_response:
         return uuid_validation_response
     
-    output, expiry = await api.get_release_group_info(mbid)
+    # Use utility function for timeout handling
+    results, valid_indices = await execute_async_tasks_with_timeout(
+        [api.get_release_group_info(mbid)],
+        timeout=10,
+        task_name="album_info",
+        default_result=(None, provider.utcnow())
+    )
+    
+    # Extract album info
+    if 0 in valid_indices and results[0] is not None:
+        output, expiry = results[0]
+    else:
+        abort(504, 'Album info request timed out or failed')
     
     return await add_cache_control_header(jsonify(output), expiry)
 
