@@ -19,6 +19,7 @@ from lidarrmetadata import provider
 from lidarrmetadata import util
 from lidarrmetadata.logging_config import get_logger
 from lidarrmetadata.async_tracker import track_async_operation, safe_async_call
+from lidarrmetadata.async_settings import get_timeout
 
 logger = get_logger(__name__)
 logger.info('Have api logger')
@@ -199,7 +200,7 @@ class MissingProviderException(Exception):
 
 @postgres_cache(util.ARTIST_CACHE)
 async def get_artist_info(mbid):
-    async with track_async_operation("get_artist_info", timeout=15, mbid=mbid):
+    async with track_async_operation("get_artist_info", timeout=get_timeout("artist_info"), mbid=mbid):
         artists = await get_artist_info_multi([mbid])
         if not artists:
             artist_provider = provider.get_providers_implementing(provider.ArtistByIdMixin)[0]
@@ -236,7 +237,7 @@ async def get_artist_info_multi(mbids):
     overview_coroutines = [get_overview(artist['data']['links'], artist['data']['id']) for artist in artists]
     overview_results, _ = await execute_async_tasks_with_timeout(
         overview_coroutines, 
-        timeout=10, 
+        timeout=get_timeout("external_api"), 
         task_name="overview",
         default_result=(None, provider.utcnow())
     )
@@ -245,7 +246,7 @@ async def get_artist_info_multi(mbids):
         image_coroutines = [artist_art_providers[0].get_artist_images(x['data']['id']) for x in artists]
         image_results, _ = await execute_async_tasks_with_timeout(
             image_coroutines,
-            timeout=10,
+            timeout=get_timeout("artist_images"),
             task_name="artist_images", 
             default_result=([], provider.utcnow())
         )
@@ -271,7 +272,7 @@ async def get_artist_info_multi(mbids):
                     # Use timeout utility for image fetching
                     results, valid_indices = await execute_async_tasks_with_timeout(
                         image_coroutines,
-                        timeout=10,
+                        timeout=get_timeout("artist_images"),
                         task_name="artist_images",
                         default_result=(None, provider.utcnow())
                     )
@@ -338,7 +339,7 @@ async def get_release_group_artists(release_group):
     artist_coroutines = [get_artist_info(gid) for gid in release_group['artistids']]
     results, valid_indices = await execute_async_tasks_with_timeout(
         artist_coroutines,
-        timeout=15,
+        timeout=get_timeout("release_group_artists"),
         task_name="release_group_artists",
         default_result=(None, provider.utcnow())
     )
@@ -370,7 +371,7 @@ class ReleaseGroupNotFoundException(Exception):
 
 @postgres_cache(util.ALBUM_CACHE)
 async def get_release_group_info_basic(mbid):
-    async with track_async_operation("get_release_group_info_basic", timeout=15, mbid=mbid):
+    async with track_async_operation("get_release_group_info_basic", timeout=get_timeout("album_info"), mbid=mbid):
         release_groups = await get_release_group_info_multi([mbid])
         if not release_groups:
 
@@ -480,7 +481,7 @@ async def get_release_group_info_multi(mbids):
     return [(item['data'], item['expiry']) for item in release_groups]
 
 async def get_release_group_info(mbid):
-    async with track_async_operation("get_release_group_info", timeout=20, mbid=mbid):
+    async with track_async_operation("get_release_group_info", timeout=get_timeout("album_info"), mbid=mbid):
         release_group, rg_expiry = await get_release_group_info_basic(mbid)
         artists, artist_expiry = await get_release_group_artists(release_group)
         

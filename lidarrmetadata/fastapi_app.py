@@ -16,6 +16,7 @@ from lidarrmetadata.models import (
     CleanupResponse, InfoResponse, HangingOperationDetail, 
     FailedOperationDetail, Artist
 )
+from lidarrmetadata.async_settings import get_timeout
 import asyncio
 from fastapi import HTTPException, Request, status, Query, Path
 from fastapi.responses import Response
@@ -231,7 +232,7 @@ async def get_artist_info(
     
     results, valid_indices = await execute_async_tasks_with_timeout(
         [artist_coroutine, albums_coroutine],
-        timeout=10,
+        timeout=get_timeout("artist_info"),
         task_name="artist_info",
         default_result=(None, provider.utcnow())
     )

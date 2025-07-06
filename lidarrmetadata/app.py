@@ -27,6 +27,7 @@ from lidarrmetadata import config
 from lidarrmetadata import provider
 from lidarrmetadata import util
 from lidarrmetadata.async_tracker import operation_tracker
+from lidarrmetadata.async_settings import get_timeout
 
 logger = logging.getLogger(__name__)
 logger.info('Have app logger')
@@ -226,7 +227,7 @@ async def get_release_group_info_route(mbid):
     # Use utility function for timeout handling
     results, valid_indices = await execute_async_tasks_with_timeout(
         [api.get_release_group_info(mbid)],
-        timeout=20,
+        timeout=get_timeout("album_info"),
         task_name="album_info",
         default_result=(None, provider.utcnow())
     )
@@ -473,7 +474,7 @@ async def search_all():
     
     results, valid_indices = await execute_async_tasks_with_timeout(
         search_operations,
-        timeout=20,
+        timeout=get_timeout("search_all"),
         task_name="search_all",
         default_result=([], [], provider.utcnow())
     )
@@ -517,7 +518,7 @@ async def search_fingerprint():
     album_coroutines = [api.get_release_group_info(id) for id in album_ids]
     results, valid_indices = await execute_async_tasks_with_timeout(
         album_coroutines,
-        timeout=15,
+        timeout=get_timeout("fingerprint_search"),
         task_name="fingerprint_search",
         default_result=(None, provider.utcnow())
     )
