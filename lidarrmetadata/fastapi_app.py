@@ -6,12 +6,19 @@ import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 import lidarrmetadata
-from lidarrmetadata import config, util, provider
+from lidarrmetadata import config, util, provider, api
 from lidarrmetadata.logging_config import configure_structlog, get_logger
 from lidarrmetadata.logging_settings import get_logging_settings
 from lidarrmetadata.async_tracker import operation_tracker
 from lidarrmetadata.circuit_breaker import circuit_breakers
+from lidarrmetadata.models import (
+    ErrorResponse, HealthResponse, AsyncHealthResponse, 
+    CleanupResponse, InfoResponse, HangingOperationDetail, 
+    FailedOperationDetail, CircuitBreakerInfo, CircuitBreakerStats, 
+    CircuitBreakerConfig
+)
 import asyncio
+from fastapi import HTTPException, Request, status
 
 # Get configuration first
 CONFIG = config.get_config()
@@ -63,42 +70,65 @@ if CONFIG.SENTRY_DSN:
 
 # Basic health check endpoint
 @fastapi_app.get("/health")
-async def health_check():
+async def health_check() -> HealthResponse:
     """Health check endpoint for FastAPI"""
-    return {"status": "healthy", "framework": "fastapi"}
+    return HealthResponse(status="healthy", framework="fastapi")
 
 # Async operations health check endpoint
 @fastapi_app.get("/health/async")
-async def async_health_check():
+async def async_health_check() -> AsyncHealthResponse:
     """
     Health check endpoint showing async operation status and hanging operations.
     Useful for monitoring and debugging hanging async calls.
     """
     status = operation_tracker.get_status()
-    
-    # Add circuit breaker information
     circuit_stats = circuit_breakers.get_all_stats()
     
-    # Add some basic health indicators
-    status["healthy"] = status["hanging_operations"] == 0
-    status["total_recent_operations"] = len(operation_tracker.completed_operations)
-    status["framework"] = "fastapi"
-    status["circuit_breakers"] = circuit_stats
+    # Convert hanging details to structured models
+    hanging_details = [
+        HangingOperationDetail(
+            name=detail["name"],
+            running_time=detail["running_time"],
+            timeout=detail["timeout"],
+            context=detail["context"]
+        )
+        for detail in status["hanging_details"]
+    ]
     
-    return status
+    # Convert recent failures to structured models  
+    recent_failures = [
+        FailedOperationDetail(
+            name=failure["name"],
+            duration=failure.get("duration"),
+            success=failure["success"],
+            context=failure["context"]
+        )
+        for failure in status["recent_failures"]
+    ]
+    
+    return AsyncHealthResponse(
+        healthy=status["hanging_operations"] == 0,
+        active_operations=status["active_operations"],
+        hanging_operations=status["hanging_operations"],
+        total_recent_operations=len(operation_tracker.completed_operations),
+        framework="fastapi",
+        hanging_details=hanging_details,
+        recent_failures=recent_failures,
+        circuit_breakers=circuit_stats
+    )
 
 # Manual cleanup endpoint for hanging operations
 @fastapi_app.post("/health/async/cleanup")
-async def manual_cleanup_hanging_operations():
+async def manual_cleanup_hanging_operations() -> CleanupResponse:
     """
     Manually trigger cleanup of hanging operations.
     Useful for debugging and emergency cleanup.
     """
     cleaned_count = await operation_tracker.cleanup_hanging_operations()
-    return {
-        "cleaned_operations": cleaned_count,
-        "message": f"Cleaned up {cleaned_count} hanging operations"
-    }
+    return CleanupResponse(
+        cleaned_operations=cleaned_count,
+        message=f"Cleaned up {cleaned_count} hanging operations"
+    )
 
 # Background task for cleaning up hanging operations
 async def cleanup_hanging_operations_task():
@@ -119,9 +149,26 @@ async def startup_event():
     asyncio.create_task(cleanup_hanging_operations_task())
     logger.info("Started hanging operations cleanup task")
 
+# Exception handlers for proper HTTP status codes
+@fastapi_app.exception_handler(api.ArtistNotFoundException)
+async def artist_not_found_handler(request: Request, exc: api.ArtistNotFoundException):
+    """Handle artist not found exceptions with 404 status"""
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=ErrorResponse(error="Artist not found", detail=str(exc)).dict()
+    )
+
+@fastapi_app.exception_handler(api.ReleaseGroupNotFoundException)
+async def album_not_found_handler(request: Request, exc: api.ReleaseGroupNotFoundException):
+    """Handle album not found exceptions with 404 status"""
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=ErrorResponse(error="Album not found", detail=str(exc)).dict()
+    )
+
 # Root endpoint - migrated from Quart
 @fastapi_app.get("/")
-async def default_route():
+async def default_route() -> InfoResponse:
     """
     Default route with API information
     FastAPI version of the root endpoint
@@ -138,10 +185,9 @@ async def default_route():
             logger.warning(f"Failed to get data vintage: {e}")
             data = None
 
-    info = {
-        'branch': os.getenv('GIT_BRANCH'),
-        'commit': os.getenv('COMMIT_HASH'),
-        'version': lidarrmetadata.__version__,
-        'replication_date': data
-    }
-    return info
+    return InfoResponse(
+        branch=os.getenv('GIT_BRANCH'),
+        commit=os.getenv('COMMIT_HASH'),
+        version=lidarrmetadata.__version__,
+        replication_date=data
+    )

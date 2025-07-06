@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from lidarrmetadata.logging_config import get_logger
+from lidarrmetadata.models import CircuitBreakerInfo, CircuitBreakerStats, CircuitBreakerConfig as ConfigModel
 
 logger = get_logger(__name__)
 
@@ -119,33 +120,33 @@ class CircuitBreaker:
                 self.state = CircuitState.OPEN
                 self.success_count = 0
     
-    def get_stats(self) -> Dict[str, Any]:
-        """Get current circuit breaker statistics"""
-        return {
-            "name": self.name,
-            "state": self.state.value,
-            "failure_count": self.failure_count,
-            "success_count": self.success_count,
-            "config": {
-                "failure_threshold": self.config.failure_threshold,
-                "recovery_timeout": self.config.recovery_timeout,
-                "success_threshold": self.config.success_threshold,
-                "timeout": self.config.timeout
-            },
-            "stats": {
-                "total_calls": self.stats.total_calls,
-                "successful_calls": self.stats.successful_calls,
-                "failed_calls": self.stats.failed_calls,
-                "timeouts": self.stats.timeouts,
-                "circuit_opens": self.stats.circuit_opens,
-                "last_failure_time": self.stats.last_failure_time,
-                "last_success_time": self.stats.last_success_time,
-                "success_rate": (
+    def get_stats(self) -> CircuitBreakerInfo:
+        """Get current circuit breaker statistics as structured model"""
+        return CircuitBreakerInfo(
+            name=self.name,
+            state=self.state.value,
+            failure_count=self.failure_count,
+            success_count=self.success_count,
+            config=ConfigModel(
+                failure_threshold=self.config.failure_threshold,
+                recovery_timeout=self.config.recovery_timeout,
+                success_threshold=self.config.success_threshold,
+                timeout=self.config.timeout
+            ),
+            stats=CircuitBreakerStats(
+                total_calls=self.stats.total_calls,
+                successful_calls=self.stats.successful_calls,
+                failed_calls=self.stats.failed_calls,
+                timeouts=self.stats.timeouts,
+                circuit_opens=self.stats.circuit_opens,
+                last_failure_time=self.stats.last_failure_time,
+                last_success_time=self.stats.last_success_time,
+                success_rate=(
                     self.stats.successful_calls / self.stats.total_calls 
                     if self.stats.total_calls > 0 else 0
                 )
-            }
-        }
+            )
+        )
 
 class CircuitBreakerOpenError(Exception):
     """Exception raised when circuit breaker is open"""
@@ -164,8 +165,8 @@ class CircuitBreakers:
             self.breakers[service_name] = CircuitBreaker(service_name, config)
         return self.breakers[service_name]
     
-    def get_all_stats(self) -> Dict[str, Dict[str, Any]]:
-        """Get statistics for all circuit breakers"""
+    def get_all_stats(self) -> Dict[str, CircuitBreakerInfo]:
+        """Get statistics for all circuit breakers as structured models"""
         return {name: breaker.get_stats() for name, breaker in self.breakers.items()}
 
 # Global instance

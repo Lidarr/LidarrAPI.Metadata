@@ -145,13 +145,31 @@ async def track_async_operation(name: str, timeout: float = 10, **context):
         yield task_id
         operation_tracker.complete_operation(task_id, success=True)
     except Exception as e:
-        operation_tracker.complete_operation(task_id, success=False)
-        logger.error(f"Async operation failed: {name}", extra={
-            'task_id': task_id,
-            'error': str(e),
-            'error_type': type(e).__name__,
-            **context
-        })
+        # Distinguish between expected exceptions (NotFound, etc.) and actual errors
+        exception_name = type(e).__name__
+        is_expected_exception = (
+            'NotFound' in exception_name or 
+            exception_name in ['ArtistNotFoundException', 'ReleaseGroupNotFoundException']
+        )
+        
+        operation_tracker.complete_operation(task_id, success=not is_expected_exception)
+        
+        if is_expected_exception:
+            # Log expected exceptions at debug level
+            logger.debug(f"Async operation completed with expected exception: {name}", extra={
+                'task_id': task_id,
+                'error': str(e),
+                'error_type': exception_name,
+                **context
+            })
+        else:
+            # Log unexpected errors at error level
+            logger.error(f"Async operation failed: {name}", extra={
+                'task_id': task_id,
+                'error': str(e),
+                'error_type': exception_name,
+                **context
+            })
         raise
 
 async def safe_async_call(
