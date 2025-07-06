@@ -1139,14 +1139,19 @@ class MusicbrainzDbProvider(Provider,
 
                 logger.debug("Initializing MB DB pool")
                 
-                # Initialize pool
+                # Initialize pool with timeouts
                 self._pool = await asyncpg.create_pool(host = self._db_host,
                                                        port = self._db_port,
                                                        user = self._db_user,
                                                        password = self._db_password,
                                                        database = self._db_name,
                                                        init = self.uuid_as_str,
-                                                       statement_cache_size=0)
+                                                       statement_cache_size=0,
+                                                       command_timeout=10,  # 10s query timeout
+                                                       server_settings={
+                                                           'statement_timeout': '10s',  # Server-side timeout
+                                                           'idle_in_transaction_session_timeout': '30s'
+                                                       })
                 
             return self._pool
         

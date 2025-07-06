@@ -11,6 +11,7 @@ from lidarrmetadata.logging_config import configure_structlog, get_logger
 from lidarrmetadata.logging_settings import get_logging_settings
 from lidarrmetadata.async_tracker import operation_tracker
 from lidarrmetadata.circuit_breaker import circuit_breakers
+import asyncio
 
 # Get configuration first
 CONFIG = config.get_config()
@@ -85,6 +86,38 @@ async def async_health_check():
     status["circuit_breakers"] = circuit_stats
     
     return status
+
+# Manual cleanup endpoint for hanging operations
+@fastapi_app.post("/health/async/cleanup")
+async def manual_cleanup_hanging_operations():
+    """
+    Manually trigger cleanup of hanging operations.
+    Useful for debugging and emergency cleanup.
+    """
+    cleaned_count = await operation_tracker.cleanup_hanging_operations()
+    return {
+        "cleaned_operations": cleaned_count,
+        "message": f"Cleaned up {cleaned_count} hanging operations"
+    }
+
+# Background task for cleaning up hanging operations
+async def cleanup_hanging_operations_task():
+    """Background task to cleanup operations that have been hanging too long"""
+    while True:
+        try:
+            await asyncio.sleep(30)  # Check every 30 seconds
+            cleaned_count = await operation_tracker.cleanup_hanging_operations()
+            if cleaned_count > 0:
+                logger.info(f"Cleaned up {cleaned_count} hanging operations")
+        except Exception as e:
+            logger.error(f"Error in cleanup task: {e}")
+
+# Start the cleanup task
+@fastapi_app.on_event("startup")
+async def startup_event():
+    """Start background tasks when FastAPI starts"""
+    asyncio.create_task(cleanup_hanging_operations_task())
+    logger.info("Started hanging operations cleanup task")
 
 # Root endpoint - migrated from Quart
 @fastapi_app.get("/")

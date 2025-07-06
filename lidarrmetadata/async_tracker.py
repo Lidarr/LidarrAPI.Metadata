@@ -77,6 +77,28 @@ class AsyncOperationTracker:
                 hanging.append(op)
         return hanging
     
+    async def cleanup_hanging_operations(self):
+        """Force cleanup operations that have been hanging for too long"""
+        current_time = time.time()
+        cleanup_threshold = 30  # Force cleanup after 30 seconds past timeout
+        
+        to_cleanup = []
+        for task_id, op in list(self.active_operations.items()):
+            time_past_timeout = current_time - op.start_time - op.timeout
+            if time_past_timeout > cleanup_threshold:
+                to_cleanup.append((task_id, op, time_past_timeout))
+        
+        for task_id, op, time_past_timeout in to_cleanup:
+            logger.warning(f"Force cleaning up hanging operation: {op.name}", extra={
+                'task_id': task_id,
+                'time_past_timeout': time_past_timeout,
+                'operation': op.name,
+                **op.context
+            })
+            self.complete_operation(task_id, success=False)
+        
+        return len(to_cleanup)
+    
     def get_status(self) -> Dict[str, Any]:
         """Get current status of all async operations"""
         hanging_ops = self.get_hanging_operations()
