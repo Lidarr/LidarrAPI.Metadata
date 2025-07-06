@@ -1,22 +1,8 @@
 """
-Pydantic models for FastAPI endpoints and error responses.
+Models for monitoring and health check endpoints.
 """
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
-from datetime import datetime
-
-
-class ErrorResponse(BaseModel):
-    """Standard error response model"""
-    error: str = Field(..., description="Error message")
-    detail: Optional[str] = Field(None, description="Additional error details")
-    error_code: Optional[str] = Field(None, description="Machine-readable error code")
-
-
-class HealthResponse(BaseModel):
-    """Health check response model"""
-    status: str = Field(..., description="Health status")
-    framework: str = Field(..., description="Framework name")
 
 
 class HangingOperationDetail(BaseModel):
@@ -81,22 +67,3 @@ class CleanupResponse(BaseModel):
     """Response for manual cleanup operations"""
     cleaned_operations: int = Field(..., description="Number of operations cleaned up")
     message: str = Field(..., description="Human-readable result message")
-
-
-class InfoResponse(BaseModel):
-    """API information response model"""
-    branch: Optional[str] = Field(None, description="Git branch")
-    commit: Optional[str] = Field(None, description="Git commit hash")
-    version: str = Field(..., description="API version")
-    replication_date: Optional[str] = Field(None, description="Data replication date")
-
-
-# Artist and Album models would go here when we migrate those endpoints
-class ArtistBase(BaseModel):
-    """Base artist model"""
-    pass  # TODO: Define when migrating artist endpoints
-
-
-class AlbumBase(BaseModel):
-    """Base album model"""
-    pass  # TODO: Define when migrating album endpoints

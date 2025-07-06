@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from lidarrmetadata.logging_config import get_logger
-from lidarrmetadata.models import CircuitBreakerInfo, CircuitBreakerStats, CircuitBreakerConfig as ConfigModel
+from lidarrmetadata.models.monitoring import CircuitBreakerInfo, CircuitBreakerStats, CircuitBreakerConfig as ConfigModel
 
 logger = get_logger(__name__)
 

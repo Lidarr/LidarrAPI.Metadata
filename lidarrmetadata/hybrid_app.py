@@ -28,6 +28,7 @@ FASTAPI_ENABLED_ENDPOINTS: Set[str] = {
     '/health',  # Health check endpoint (FastAPI only)
     '/health/async',  # Async health check endpoint (FastAPI only)
     '/',        # Root endpoint - migrated to FastAPI
+    '/artist/*',  # Artist endpoint - migrated to FastAPI
     # Add more endpoints here as we migrate them
 }
 
@@ -89,10 +90,12 @@ async def route_request(scope, receive, send):
         
         if hybrid_app.should_use_fastapi(path):
             # Route to FastAPI
+            logger.debug(f"Routing to FastAPI for path: {path}")
             await fastapi_app(scope, receive, send)
         else:
             # Route to Quart (need to convert ASGI to WSGI for Quart)
             # This is a simplified approach - in production you'd want proper ASGI handling
+            logger.debug(f"Routing to Quart for path: {path}")
             await quart_app(scope, receive, send)
     else:
         # Handle websockets and other protocols with Quart
