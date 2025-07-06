@@ -31,6 +31,7 @@ from lidarrmetadata import util
 from lidarrmetadata.circuit_breaker import protected_call, CircuitBreakerConfig
 from lidarrmetadata.cache import conn
 from lidarrmetadata.logging_config import get_logger
+from lidarrmetadata.db_monitor import db_monitor
 
 logger = get_logger(__name__)
 logger.info('Have provider logger')
@@ -38,52 +39,83 @@ logger.info('Have provider logger')
 def debug_async_operation(func):
     """
     Decorator to log async operations with timing and provider info for debugging.
+    Enhanced with timeout tracking and performance analysis.
     """
     import functools
     import time
+    from lidarrmetadata.async_tracker import track_async_operation
+    from lidarrmetadata.async_settings import get_timeout
     
     @functools.wraps(func)
     async def wrapper(self, *args, **kwargs):
         provider_name = getattr(self, '_name', self.__class__.__name__)
+        operation_key = f"{provider_name}_{func.__name__}"
         
-        # Log operation start with arguments
-        logger.debug(
-            "Provider operation started",
-            provider=provider_name,
-            operation=func.__name__,
-            args_count=len(args),
-            kwargs_keys=list(kwargs.keys()) if kwargs else []
-        )
+        # Get appropriate timeout based on operation type
+        timeout_key = "external_api"  # Default
+        if "database" in func.__name__.lower() or "query" in func.__name__.lower():
+            timeout_key = "database_query"
+        elif "image" in func.__name__.lower():
+            timeout_key = "artist_images"
         
-        start_time = time.time()
+        operation_timeout = get_timeout(timeout_key)
         
-        try:
-            result = await func(self, *args, **kwargs)
-            elapsed = time.time() - start_time
+        # Enhanced context with provider and operation details
+        context = {
+            'provider': provider_name,
+            'operation': func.__name__,
+            'args_count': len(args),
+            'timeout_category': timeout_key
+        }
+        
+        # Add first argument as context if it looks like an ID
+        if args and len(args) > 0:
+            first_arg = args[0]
+            if isinstance(first_arg, (str, list)) and len(str(first_arg)) < 200:
+                context['primary_arg'] = str(first_arg)
+        
+        async with track_async_operation(operation_key, operation_timeout, **context):
+            start_time = time.time()
             
-            logger.info(
-                "Provider operation completed",
-                provider=provider_name,
-                operation=func.__name__,
-                elapsed_seconds=round(elapsed, 4),
-                success=True
-            )
-            
-            return result
-            
-        except Exception as e:
-            elapsed = time.time() - start_time
-            
-            logger.error(
-                "Provider operation failed",
-                provider=provider_name,
-                operation=func.__name__,
-                elapsed_seconds=round(elapsed, 4),
-                error=str(e),
-                error_type=type(e).__name__,
-                success=False
-            )
-            raise
+            try:
+                result = await func(self, *args, **kwargs)
+                elapsed = time.time() - start_time
+                
+                # Check for slow operations
+                if elapsed > operation_timeout * 0.7:
+                    logger.warning(
+                        "Slow provider operation",
+                        provider=provider_name,
+                        operation=func.__name__,
+                        elapsed_seconds=round(elapsed, 4),
+                        timeout=operation_timeout,
+                        threshold_percent=70,
+                        performance_concern=True
+                    )
+                else:
+                    logger.debug(
+                        "Provider operation completed",
+                        provider=provider_name,
+                        operation=func.__name__,
+                        elapsed_seconds=round(elapsed, 4),
+                        success=True
+                    )
+                
+                return result
+                
+            except Exception as e:
+                elapsed = time.time() - start_time
+                
+                logger.error(
+                    "Provider operation failed",
+                    provider=provider_name,
+                    operation=func.__name__,
+                    elapsed_seconds=round(elapsed, 4),
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    success=False
+                )
+                raise
     
     return wrapper
 
@@ -1351,12 +1383,80 @@ class MusicbrainzDbProvider(Provider,
         :param kwargs: Keyword args to pass to cursor.execute
         :return: List of dict with column: value
         """
-
-        data = await _conn.fetch(sql, *args, timeout=120)
+        from lidarrmetadata.async_settings import get_timeout
+        
+        # Get query timeout from settings
+        query_timeout = get_timeout("database_query")
+        
+        # Enhanced logging for debugging slow queries
+        start_time = time.time()
+        logger.debug("Starting database query", extra={
+            'sql_preview': sql[:100] + '...' if len(sql) > 100 else sql,
+            'args_count': len(args),
+            'timeout': query_timeout
+        })
+        
+        try:
+            data = await _conn.fetch(sql, *args, timeout=query_timeout)
+            execution_time = time.time() - start_time
             
-        results = [dict(row.items()) for row in data]
-
-        return results
+            results = [dict(row.items()) for row in data]
+            
+            # Record query metrics
+            db_monitor.record_query(sql, execution_time, len(results), success=True)
+            
+            # Log query performance
+            logger.info("Database query completed", extra={
+                'execution_time': round(execution_time, 4),
+                'result_count': len(results),
+                'timeout': query_timeout,
+                'sql_preview': sql[:100] + '...' if len(sql) > 100 else sql
+            })
+            
+            # Warn about slow queries and add EXPLAIN ANALYZE for very slow ones
+            if execution_time > query_timeout * 0.8:
+                logger.warning("Slow database query detected", extra={
+                    'execution_time': round(execution_time, 4),
+                    'timeout_threshold': query_timeout * 0.8,
+                    'sql_preview': sql[:100] + '...' if len(sql) > 100 else sql,
+                    'performance_issue': True
+                })
+                
+                # For very slow queries, run EXPLAIN ANALYZE to understand performance
+                if execution_time > query_timeout * 0.9:
+                    try:
+                        explain_sql = f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {sql}"
+                        explain_data = await _conn.fetch(explain_sql, *args, timeout=5)  # Short timeout for explain
+                        explain_result = explain_data[0][0] if explain_data else None
+                        
+                        logger.error("Critical slow query - EXPLAIN ANALYZE", extra={
+                            'execution_time': round(execution_time, 4),
+                            'sql_preview': sql[:200] + '...' if len(sql) > 200 else sql,
+                            'explain_plan': explain_result,
+                            'critical_performance_issue': True
+                        })
+                    except Exception as explain_error:
+                        logger.warning(f"Could not get EXPLAIN ANALYZE for slow query: {explain_error}", extra={
+                            'execution_time': round(execution_time, 4),
+                            'sql_preview': sql[:100] + '...' if len(sql) > 100 else sql
+                        })
+            
+            return results
+            
+        except Exception as e:
+            execution_time = time.time() - start_time
+            
+            # Record failed query metrics
+            db_monitor.record_query(sql, execution_time, 0, success=False)
+            
+            logger.error("Database query failed", extra={
+                'execution_time': round(execution_time, 4),
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'sql_preview': sql[:100] + '...' if len(sql) > 100 else sql,
+                'timeout': query_timeout
+            })
+            raise
 
     @staticmethod
     def parse_url_source(url):

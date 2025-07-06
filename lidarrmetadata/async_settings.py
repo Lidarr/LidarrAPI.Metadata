@@ -18,7 +18,7 @@ class AsyncTimeoutSettings(BaseSettings):
     """
     
     # Core API operations
-    artist_info: int = 15           # Getting artist info + albums
+    artist_info: int = 45           # Getting artist info + albums
     album_info: int = 20            # Getting album info (includes database queries)
     
     # Search operations

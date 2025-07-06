@@ -16,12 +16,14 @@ from lidarrmetadata.models import (
     CleanupResponse, InfoResponse, HangingOperationDetail, 
     FailedOperationDetail, Artist
 )
+from lidarrmetadata.db_monitor import db_monitor
 from lidarrmetadata.async_settings import get_timeout
 import asyncio
 from fastapi import HTTPException, Request, status, Query, Path
 from fastapi.responses import Response
 import uuid
-from typing import Optional
+from typing import Optional, Dict, Any
+import json
 
 # Get configuration first
 CONFIG = config.get_config()
@@ -285,3 +287,85 @@ async def get_artist_info(
     
     # Convert to Pydantic model for validation and proper serialization
     return Artist.parse_obj(artist_data)
+
+# Debug endpoints for performance monitoring
+@fastapi_app.get("/debug/database")
+async def get_database_metrics() -> Dict[str, Any]:
+    """
+    Get detailed database performance metrics for debugging.
+    Shows connection pool status, query performance, and slow queries.
+    """
+    return db_monitor.get_metrics()
+
+@fastapi_app.get("/debug/artist/{mbid}")
+async def debug_artist_performance(
+    mbid: str = Path(..., description="MusicBrainz Artist ID"),
+    include_db_metrics: bool = Query(True, description="Include database metrics"),
+    include_async_status: bool = Query(True, description="Include async operation status")
+) -> Dict[str, Any]:
+    """
+    Debug endpoint for artist performance monitoring.
+    
+    This endpoint provides detailed debugging information for artist operations
+    including database metrics, async operation status, and circuit breaker status.
+    Use this to diagnose timeout issues.
+    """
+    # Validate UUID format
+    validate_uuid(mbid)
+    
+    debug_info = {
+        "artist_id": mbid,
+        "timestamp": provider.utcnow().isoformat(),
+        "timeouts": {
+            "artist_info": get_timeout("artist_info"),
+            "database_query": get_timeout("database_query"),
+            "external_api": get_timeout("external_api"),
+            "artist_images": get_timeout("artist_images")
+        }
+    }
+    
+    if include_db_metrics:
+        debug_info["database_metrics"] = db_monitor.get_metrics()
+    
+    if include_async_status:
+        async_status = operation_tracker.get_status()
+        debug_info["async_operations"] = {
+            "active_operations": async_status["active_operations"],
+            "hanging_operations": async_status["hanging_operations"],
+            "hanging_details": async_status["hanging_details"],
+            "recent_failures": async_status["recent_failures"][-5:]  # Last 5 failures
+        }
+        
+        # Add circuit breaker status
+        debug_info["circuit_breakers"] = circuit_breakers.get_all_stats()
+    
+    # Add provider information
+    artist_providers = provider.get_providers_implementing(provider.ArtistByIdMixin)
+    artist_art_providers = provider.get_providers_implementing(provider.ArtistArtworkMixin)
+    
+    debug_info["providers"] = {
+        "artist_providers": [type(p).__name__ for p in artist_providers],
+        "artist_art_providers": [type(p).__name__ for p in artist_art_providers]
+    }
+    
+    return debug_info
+
+@fastapi_app.post("/debug/database/reset")
+async def reset_database_metrics() -> Dict[str, str]:
+    """
+    Reset database monitoring metrics (useful for testing).
+    """
+    db_monitor.reset_metrics()
+    return {"message": "Database metrics reset successfully"}
+
+@fastapi_app.get("/debug/operations/hanging")
+async def get_hanging_operations() -> Dict[str, Any]:
+    """
+    Get detailed information about currently hanging operations.
+    """
+    status = operation_tracker.get_status()
+    return {
+        "hanging_operations_count": status["hanging_operations"],
+        "hanging_details": status["hanging_details"],
+        "timestamp": provider.utcnow().isoformat()
+    }

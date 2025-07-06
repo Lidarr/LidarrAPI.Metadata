@@ -29,6 +29,7 @@ FASTAPI_ENABLED_ENDPOINTS: Set[str] = {
     '/health/async',  # Async health check endpoint (FastAPI only)
     '/',        # Root endpoint - migrated to FastAPI
     '/artist/*',  # Artist endpoint - migrated to FastAPI
+    '/debug/*',  # Debug endpoints for performance monitoring
     # Add more endpoints here as we migrate them
 }
 

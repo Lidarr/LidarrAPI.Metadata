@@ -99,3 +99,7 @@ docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 ## Version Control
 
 - Use git flow branches
+
+## Development Memories
+
+- Add new settings to pydantic-basesettings model rather than old config model

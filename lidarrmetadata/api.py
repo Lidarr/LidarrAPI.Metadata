@@ -225,31 +225,34 @@ async def get_artist_info_multi(mbids):
     
     expiry = provider.utcnow() + timedelta(seconds = CONFIG.CACHE_TTL['cloudflare'])
     
-    # Do the main DB query
-    artists = await artist_providers[0].get_artists_by_id(mbids)
-    if not artists:
-        return None
+    # Do the main DB query with detailed tracking
+    async with track_async_operation("database_artist_lookup", timeout=get_timeout("database_query"), mbids=mbids):
+        artists = await artist_providers[0].get_artists_by_id(mbids)
+        if not artists:
+            return None
     
     # Add in default expiry
     artists = [{'data': artist, 'expiry': expiry} for artist in artists]
     
-    # Get overviews with timeout handling
-    overview_coroutines = [get_overview(artist['data']['links'], artist['data']['id']) for artist in artists]
-    overview_results, _ = await execute_async_tasks_with_timeout(
-        overview_coroutines, 
-        timeout=get_timeout("external_api"), 
-        task_name="overview",
-        default_result=(None, provider.utcnow())
-    )
-    if artist_art_providers:
-        # Get artist images with timeout handling
-        image_coroutines = [artist_art_providers[0].get_artist_images(x['data']['id']) for x in artists]
-        image_results, _ = await execute_async_tasks_with_timeout(
-            image_coroutines,
-            timeout=get_timeout("artist_images"),
-            task_name="artist_images", 
-            default_result=([], provider.utcnow())
+    # Get overviews with timeout handling and detailed tracking
+    async with track_async_operation("artist_overviews_batch", timeout=get_timeout("external_api"), artist_count=len(artists)):
+        overview_coroutines = [get_overview(artist['data']['links'], artist['data']['id']) for artist in artists]
+        overview_results, _ = await execute_async_tasks_with_timeout(
+            overview_coroutines, 
+            timeout=get_timeout("external_api"), 
+            task_name="overview",
+            default_result=(None, provider.utcnow())
         )
+    if artist_art_providers:
+        # Get artist images with timeout handling and detailed tracking
+        async with track_async_operation("artist_images_primary", timeout=get_timeout("artist_images"), artist_count=len(artists), provider=type(artist_art_providers[0]).__name__):
+            image_coroutines = [artist_art_providers[0].get_artist_images(x['data']['id']) for x in artists]
+            image_results, _ = await execute_async_tasks_with_timeout(
+                image_coroutines,
+                timeout=get_timeout("artist_images"),
+                task_name="artist_images", 
+                default_result=([], provider.utcnow())
+            )
         
         # Apply image results to artists
         for i, artist in enumerate(artists):
@@ -264,18 +267,19 @@ async def get_artist_info_multi(mbids):
             image_types = {'Banner', 'Fanart', 'Logo', 'Poster'}
             artists_without_images = [x for x in artists if not x['data']['images'] or not image_types.issubset({i['CoverType'] for i in x['data']['images']})]
             if artists_without_images:
-                # Get image coroutines and filter out None values
-                image_coroutines = [artist_art_providers[1].get_artist_images(x['data']['id']) for x in artists_without_images]
-                image_coroutines = [coro for coro in image_coroutines if coro is not None]
-                
-                if image_coroutines:
-                    # Use timeout utility for image fetching
-                    results, valid_indices = await execute_async_tasks_with_timeout(
-                        image_coroutines,
-                        timeout=get_timeout("artist_images"),
-                        task_name="artist_images",
-                        default_result=(None, provider.utcnow())
-                    )
+                # Get image coroutines and filter out None values with detailed tracking
+                async with track_async_operation("artist_images_secondary", timeout=get_timeout("artist_images"), artists_needing_images=len(artists_without_images), provider=type(artist_art_providers[1]).__name__):
+                    image_coroutines = [artist_art_providers[1].get_artist_images(x['data']['id']) for x in artists_without_images]
+                    image_coroutines = [coro for coro in image_coroutines if coro is not None]
+                    
+                    if image_coroutines:
+                        # Use timeout utility for image fetching
+                        results, valid_indices = await execute_async_tasks_with_timeout(
+                            image_coroutines,
+                            timeout=get_timeout("artist_images"),
+                            task_name="artist_images",
+                            default_result=(None, provider.utcnow())
+                        )
                     
                     for i, artist in enumerate(artists_without_images):
                         if i < len(results) and i in valid_indices:
@@ -321,6 +325,7 @@ def combine_images(a, b):
     return result
 
 async def get_artist_albums(mbid):
+    return []
     release_group_providers = provider.get_providers_implementing(
         provider.ReleaseGroupByArtistMixin)
     if release_group_providers and not mbid in CONFIG.BLACKLISTED_ARTISTS:
