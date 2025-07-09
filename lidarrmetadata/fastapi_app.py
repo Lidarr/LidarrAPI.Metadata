@@ -194,7 +194,7 @@ async def default_route() -> InfoResponse:
         branch=os.getenv('GIT_BRANCH'),
         commit=os.getenv('COMMIT_HASH'),
         version=lidarrmetadata.__version__,
-        replication_date=data
+        replication_date=data.isoformat() if data else None
     )
 
 # Helper function for UUID validation
