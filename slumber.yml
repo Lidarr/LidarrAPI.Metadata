@@ -1,0 +1,44 @@
+# For basic usage info, see:
+# https://slumber.lucaspickering.me/book/getting_started.html
+# For all collection options, see:
+# https://slumber.lucaspickering.me/book/api/request_collection/index.html
+
+# Profiles are groups of data you can easily switch between. A common usage is
+# to define profiles for various environments of a REST service
+profiles:
+  local:
+    data:
+      host: http://localhost:8000
+      root_path: /
+  meta-latest:
+    data:
+      host: https://api.lidarr.audio
+      root_path: /api/testing
+
+# Chains allow you to use dynamic data in your request templates
+# chains:
+#   example:
+#     source: !request
+#       recipe: example1
+#     selector: $.data
+
+requests:
+  # search_artist: !request
+  #   name: Search Artist
+  #   method: GET
+  #   url: "{{host}}/search/artist?query=blink%20182"
+
+  search: !folder
+    name: Search
+    requests:
+      search_artist: !request
+        name: Search Artist by Name
+        method: GET
+        url: "{{host}}{{root_path}}/search/artist"
+        query:
+          query: blink 182
+      # search_artist: !request
+      #   name: artist
+      #   method: POST
+      #   url: "{{host}}{{root_path}}/search/artist?query=blink%20182"
+      #   body: {}

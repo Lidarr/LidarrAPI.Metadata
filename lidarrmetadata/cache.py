@@ -3,7 +3,6 @@ Defines the custom redis cache backend which compresses pickle dumps
 """
 import functools
 import hashlib
-import logging
 import contextlib
 import zlib
 import asyncio
@@ -13,10 +12,10 @@ from timeit import default_timer as timer
 
 from aiocache.serializers import BaseSerializer, PickleSerializer
 from aiocache.base import BaseCache
+from lidarrmetadata.logging_config import get_logger
+from lidarrmetadata.db_monitor import db_monitor
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
+logger = get_logger(__name__)
 logger.info('Have cache logger')
 
 try:
@@ -56,8 +55,22 @@ def conn(func):
     async def wrapper(self, *args, _conn=None, **kwargs):
         if _conn is None:
             pool = await self._get_pool()
-            async with pool.acquire() as _conn:
-                return await func(self, *args, _conn=_conn, **kwargs)
+            
+            # Monitor connection acquisition
+            acquisition_start = timer()
+            try:
+                async with pool.acquire() as _conn:
+                    acquisition_time = timer() - acquisition_start
+                    db_monitor.record_connection_acquisition(acquisition_time, success=True)
+                    
+                    # Update pool status for monitoring
+                    db_monitor.update_pool_status(pool)
+                    
+                    return await func(self, *args, _conn=_conn, **kwargs)
+            except Exception as e:
+                acquisition_time = timer() - acquisition_start
+                db_monitor.record_connection_acquisition(acquisition_time, success=False)
+                raise
 
         return await func(self, *args, _conn=_conn, **kwargs)
 

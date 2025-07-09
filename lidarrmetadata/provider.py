@@ -6,10 +6,10 @@ from datetime import timedelta
 import time
 import pytz
 import imp
-import logging
 import pkg_resources
 import re
 import six
+import ssl
 from timeit import default_timer as timer
 from urllib.parse import urlparse
 from urllib.parse import quote as url_quote
@@ -17,6 +17,7 @@ from urllib.parse import quote as url_quote
 import asyncio
 import aiohttp
 import asyncpg
+import certifi
 import json
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
@@ -27,12 +28,96 @@ from lidarrmetadata.config import get_config
 from lidarrmetadata import limit
 from lidarrmetadata import stats
 from lidarrmetadata import util
+from lidarrmetadata.circuit_breaker import protected_call, CircuitBreakerConfig
 from lidarrmetadata.cache import conn
+from lidarrmetadata.logging_config import get_logger
+from lidarrmetadata.db_monitor import db_monitor
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 logger.info('Have provider logger')
+
+def debug_async_operation(func):
+    """
+    Decorator to log async operations with timing and provider info for debugging.
+    Enhanced with timeout tracking and performance analysis.
+    """
+    import functools
+    import time
+    from lidarrmetadata.async_tracker import track_async_operation
+    from lidarrmetadata.async_settings import get_timeout
+    
+    @functools.wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        provider_name = getattr(self, '_name', self.__class__.__name__)
+        operation_key = f"{provider_name}_{func.__name__}"
+        
+        # Get appropriate timeout based on operation type
+        timeout_key = "external_api"  # Default
+        if "database" in func.__name__.lower() or "query" in func.__name__.lower():
+            timeout_key = "database_query"
+        elif "image" in func.__name__.lower():
+            timeout_key = "artist_images"
+        
+        operation_timeout = get_timeout(timeout_key)
+        
+        # Enhanced context with provider and operation details
+        context = {
+            'provider': provider_name,
+            'operation': func.__name__,
+            'args_count': len(args),
+            'timeout_category': timeout_key
+        }
+        
+        # Add first argument as context if it looks like an ID
+        if args and len(args) > 0:
+            first_arg = args[0]
+            if isinstance(first_arg, (str, list)) and len(str(first_arg)) < 200:
+                context['primary_arg'] = str(first_arg)
+        
+        async with track_async_operation(operation_key, operation_timeout, **context):
+            start_time = time.time()
+            
+            try:
+                result = await func(self, *args, **kwargs)
+                elapsed = time.time() - start_time
+                
+                # Check for slow operations
+                if elapsed > operation_timeout * 0.7:
+                    logger.warning(
+                        "Slow provider operation",
+                        provider=provider_name,
+                        operation=func.__name__,
+                        elapsed_seconds=round(elapsed, 4),
+                        timeout=operation_timeout,
+                        threshold_percent=70,
+                        performance_concern=True
+                    )
+                else:
+                    logger.debug(
+                        "Provider operation completed",
+                        provider=provider_name,
+                        operation=func.__name__,
+                        elapsed_seconds=round(elapsed, 4),
+                        success=True
+                    )
+                
+                return result
+                
+            except Exception as e:
+                elapsed = time.time() - start_time
+                
+                logger.error(
+                    "Provider operation failed",
+                    provider=provider_name,
+                    operation=func.__name__,
+                    elapsed_seconds=round(elapsed, 4),
+                    error=str(e),
+                    error_type=type(e).__name__,
+                    success=False
+                )
+                raise
+    
+    return wrapper
 
 CONFIG = get_config()
 
@@ -453,7 +538,14 @@ class HttpProvider(Provider,
             async with self._session_lock:
                 logger.debug("Initializing AIOHTTP Session")
                 
-                self._session = aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000))
+                # Create SSL context with proper certificate verification
+                ssl_context = ssl.create_default_context(cafile=certifi.where())
+                connector = aiohttp.TCPConnector(ssl=ssl_context)
+                
+                self._session = aiohttp.ClientSession(
+                    timeout=aiohttp.ClientTimeout(total=CONFIG.EXTERNAL_TIMEOUT / 1000),
+                    connector=connector
+                )
                 
         return self._session
             
@@ -555,16 +647,18 @@ class TheAudioDbProvider(HttpProvider,
         url += f'{self._api_key}/artist-mb.php?i={mbid}'
         return url
 
+    @debug_async_operation
     async def get_artist_images(self, artist_id):
         
         return await self.get_data(artist_id, self.parse_artist_images)
 
+    @debug_async_operation
     async def get_artist_overview(self, artist_id):
 
         return await self.get_data(artist_id, self.parse_artist_overview)
         
     async def get_data(self, mbid, handler):
-
+        return []
         cached, expires = await util.TADB_CACHE.get(mbid)
         now = utcnow()
         
@@ -597,6 +691,7 @@ class TheAudioDbProvider(HttpProvider,
 
         await self.cache_results(mbid, results)
         
+    @debug_async_operation
     async def get_by_mbid(self, mbid):
         """
         Gets the theaudiodb.com response for resource with Musicbrainz id mbid
@@ -675,16 +770,18 @@ class FanArtTvProvider(HttpProvider,
         ## dummy value for initialization, will be picked up from redis later on
         self._last_cache_invalidation = time.time() - 60 * 60 * 24
 
+    @debug_async_operation
     async def get_artist_images(self, artist_id):
         
         return await self.get_images(artist_id, self.parse_artist_images)
         
+    @debug_async_operation
     async def get_album_images(self, album_id):
         
         return await self.get_images(album_id, self.parse_album_images)
         
     async def get_images(self, mbid, handler):
-
+        return []
         now = utcnow()
         cached, expires = await util.FANART_CACHE.get(mbid)
 
@@ -709,6 +806,7 @@ class FanArtTvProvider(HttpProvider,
             logger.debug("Fanart unavailable")
             await util.FANART_CACHE.expire(mbid, CONFIG.CACHE_TTL['provider_error'])
         
+    @debug_async_operation
     async def get_by_mbid(self, mbid):
         """
         Gets the fanart.tv response for resource with Musicbrainz id mbid
@@ -913,6 +1011,7 @@ class SolrSearchProvider(HttpProvider,
     async def get_with_limit(self, url):
         return await super().get_with_limit(url, timeout=aiohttp.ClientTimeout(total=5))
             
+    @debug_async_operation
     async def search_artist_name(self, name, limit=None):
         
         # Note that when using a dismax query we shouldn't apply lucene escaping
@@ -955,6 +1054,7 @@ class SolrSearchProvider(HttpProvider,
 
         return handler(response)
     
+    @debug_async_operation
     async def search_album_name(self, name, limit=None, artist_name=''):
         
         if artist_name:
@@ -1071,14 +1171,19 @@ class MusicbrainzDbProvider(Provider,
 
                 logger.debug("Initializing MB DB pool")
                 
-                # Initialize pool
+                # Initialize pool with timeouts
                 self._pool = await asyncpg.create_pool(host = self._db_host,
                                                        port = self._db_port,
                                                        user = self._db_user,
                                                        password = self._db_password,
                                                        database = self._db_name,
                                                        init = self.uuid_as_str,
-                                                       statement_cache_size=0)
+                                                       statement_cache_size=0,
+                                                       command_timeout=10,  # 10s query timeout
+                                                       server_settings={
+                                                           'statement_timeout': '10s',  # Server-side timeout
+                                                           'idle_in_transaction_session_timeout': '30s'
+                                                       })
                 
             return self._pool
         
@@ -1121,6 +1226,7 @@ class MusicbrainzDbProvider(Provider,
         entities = await self.query_from_file(changed_query, self._last_cache_invalidation)
         return [entity['spotifyid'] for entity in entities]
     
+    @debug_async_operation
     async def get_artists_by_id(self, artist_ids):
         artists = await self.query_from_file('artist_by_id.sql', artist_ids)
         
@@ -1197,8 +1303,17 @@ class MusicbrainzDbProvider(Provider,
             
         return release_group
 
+    @debug_async_operation
     async def get_release_groups_by_id(self, rgids):
-        release_groups = await self.query_from_file('release_group_by_id.sql', rgids)
+        # Use circuit breaker for database operations
+        db_config = CircuitBreakerConfig(failure_threshold=3, recovery_timeout=30, timeout=15.0)
+        release_groups = await protected_call(
+            "musicbrainz_db", 
+            self.query_from_file, 
+            'release_group_by_id.sql', 
+            rgids,
+            config=db_config
+        )
         
         logger.debug("got release groups")
         
@@ -1268,12 +1383,80 @@ class MusicbrainzDbProvider(Provider,
         :param kwargs: Keyword args to pass to cursor.execute
         :return: List of dict with column: value
         """
-
-        data = await _conn.fetch(sql, *args, timeout=120)
+        from lidarrmetadata.async_settings import get_timeout
+        
+        # Get query timeout from settings
+        query_timeout = get_timeout("database_query")
+        
+        # Enhanced logging for debugging slow queries
+        start_time = time.time()
+        logger.debug("Starting database query", extra={
+            'sql_preview': sql[:100] + '...' if len(sql) > 100 else sql,
+            'args_count': len(args),
+            'timeout': query_timeout
+        })
+        
+        try:
+            data = await _conn.fetch(sql, *args, timeout=query_timeout)
+            execution_time = time.time() - start_time
             
-        results = [dict(row.items()) for row in data]
-
-        return results
+            results = [dict(row.items()) for row in data]
+            
+            # Record query metrics
+            db_monitor.record_query(sql, execution_time, len(results), success=True)
+            
+            # Log query performance
+            logger.info("Database query completed", extra={
+                'execution_time': round(execution_time, 4),
+                'result_count': len(results),
+                'timeout': query_timeout,
+                'sql_preview': sql[:100] + '...' if len(sql) > 100 else sql
+            })
+            
+            # Warn about slow queries and add EXPLAIN ANALYZE for very slow ones
+            if execution_time > query_timeout * 0.8:
+                logger.warning("Slow database query detected", extra={
+                    'execution_time': round(execution_time, 4),
+                    'timeout_threshold': query_timeout * 0.8,
+                    'sql_preview': sql[:100] + '...' if len(sql) > 100 else sql,
+                    'performance_issue': True
+                })
+                
+                # For very slow queries, run EXPLAIN ANALYZE to understand performance
+                if execution_time > query_timeout * 0.9:
+                    try:
+                        explain_sql = f"EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {sql}"
+                        explain_data = await _conn.fetch(explain_sql, *args, timeout=5)  # Short timeout for explain
+                        explain_result = explain_data[0][0] if explain_data else None
+                        
+                        logger.error("Critical slow query - EXPLAIN ANALYZE", extra={
+                            'execution_time': round(execution_time, 4),
+                            'sql_preview': sql[:200] + '...' if len(sql) > 200 else sql,
+                            'explain_plan': explain_result,
+                            'critical_performance_issue': True
+                        })
+                    except Exception as explain_error:
+                        logger.warning(f"Could not get EXPLAIN ANALYZE for slow query: {explain_error}", extra={
+                            'execution_time': round(execution_time, 4),
+                            'sql_preview': sql[:100] + '...' if len(sql) > 100 else sql
+                        })
+            
+            return results
+            
+        except Exception as e:
+            execution_time = time.time() - start_time
+            
+            # Record failed query metrics
+            db_monitor.record_query(sql, execution_time, 0, success=False)
+            
+            logger.error("Database query failed", extra={
+                'execution_time': round(execution_time, 4),
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'sql_preview': sql[:100] + '...' if len(sql) > 100 else sql,
+                'timeout': query_timeout
+            })
+            raise
 
     @staticmethod
     def parse_url_source(url):
@@ -1346,6 +1529,7 @@ class WikipediaProvider(HttpProvider, ArtistOverviewMixin):
             'vi', 'zh'
         )
         
+    @debug_async_operation
     async def get_artist_overview(self, url, ignore_cache=False):
         
         if not ignore_cache:

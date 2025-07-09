@@ -2,11 +2,12 @@ import argparse
 import asyncio
 import datetime
 from datetime import timedelta
-import logging
 from timeit import default_timer as timer
+import ssl
 import sys
 
 import aiohttp
+import certifi
 import sentry_sdk
 
 import lidarrmetadata
@@ -15,10 +16,9 @@ from lidarrmetadata import provider
 from lidarrmetadata import util
 from lidarrmetadata import limit
 from lidarrmetadata.api import get_artist_info_multi, ArtistNotFoundException, get_release_group_info_multi, ReleaseGroupNotFoundException
+from lidarrmetadata.logging_config import get_logger
 
-logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.DEBUG)
+logger = get_logger(__name__)
 logger.info('Have crawler logger')
 
 CONFIG = get_config()
@@ -41,7 +41,8 @@ async def update_wikipedia(count = 50, max_ttl = 60 * 60):
     # https://www.mediawiki.org/wiki/API:Etiquette
     # Only put timeout on sock_read - otherwise we can get timed out waiting for a connection from the pool.
     # Don't make these count towards rate limiting.
-    async with aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(sock_read = 2), connector = aiohttp.TCPConnector(limit_per_host=1)) as session:
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+    async with aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(sock_read = 2), connector = aiohttp.TCPConnector(limit_per_host=1, ssl=ssl_context)) as session:
         wikipedia_provider = provider.WikipediaProvider(session, limit.NullRateLimiter())
 
         while True:
@@ -61,9 +62,10 @@ async def update_fanart(count = 500, max_ttl = 60 * 60):
     # Use an aiohttp session which only allows 10 concurrent connections per host to be (a little bit) nice
     # Only put timeout on sock_read - otherwise we can get timed out waiting for a connection from the pool.
     # Don't make these count towards rate limiting.
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
     async with aiohttp.ClientSession(
             timeout = aiohttp.ClientTimeout(sock_read = 2), 
-            connector = aiohttp.TCPConnector(limit_per_host=10)
+            connector = aiohttp.TCPConnector(limit_per_host=10, ssl=ssl_context)
     ) as session:
         fanart_provider = provider.FanArtTvProvider(
             CONFIG.FANART_KEY, 
@@ -88,9 +90,10 @@ async def update_tadb(count = 500, max_ttl = 60 * 60):
     # Only put timeout on sock_read - otherwise we can get timed out waiting for a connection from the pool.
     # Don't make these count towards rate limiting.
     # TADB is slow as balls so put in a big timeout.
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
     async with aiohttp.ClientSession(
             timeout = aiohttp.ClientTimeout(sock_read = 10), 
-            connector = aiohttp.TCPConnector(limit_per_host=CONFIG.TADB_CONNECTIONS)
+            connector = aiohttp.TCPConnector(limit_per_host=CONFIG.TADB_CONNECTIONS, ssl=ssl_context)
     ) as session:
         tadb_provider = provider.TheAudioDbProvider(
             CONFIG.TADB_KEY, 

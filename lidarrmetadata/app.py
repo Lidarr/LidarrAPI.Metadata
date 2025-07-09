@@ -21,14 +21,15 @@ import Levenshtein
 
 import lidarrmetadata
 from lidarrmetadata import api
+from lidarrmetadata.api import execute_async_tasks_with_timeout
 from lidarrmetadata import chart
 from lidarrmetadata import config
 from lidarrmetadata import provider
 from lidarrmetadata import util
+from lidarrmetadata.async_tracker import operation_tracker
+from lidarrmetadata.async_settings import get_timeout
 
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logger.setLevel(logging.INFO)
 logger.info('Have app logger')
 
 app = Quart(__name__)
@@ -159,12 +160,28 @@ async def get_artist_info_route(mbid):
     if uuid_validation_response:
         return uuid_validation_response
     
-    artist_task = asyncio.create_task(api.get_artist_info(mbid))
-    albums_task = asyncio.create_task(api.get_artist_albums(mbid))
-
-    artist, expiry = await artist_task
-
-    albums = await albums_task
+    # Use utility function for timeout handling
+    artist_coroutine = api.get_artist_info(mbid)
+    albums_coroutine = api.get_artist_albums(mbid)
+    
+    results, valid_indices = await execute_async_tasks_with_timeout(
+        [artist_coroutine, albums_coroutine],
+        timeout=10,
+        task_name="artist_info",
+        default_result=(None, provider.utcnow())
+    )
+    
+    # Extract artist info (first task)
+    if 0 in valid_indices and results[0] is not None:
+        artist, expiry = results[0]
+    else:
+        abort(504, 'Artist info request timed out or failed')
+    
+    # Extract albums (second task)
+    if 1 in valid_indices and results[1] is not None:
+        albums = results[1]
+    else:
+        albums = []
         
     # Filter release group types
     # This will soon happen client side but keep around until api version is bumped for older clients
@@ -207,7 +224,19 @@ async def get_release_group_info_route(mbid):
     if uuid_validation_response:
         return uuid_validation_response
     
-    output, expiry = await api.get_release_group_info(mbid)
+    # Use utility function for timeout handling
+    results, valid_indices = await execute_async_tasks_with_timeout(
+        [api.get_release_group_info(mbid)],
+        timeout=get_timeout("album_info"),
+        task_name="album_info",
+        default_result=(None, provider.utcnow())
+    )
+    
+    # Extract album info
+    if 0 in valid_indices and results[0] is not None:
+        output, expiry = results[0]
+    else:
+        abort(504, 'Album info request timed out or failed')
     
     return await add_cache_control_header(jsonify(output), expiry)
 
@@ -333,7 +362,15 @@ async def get_album_search_results(query, limit, include_tracks, artist_name):
                 return None, -1, provider.utcnow()
             
         
-        results = await asyncio.gather(*[get_search_result(item) for item in search_results])
+        # Use utility function for timeout handling
+        search_coroutines = [get_search_result(item) for item in search_results]
+        results, _ = await execute_async_tasks_with_timeout(
+            search_coroutines,
+            timeout=10,
+            task_name="album_search",
+            default_result=(None, -1, provider.utcnow())
+        )
+        
         albums = [result[0] for result in results if result[0]]
 
         # Current versions of lidarr will fail trying to parse the tracks contained in releases
@@ -407,8 +444,15 @@ async def get_artist_search_results(query, limit):
         except api.ArtistNotFoundException:
             return None, -1, provider.utcnow()
 
-    results = await asyncio.gather(*[get_search_result(item['Id'], item['Score']) for item in artist_ids])
+    done, pending = await asyncio.wait(
+        [get_search_result(item['Id'], item['Score']) for item in artist_ids], 
+        timeout=10
+        )
+    logger.debug("Got artist search results", extra={'query': query, 'results': len(done), 'pending': len(pending)})
+    for task in pending:
+        task.cancel()
 
+    results = [task.result() for task in done if not task.cancelled()]
     artists = [result[0] for result in results if result[0]]
     scores = [result[1] for result in results if result[0]]
     validity = min([result[2] for result in results if result[0]] or [provider.utcnow()])
@@ -422,12 +466,29 @@ async def search_all():
     limit = request.args.get('limit', default=10, type=int)
     limit = None if limit < 1 else limit
 
-    results = await asyncio.gather(
+    # Use timeout utility for search operations
+    search_operations = [
         get_artist_search_results(query, limit),
         get_album_search_results(query, limit, True, None)
+    ]
+    
+    results, valid_indices = await execute_async_tasks_with_timeout(
+        search_operations,
+        timeout=get_timeout("search_all"),
+        task_name="search_all",
+        default_result=([], [], provider.utcnow())
     )
-    artists, artist_scores, artist_validity = results[0]
-    albums, album_scores, album_validity = results[1]
+    
+    # Extract results with fallback for failed operations
+    if 0 in valid_indices and results[0]:
+        artists, artist_scores, artist_validity = results[0]
+    else:
+        artists, artist_scores, artist_validity = [], [], provider.utcnow()
+    
+    if 1 in valid_indices and results[1]:
+        albums, album_scores, album_validity = results[1]  
+    else:
+        albums, album_scores, album_validity = [], [], provider.utcnow()
     validity = min(artist_validity, album_validity)
 
     artist_items = [{'score': artist_scores[i],
@@ -453,9 +514,24 @@ async def search_fingerprint():
     album_provider = provider.get_providers_implementing(provider.ReleaseGroupByIdMixin)[0]
     album_ids = await album_provider.get_release_groups_by_recording_ids(ids)
 
-    results = await asyncio.gather(*[api.get_release_group_info(id) for id in album_ids])
-    albums = [result[0] for result in results]
-    validity = min([result[1] for result in results] or [provider.utcnow()])
+    # Use timeout utility for album info gathering
+    album_coroutines = [api.get_release_group_info(id) for id in album_ids]
+    results, valid_indices = await execute_async_tasks_with_timeout(
+        album_coroutines,
+        timeout=get_timeout("fingerprint_search"),
+        task_name="fingerprint_search",
+        default_result=(None, provider.utcnow())
+    )
+    
+    # Extract valid results
+    albums = []
+    validities = []
+    for i, result in enumerate(results):
+        if i in valid_indices and result and result[0]:
+            albums.append(result[0])
+            validities.append(result[1])
+    
+    validity = min(validities or [provider.utcnow()])
 
     return await add_cache_control_header(jsonify(albums), validity)
 
