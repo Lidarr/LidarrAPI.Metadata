@@ -54,8 +54,9 @@ To set up the search index triggers, run::
 
 To set up the search indices, run::
 
-  docker-compose run --rm musicbrainz fetch-dump.sh search
-  docker-compose run --rm search load-search-indexes.sh --force
+  docker compose exec search fetch-backup-archives
+  docker compose exec search load-backup-archives
+
 
 The database / search indices are now in line with the latest musicbrainz weekly dump.  To enable replication, set the brainzcode and run::
 
@@ -69,7 +70,6 @@ Next create the extra indices lidarr needs in::
 
 Then you need to set up the lidarr cache::
 
-  docker-compose up -d cache-db
   docker-compose run --rm crawler 
   
 - `docker-compose.yml` defines the base services required - the musicbrainz database, server, solr and supporting services.
