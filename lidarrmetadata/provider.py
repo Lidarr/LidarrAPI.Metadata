@@ -809,7 +809,7 @@ class FanArtTvProvider(HttpProvider,
         if url[-1] != '/':
             url += '/'
         url += mbid
-        url += '/?api_key={api_key}'.format(api_key=self._api_key)
+        url += '?api_key={api_key}'.format(api_key=self._api_key)
         return url
 
     @staticmethod
